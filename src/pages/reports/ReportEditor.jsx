@@ -116,8 +116,8 @@ export default function ReportEditor() {
             <Field label="Class name" hint="Optional, e.g. Secondary"><TextInput value={report.class_name} onChange={(v) => patchReport({ class_name: v })} disabled={!homeroomOk} /></Field>
             <Field label="Printed language"><Select value={report.lang || 'en'} onChange={(v) => patchReport({ lang: v })} disabled={!homeroomOk} options={[{ value: 'en', label: 'English' }, { value: 'bi', label: 'English + Vietnamese' }]} /></Field>
           </div>
-          <Field label="This period at a glance" className="mt-3" right={`${wordCount(report.glance)} words · about 60 fits`}>
-            <TextArea rows={3} value={report.glance} onChange={(v) => patchReport({ glance: v })} disabled={!homeroomOk} placeholder={`How has ${student?.nickname || 'the student'} settled in and approached learning this period?`} />
+          <Field label="This period at a glance" className="mt-3" right={`${wordCount(report.glance)} words · about 40 fits`}>
+            <TextArea rows={2} value={report.glance} onChange={(v) => patchReport({ glance: v })} disabled={!homeroomOk} placeholder={`How has ${student?.nickname || 'the student'} settled in and approached learning this period?`} />
           </Field>
         </Card>
 
@@ -160,8 +160,8 @@ export default function ReportEditor() {
           </div>
         </Card>
 
-        <Card title="Homeroom teacher note" locked={!homeroomOk}>
-          <Field label="Note" right={`${wordCount(report.homeroom_note)} words · about 120 fits`}><TextArea rows={5} value={report.homeroom_note} onChange={(v) => patchReport({ homeroom_note: v })} disabled={!homeroomOk} /></Field>
+        <Card title="Homeroom teacher note" locked={!homeroomOk} subtitle="Prints inside the 'at a glance' box on the report.">
+          <Field label="Note" right={`${wordCount(report.homeroom_note)} words · about 60 fits`}><TextArea rows={3} value={report.homeroom_note} onChange={(v) => patchReport({ homeroom_note: v })} disabled={!homeroomOk} /></Field>
           {bi && <Field label="Vietnamese" className="mt-3"><TextArea rows={5} value={report.homeroom_note_vi} onChange={(v) => patchReport({ homeroom_note_vi: v })} disabled={!homeroomOk} /></Field>}
         </Card>
 
@@ -225,7 +225,7 @@ function SubjectCard({ section: s, settings, levels, bi, editable, onPatch, coho
           )}
         </div>
         <div className="space-y-3">
-          <Field label="Teacher comment" right={`${wordCount(s.comment)} words · about ${compact ? 45 : 90} fits`}>
+          <Field label="Teacher comment" right={`${wordCount(s.comment)} words · about ${compact ? 25 : 55} fits`}>
             <TextArea rows={compact ? 3 : 5} value={s.comment} onChange={(v) => onPatch({ comment: v })} disabled={!editable} placeholder="Strengths, progress and evidence from this period…" />
           </Field>
           {bi && <Field label="Vietnamese"><TextArea rows={compact ? 3 : 5} value={s.comment_vi} onChange={(v) => onPatch({ comment_vi: v })} disabled={!editable} /></Field>}
