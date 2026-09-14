@@ -5,7 +5,7 @@ import { useData } from '../../lib/DataContext'
 import { useAuth } from '../../lib/AuthContext'
 import { db, genId } from '../../lib/db'
 import { loadReportBundle } from '../../lib/report/loaders'
-import { subjectByKey, completion, wordCount, levelInfo } from '../../lib/report/utils'
+import { subjectByKey, completion, wordCount, levelInfo, hasNum } from '../../lib/report/utils'
 import { Card, Field, TextInput, TextArea, NumberInput, Select, Checkbox, Spinner, LevelPicker, SaveState, BulletList, ReportStatusChip } from '../../components/ui'
 import { Icon } from '../../components/report/icons'
 import ReportDocument from '../../components/report/ReportDocument'
@@ -160,7 +160,7 @@ export default function ReportEditor() {
           </div>
         </Card>
 
-        <Card title="Homeroom teacher note" locked={!homeroomOk} subtitle="Prints inside the 'at a glance' box on the report.">
+        <Card title="Homeroom teacher note" locked={!homeroomOk} subtitle="Prints in the Homeroom Teacher Comment box on the report.">
           <Field label="Note" right={`${wordCount(report.homeroom_note)} words · about 60 fits`}><TextArea rows={3} value={report.homeroom_note} onChange={(v) => patchReport({ homeroom_note: v })} disabled={!homeroomOk} /></Field>
           {bi && <Field label="Vietnamese" className="mt-3"><TextArea rows={5} value={report.homeroom_note_vi} onChange={(v) => patchReport({ homeroom_note_vi: v })} disabled={!homeroomOk} /></Field>}
         </Card>
@@ -197,29 +197,37 @@ function SubjectCard({ section: s, settings, levels, bi, editable, onPatch, coho
   const sub = subjectByKey(settings, s.subject_key)
   const [showNote, setShowNote] = useState(false)
   const scored = sub.scored !== false && !compact
+  const handleRawScore = (raw) => {
+    const patch = { score_raw: raw }
+    const m = raw.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/)
+    if (m && parseFloat(m[2]) > 0) {
+      patch.score_pct = Math.round((parseFloat(m[1]) / parseFloat(m[2])) * 100)
+      if (cohortAvg != null && !hasNum(s.class_avg)) patch.class_avg = cohortAvg
+    }
+    onPatch(patch)
+  }
   return (
     <Card locked={!editable} className="!p-4" title={<span className="flex items-center gap-2"><Icon name={sub.icon} size={18} className="text-pra-navy" /> {sub.name}</span>}
       actions={editable && !s.teacher_name && signName ? <button className="btn-ghost text-xs" onClick={() => onPatch({ teacher_name: signName })}>Sign as {signName}</button> : null}>
       <div className="grid gap-4 lg:grid-cols-[auto_1fr]">
         <div className="space-y-3">
           <div>
-            <div className="label">Previous level</div>
-            <LevelPicker size="sm" levels={levels} value={s.level_prev} disabled={!editable} onChange={(v) => onPatch({ level_prev: v })} />
-          </div>
-          <div>
-            <div className="label">This period</div>
+            <div className="label">Level this period</div>
             <LevelPicker levels={levels} value={s.level} disabled={!editable} onChange={(v) => onPatch({ level: v })} />
-            <div className="mt-1 text-xs text-slate-500">{levelInfo(settings, s.level)?.name || 'Not yet assessed'}</div>
+            <div className="mt-1 text-xs text-slate-500">
+              {levelInfo(settings, s.level)?.name || 'Not yet assessed'}
+              {s.level_prev != null && <span className="ml-2 text-slate-400">(prev: {levelInfo(settings, s.level_prev)?.name || '—'})</span>}
+            </div>
           </div>
           {scored && (
             <div className="space-y-2 rounded-lg bg-slate-50 p-2">
               <div className="label !mb-0">Progress review score</div>
               <div className="grid grid-cols-2 gap-2">
-                <Field label="Raw"><TextInput value={s.score_raw} onChange={(v) => onPatch({ score_raw: v })} disabled={!editable} placeholder="45/50" /></Field>
-                <Field label="%"><NumberInput value={s.score_pct} onChange={(v) => onPatch({ score_pct: v })} disabled={!editable} min={0} max={100} /></Field>
+                <Field label="Raw score"><TextInput value={s.score_raw} onChange={handleRawScore} disabled={!editable} placeholder="45/50" /></Field>
+                <Field label="%" hint="Auto from raw"><NumberInput value={s.score_pct} onChange={(v) => onPatch({ score_pct: v })} disabled={!editable} min={0} max={100} /></Field>
               </div>
-              <Field label="Class reference %" right={cohortAvg != null ? <button type="button" className="font-semibold text-pra-blue" disabled={!editable} onClick={() => onPatch({ class_avg: cohortAvg })}>use {cohortAvg}%</button> : 'no cohort scores yet'}>
-                <NumberInput value={s.class_avg} onChange={(v) => onPatch({ class_avg: v })} disabled={!editable} min={0} max={100} />
+              <Field label="Class average %" hint={cohortAvg != null ? `Cohort: ${cohortAvg}%` : 'no cohort scores yet'}>
+                <NumberInput value={hasNum(s.class_avg) ? s.class_avg : cohortAvg ?? ''} onChange={(v) => onPatch({ class_avg: v })} disabled={!editable} min={0} max={100} />
               </Field>
             </div>
           )}

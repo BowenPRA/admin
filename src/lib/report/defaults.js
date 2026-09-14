@@ -78,6 +78,6 @@ export const DEFAULT_REPORT_SETTINGS = {
   templates: TEMPLATES,
   signatures: [
     { role: 'Homeroom Teacher', name: '' },
-    { role: 'Head Teacher', name: '' },
+    { role: 'Head Teacher', name: 'Mr. Seth' },
   ],
 }

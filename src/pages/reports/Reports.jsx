@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Printer, Trash2, RefreshCw, ExternalLink, Settings, ArrowRight } from 'lucide-react'
+import { Plus, Printer, Trash2, RefreshCw, ExternalLink, Settings, ArrowRight, Database } from 'lucide-react'
 import { useData } from '../../lib/DataContext'
 import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
 import { loadPreviousSections } from '../../lib/report/loaders'
 import { buildReport, buildSections, completion, cohortAverages, templateForYearGroup, fmtDate, subjectByKey, currentPeriod } from '../../lib/report/utils'
+import { photoSrc } from '../../lib/report/photo'
 import { Card, Field, Select, Checkbox, Modal, Empty, Spinner, ReportStatusChip, TextInput } from '../../components/ui'
+import { seedYear7 } from '../../lib/seedYear7'
+
+function studentAge(dob) {
+  if (!dob) return null
+  const d = new Date(dob)
+  const now = new Date()
+  let age = now.getFullYear() - d.getFullYear()
+  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age--
+  return age
+}
 
 export default function Reports() {
   const { reportSettings, loading } = useData()
@@ -30,6 +41,7 @@ function ReportsList({ settings }) {
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
+  const [seeding, setSeeding] = useState(false)
 
   const load = useCallback(() => setReloadKey((k) => k + 1), [])
   useEffect(() => {
@@ -80,6 +92,7 @@ function ReportsList({ settings }) {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-auto text-2xl font-black text-slate-800">Progress reports <span className="text-base font-normal text-slate-400">{settings.schoolYear}</span></h1>
         {isHead && <Link to="/reports/settings" className="btn-secondary"><Settings size={16} /> Report settings</Link>}
+        {isHead && <button className="btn-secondary" disabled={seeding} onClick={async () => { setSeeding(true); try { const r = await seedYear7(); alert(r.msg); load() } catch (e) { alert(e.message) } finally { setSeeding(false) } }}><Database size={16} /> {seeding ? 'Seeding…' : 'Seed Year 7 demo'}</button>}
         {isHead && <button className="btn-green" onClick={() => setCreating(true)}><Plus size={16} /> Create reports</button>}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -115,14 +128,23 @@ function ReportsList({ settings }) {
           </div>
         )}>
           <table className="w-full text-sm">
-            <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2">Student</th><th>Completion</th><th>Status</th><th>Updated</th><th></th></tr></thead>
+            <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2">Student</th><th>Grade</th><th>Age</th><th>Completion</th><th>Status</th><th>Updated</th><th></th></tr></thead>
             <tbody>
               {list.map((r) => {
                 const student = students.find((s) => s.id === r.student_id)
                 const c = completion(r, sections.filter((s) => s.report_id === r.id))
+                const photo = photoSrc(student?.photo)
+                const age = studentAge(student?.dob)
                 return (
                   <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50">
-                    <td className="py-2"><Link to={`/reports/${r.id}`} className="font-semibold text-slate-800 hover:text-pra-blue">{student?.full_name || r.student_name}</Link>{student?.nickname && <span className="ml-1 text-xs text-slate-400">“{student.nickname}”</span>}</td>
+                    <td className="py-2">
+                      <Link to={`/reports/${r.id}`} className="flex items-center gap-2 font-semibold text-slate-800 hover:text-pra-blue">
+                        {photo ? <img src={photo} alt="" className="h-7 w-7 rounded-full object-cover flex-none" /> : <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-400 flex-none">{(student?.nickname || r.student_name || '?')[0]}</span>}
+                        <span>{student?.full_name || r.student_name}{student?.nickname && <span className="ml-1 text-xs font-normal text-slate-400">"{student.nickname}"</span>}</span>
+                      </Link>
+                    </td>
+                    <td className="text-xs text-slate-500">{student?.level || r.year_group}</td>
+                    <td className="text-xs text-slate-500">{age != null ? age : '—'}</td>
                     <td><div className="flex items-center gap-2"><div className="h-2 w-28 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-pra-green" style={{ width: `${c.pct}%` }} /></div><span className="text-xs text-slate-500">{c.pct}%</span></div></td>
                     <td><ReportStatusChip status={r.status} /></td>
                     <td className="text-xs text-slate-500">{fmtDate(r.updated_at)}</td>

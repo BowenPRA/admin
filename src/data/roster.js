@@ -17,7 +17,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/sophia.jpg"
   },
   {
     "student_code": "BLE0077",
@@ -35,7 +36,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": ""
   },
   {
     "student_code": "BLE0078",
@@ -53,7 +55,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": ""
   },
   {
     "student_code": "PAL0134",
@@ -71,7 +74,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": ""
   },
   {
     "student_code": "PAL0125",
@@ -89,7 +93,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/gia_linh.jpg"
   },
   {
     "student_code": "PAL0126",
@@ -107,7 +112,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/quang_minh.jpg"
   },
   {
     "student_code": "PAL0110",
@@ -125,7 +131,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/louis_c.jpg"
   },
   {
     "student_code": "PAL0052",
@@ -143,7 +150,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/sunny.jpg"
   },
   {
     "student_code": "PAL0072",
@@ -161,7 +169,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/gin.jpg"
   },
   {
     "student_code": "PAL0077",
@@ -179,7 +188,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/helios.jpg"
   },
   {
     "student_code": "PAL0070",
@@ -197,7 +207,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/bống.jpg"
   },
   {
     "student_code": "PAL0090",
@@ -215,7 +226,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/mía.jpg"
   },
   {
     "student_code": "PAL0122",
@@ -233,7 +245,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/mít.jpg"
   },
   {
     "student_code": "PAL0123",
@@ -251,7 +264,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/coffee.jpg"
   },
   {
     "student_code": "PAL0137",
@@ -269,7 +283,8 @@ export const ROSTER = [
     "allergies": "Vegeterian",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/anaya.jpg"
   },
   {
     "student_code": "PAL0130",
@@ -287,7 +302,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": ""
   },
   {
     "student_code": "PAL0067",
@@ -305,7 +321,8 @@ export const ROSTER = [
     "allergies": "Hạn chế đường, nước đá, kem chống nắng",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/bob.jpg"
   },
   {
     "student_code": "PAL0035",
@@ -323,7 +340,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/chom_chom.jpg"
   },
   {
     "student_code": "PAL0135",
@@ -341,7 +359,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": ""
   },
   {
     "student_code": "PAL0026",
@@ -359,7 +378,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/bơ.jpg"
   },
   {
     "student_code": "PAL0066",
@@ -377,7 +397,8 @@ export const ROSTER = [
     "allergies": "Hạn chế ăn đường, đá và dị ứng kem chống nắng",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/bo.jpg"
   },
   {
     "student_code": "PAL0060",
@@ -395,7 +416,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/selena.jpg"
   },
   {
     "student_code": "BLE0055",
@@ -413,7 +435,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/gene.jpg"
   },
   {
     "student_code": "PAL0131",
@@ -431,7 +454,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/margot.jpg"
   },
   {
     "student_code": "PAL0136",
@@ -449,7 +473,8 @@ export const ROSTER = [
     "allergies": "Alergy to: Amoxicillin (Kháng sinh)",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/oliver.jpg"
   },
   {
     "student_code": "PAL0024",
@@ -467,7 +492,8 @@ export const ROSTER = [
     "allergies": "Con không ăn hải sản và tôm, nước đậu xanh",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/goku.jpg"
   },
   {
     "student_code": "PAL0051",
@@ -485,7 +511,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/lily.jpg"
   },
   {
     "student_code": "PAL0007",
@@ -503,7 +530,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/amada.jpg"
   },
   {
     "student_code": "PAL0108",
@@ -521,7 +549,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/su.jpg"
   },
   {
     "student_code": "PAL0054",
@@ -539,7 +568,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/ana.jpg"
   },
   {
     "student_code": "BLE0056",
@@ -557,7 +587,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/hunter.jpg"
   },
   {
     "student_code": "PAL0018",
@@ -575,7 +606,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/erica.jpg"
   },
   {
     "student_code": "PAL0011",
@@ -593,7 +625,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/carrot.jpg"
   },
   {
     "student_code": "PAL0006",
@@ -611,7 +644,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/nấm.jpg"
   },
   {
     "student_code": "PAL0138",
@@ -629,7 +663,8 @@ export const ROSTER = [
     "allergies": "Alergy to shellfish even shrimp",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": "Trial Day on  Aug 17, 19, 20"
+    "notes": "Trial Day on  Aug 17, 19, 20",
+    "photo": ""
   },
   {
     "student_code": "PAL0091",
@@ -647,7 +682,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/louis_g.jpg"
   },
   {
     "student_code": "PAL0017",
@@ -665,7 +701,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/khoi.jpg"
   },
   {
     "student_code": "PAL0050",
@@ -683,7 +720,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/angelo.jpg"
   },
   {
     "student_code": "PAL0019",
@@ -701,7 +739,8 @@ export const ROSTER = [
     "allergies": "alergy to shrimp, can not eat vegetables",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/chris.jpg"
   },
   {
     "student_code": "PAL0001",
@@ -719,7 +758,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/jackson.jpg"
   },
   {
     "student_code": "PAL0012",
@@ -737,7 +777,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/kim_long.jpg"
   },
   {
     "student_code": "PAL0097",
@@ -755,7 +796,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/sky.jpg"
   },
   {
     "student_code": "PAL0118",
@@ -773,7 +815,8 @@ export const ROSTER = [
     "allergies": "",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": "photos/martha.jpg"
   },
   {
     "student_code": "PAL0121",
@@ -791,7 +834,8 @@ export const ROSTER = [
     "allergies": "Không ăn được hành tây",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": ""
+    "notes": "",
+    "photo": ""
   },
   {
     "student_code": "BLE0084",
@@ -809,7 +853,8 @@ export const ROSTER = [
     "allergies": "Vegeterian (strickly)",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": "Trial day on Augt 17,18"
+    "notes": "Trial day on Augt 17,18",
+    "photo": ""
   },
   {
     "student_code": "BLE0085",
@@ -827,6 +872,7 @@ export const ROSTER = [
     "allergies": "Vegeterian (strickly)",
     "enrollment_status": "Enrolled",
     "active": true,
-    "notes": "Trial day on Augt 17,18"
+    "notes": "Trial day on Augt 17,18",
+    "photo": ""
   }
 ]

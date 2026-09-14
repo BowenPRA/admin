@@ -1,5 +1,9 @@
-// Shrinks a chosen image to a small square-ish JPEG data URL so student photos
-// can be stored directly on the student row (no storage bucket needed).
+export function photoSrc(photo) {
+  if (!photo) return null
+  if (photo.startsWith('data:') || photo.startsWith('http')) return photo
+  return `${import.meta.env.BASE_URL}${photo}`
+}
+
 export function resizeImage(file, max = 360) {
   return new Promise((resolve, reject) => {
     const img = new Image()

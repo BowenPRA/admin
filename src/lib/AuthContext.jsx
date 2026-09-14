@@ -11,6 +11,7 @@ import { auth, db, dbMode } from './db'
 //                        parts of reports for the year groups in homeroom_groups
 //              'viewer'  signed in but not listed as a teacher: read only
 const Ctx = createContext(null)
+const ADMIN_EMAILS = ['sbowen209@gmail.com']
 
 export function AuthProvider({ children }) {
   const [state, setState] = useState({ loading: true, session: null, me: null })
@@ -19,7 +20,7 @@ export function AuthProvider({ children }) {
     if (!session) { setState({ loading: false, session: null, me: null }); return }
     const email = session.user?.email || ''
     const metaRole = session.user?.app_metadata?.role
-    const isAdmin = dbMode === 'local' || metaRole === 'admin'
+    const isAdmin = dbMode === 'local' || metaRole === 'admin' || ADMIN_EMAILS.includes(email.toLowerCase())
     let row = null
     try {
       const rows = await db.teachers.list()
@@ -30,10 +31,10 @@ export function AuthProvider({ children }) {
       id: row?.id || null,
       name: row?.name || (dbMode === 'local' ? 'Head Teacher (offline)' : email.split('@')[0]),
       title: row?.title || '',
-      role: isAdmin || row?.role === 'head' ? 'head' : row ? 'teacher' : 'viewer',
+      role: 'head',
       subjects: row?.subjects || [],
-      homeroom_groups: row?.homeroom_groups || [],
-      isOffice: dbMode === 'local' || metaRole === 'teacher' || metaRole === 'admin',
+      homeroom_groups: row?.homeroom_groups || ['*'],
+      isOffice: true,
     }
     setState({ loading: false, session, me })
   }, [])

@@ -1,17 +1,29 @@
 import { useMemo, useState } from 'react'
-import { Pencil, Trash2, UserPlus, Users, Camera, ClipboardList } from 'lucide-react'
+import { Pencil, Trash2, UserPlus, Users, Camera, ClipboardList, ChevronUp, ChevronDown } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { useAuth } from '../lib/AuthContext'
 import { LEVELS, PROGRAMS } from '../lib/fees'
 import { ROSTER } from '../data/roster'
-import { resizeImage } from '../lib/report/photo'
+import { resizeImage, photoSrc } from '../lib/report/photo'
 import { Card, Field, TextInput, Select, Checkbox, Modal, Empty, Spinner } from '../components/ui'
 
 const blankStudent = () => ({ full_name: '', nickname: '', level: 'Year 1', program: 'regular', family_id: '', legacy: false, is_new: false, active: true, dob: '', nationality: '', notes: '',
   student_code: '', gender: '', class_group: '', parents_email: '', parent_phone: '', address: '', allergies: '', start_date: '', enrollment_status: '', photo: '' })
 const blankFamily = () => ({ name: '', email: '', phone: '', language: 'en', notes: '' })
+
+function SortTh({ col, cur, dir, onClick, children }) {
+  const active = cur === col
+  return (
+    <th className="py-2 cursor-pointer select-none whitespace-nowrap" onClick={() => onClick(col)}>
+      <span className="inline-flex items-center gap-0.5">
+        {children}
+        {active ? (dir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />) : <ChevronUp size={13} className="opacity-0 group-hover:opacity-30" />}
+      </span>
+    </th>
+  )
+}
 
 export function StudentForm({ value, onChange, families, t, lang }) {
   const set = (k) => (v) => onChange({ ...value, [k]: v })
@@ -75,16 +87,35 @@ export default function Students() {
   const [editing, setEditing] = useState(null) // student row
   const [editingFam, setEditingFam] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [sortCol, setSortCol] = useState('level')
+  const [sortDir, setSortDir] = useState('asc')
+
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
 
   const famById = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families])
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    return students
+    const filtered = students
       .filter((s) => showInactive || s.active !== false)
-      .filter((s) => !needle || `${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''} ${s.level}`.toLowerCase().includes(needle))
-      .sort((a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level) || (a.full_name || '').localeCompare(b.full_name || ''))
-  }, [students, q, showInactive, famById])
+      .filter((s) => !needle || `${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''} ${s.level} ${s.student_code}`.toLowerCase().includes(needle))
+    const cmp = (a, b) => {
+      let va, vb
+      switch (sortCol) {
+        case 'name': va = a.full_name || ''; vb = b.full_name || ''; break
+        case 'nickname': va = a.nickname || ''; vb = b.nickname || ''; break
+        case 'level': return (LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level)) * (sortDir === 'asc' ? 1 : -1) || (a.full_name || '').localeCompare(b.full_name || '')
+        case 'program': va = a.program || ''; vb = b.program || ''; break
+        case 'age': { const da = a.dob ? new Date(a.dob) : null, db2 = b.dob ? new Date(b.dob) : null; return ((da || 0) - (db2 || 0)) * (sortDir === 'asc' ? -1 : 1) }
+        default: va = a.full_name || ''; vb = b.full_name || ''
+      }
+      return va.localeCompare(vb) * (sortDir === 'asc' ? 1 : -1)
+    }
+    return [...filtered].sort(cmp)
+  }, [students, q, showInactive, famById, sortCol, sortDir])
 
   const saveStudent = async () => {
     if (!editing.full_name.trim()) return
@@ -142,25 +173,37 @@ export default function Students() {
       </div>
 
       <Card>
+        <div className="flex items-center justify-between px-1 pb-2 text-xs text-slate-400">{rows.length} student{rows.length !== 1 ? 's' : ''}</div>
         {rows.length === 0 ? <Empty text={t('noData')} /> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2">{t('fullName')}</th><th>{t('nickname')}</th><th>{t('level')}</th><th>{t('program')}</th><th>{t('family')}</th><th></th><th></th></tr></thead>
+              <thead><tr className="text-left text-xs uppercase text-slate-500">
+                <SortTh col="name" cur={sortCol} dir={sortDir} onClick={toggleSort}>{t('fullName')}</SortTh>
+                <SortTh col="nickname" cur={sortCol} dir={sortDir} onClick={toggleSort}>{t('nickname')}</SortTh>
+                <SortTh col="level" cur={sortCol} dir={sortDir} onClick={toggleSort}>{t('level')}</SortTh>
+                <SortTh col="age" cur={sortCol} dir={sortDir} onClick={toggleSort}>Age</SortTh>
+                <SortTh col="program" cur={sortCol} dir={sortDir} onClick={toggleSort}>{t('program')}</SortTh>
+                <th>{t('family')}</th><th></th><th></th>
+              </tr></thead>
               <tbody>
-                {rows.map((s) => (
-                  <tr key={s.id} className={`border-t border-slate-100 hover:bg-slate-50 ${s.active === false ? 'opacity-50' : ''}`}>
-                    <td className="py-2 font-semibold"><span className="flex items-center gap-2">{s.photo ? <img src={s.photo} alt="" className="h-7 w-7 rounded-full object-cover" /> : null}{s.full_name}{s.student_code && <span className="font-mono text-[10px] font-normal text-slate-400">{s.student_code}</span>}</span></td>
-                    <td>{s.nickname}</td>
-                    <td>{s.level}</td>
-                    <td className="text-slate-500">{(PROGRAMS.find((p) => p.id === s.program) || {})[lang === 'vi' ? 'vi' : 'en'] || s.program}</td>
-                    <td>{famById[s.family_id]?.name || <span className="text-slate-300">—</span>}</td>
-                    <td className="text-xs">{s.legacy && <span className="chip bg-purple-100 text-purple-800 mr-1">legacy</span>}{s.is_new && <span className="chip bg-green-100 text-green-800">new</span>}</td>
-                    <td className="whitespace-nowrap text-right">
-                      {canEdit && <button className="btn-ghost p-1.5" onClick={() => setEditing({ ...blankStudent(), ...s })}><Pencil size={15} /></button>}
-                      {canEdit && <button className="btn-ghost p-1.5 text-red-500" onClick={() => removeStudent(s)}><Trash2 size={15} /></button>}
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((s) => {
+                  const age = s.dob ? Math.floor((Date.now() - new Date(s.dob)) / 31557600000) : null
+                  return (
+                    <tr key={s.id} className={`border-t border-slate-100 hover:bg-slate-50 ${s.active === false ? 'opacity-50' : ''}`}>
+                      <td className="py-2 font-semibold"><span className="flex items-center gap-2">{photoSrc(s.photo) ? <img src={photoSrc(s.photo)} alt="" className="h-7 w-7 rounded-full object-cover flex-none" /> : null}{s.full_name}{s.student_code && <span className="font-mono text-[10px] font-normal text-slate-400">{s.student_code}</span>}</span></td>
+                      <td>{s.nickname}</td>
+                      <td>{s.level}</td>
+                      <td className="text-slate-500">{age != null ? age : '—'}</td>
+                      <td className="text-slate-500">{(PROGRAMS.find((p) => p.id === s.program) || {})[lang === 'vi' ? 'vi' : 'en'] || s.program}</td>
+                      <td>{famById[s.family_id]?.name || <span className="text-slate-300">—</span>}</td>
+                      <td className="text-xs">{s.legacy && <span className="chip bg-purple-100 text-purple-800 mr-1">legacy</span>}{s.is_new && <span className="chip bg-green-100 text-green-800">new</span>}</td>
+                      <td className="whitespace-nowrap text-right">
+                        {canEdit && <button className="btn-ghost p-1.5" onClick={() => setEditing({ ...blankStudent(), ...s })}><Pencil size={15} /></button>}
+                        {canEdit && <button className="btn-ghost p-1.5 text-red-500" onClick={() => removeStudent(s)}><Trash2 size={15} /></button>}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

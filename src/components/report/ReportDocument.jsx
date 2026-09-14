@@ -1,7 +1,8 @@
 import { Icon } from './icons'
 import TrendChart from './TrendChart'
-import { levelInfo, subjectByKey, avg, firstName, hasNum } from '../../lib/report/utils'
+import { levelInfo, subjectByKey, firstName, hasNum } from '../../lib/report/utils'
 import { fmtDate } from '../../lib/report/utils'
+import { photoSrc } from '../../lib/report/photo'
 
 function Level({ settings, value, name = true }) {
   const l = levelInfo(settings, value)
@@ -39,15 +40,26 @@ export default function ReportDocument({ report, sections, student, settings, hi
   const refFor = (s) => (hasNum(s.class_avg) ? Number(s.class_avg) : cohortAvg[s.subject_key] ?? null)
   const periods = (settings.periods || []).map((p) => ({ label: p.label, short: p.label.replace(/Quarter/i, 'Q').replace(/Semester/i, 'S').replace(/Term/i, 'T') }))
   const bundleFor = (idx) => history.find((h) => Number(h.report.period_index) === idx)
-  const seriesStudent = (settings.periods || []).map((p) => {
-    const h = bundleFor(p.index); if (!h) return null
-    return avg(h.sections.filter((s) => scoredKeys.includes(s.subject_key)).map((s) => s.score_pct))
+
+  const noteFor = (key) => courseNotes.find((n) => n.subject_key === key)
+
+  const CHART_COLORS = ['#6f9f2f', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6']
+  const chartSeries = scoredKeys.map((key, i) => {
+    const sub = subjectByKey(settings, key)
+    const studentScores = (settings.periods || []).map((p) => {
+      const h = bundleFor(p.index); if (!h) return null
+      const sec = h.sections.find((x) => x.subject_key === key)
+      return sec && hasNum(sec.score_pct) ? Number(sec.score_pct) : null
+    })
+    const refScores = (settings.periods || []).map((p) => {
+      const h = bundleFor(p.index); if (!h) return null
+      const sec = h.sections.find((x) => x.subject_key === key)
+      if (!sec) return null
+      return h.report.id === report.id ? refFor(sec) : (hasNum(sec.class_avg) ? Number(sec.class_avg) : null)
+    })
+    return { name: sub.name, color: CHART_COLORS[i % CHART_COLORS.length], student: studentScores, reference: refScores }
   })
-  const seriesRef = (settings.periods || []).map((p) => {
-    const h = bundleFor(p.index); if (!h) return null
-    return avg(h.sections.filter((s) => scoredKeys.includes(s.subject_key)).map((s) => (h.report.id === report.id ? refFor(s) : s.class_avg)))
-  })
-  const anyScore = seriesStudent.some((v) => v != null)
+  const anyScore = chartSeries.some((s) => s.student.some((v) => v != null))
   const closing = (org.closing || '').replace('{nickname}', nick).replace('{name}', student?.full_name || '')
 
   return (
@@ -71,11 +83,11 @@ export default function ReportDocument({ report, sections, student, settings, hi
           </div>
         </header>
 
-        {/* ---- student info + at a glance (with homeroom note) ---- */}
+        {/* ---- student info + homeroom teacher comment ---- */}
         <section style={{ display: 'grid', gridTemplateColumns: '1fr 1.9fr', gap: 7, alignItems: 'stretch' }}>
           <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-            {student?.photo
-              ? <img className="photo" src={student.photo} alt="" style={{ width: '18mm', height: '18mm' }} />
+            {photoSrc(student?.photo)
+              ? <img className="photo" src={photoSrc(student.photo)} alt="" style={{ width: '18mm', height: '18mm' }} />
               : <div className="photo placeholder" style={{ width: '18mm', height: '18mm', fontSize: '14pt' }}>{initials}</div>}
             <div>
               <div style={{ fontWeight: 900, fontSize: '11pt', lineHeight: 1.1 }}>{student?.full_name}</div>
@@ -85,16 +97,10 @@ export default function ReportDocument({ report, sections, student, settings, hi
             </div>
           </div>
           <div className="box" style={{ background: '#eef4fb', borderColor: '#cfe0f3', padding: '5px 8px' }}>
-            <div className="kicker" style={{ color: 'var(--navy)', fontSize: '7pt' }}>This period at a glance{bi ? ' · Tổng quan' : ''}</div>
-            <div style={{ marginTop: 2, fontSize: '8pt', whiteSpace: 'pre-line', lineHeight: 1.3 }}>{report.glance || <span className="muted">—</span>}</div>
-            {(report.homeroom_note || '').trim() && (
-              <div style={{ marginTop: 3, borderTop: '1px solid #cfe0f3', paddingTop: 3 }}>
-                <span style={{ fontSize: '6.5pt', fontWeight: 700, color: 'var(--navy)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Homeroom note{bi ? ' · Nhận xét GVCN' : ''}: </span>
-                <span style={{ fontSize: '8pt', lineHeight: 1.3 }}>
-                  <Bi en={report.homeroom_note} vi={report.homeroom_note_vi} bi={bi} />
-                </span>
-              </div>
-            )}
+            <div className="kicker" style={{ color: 'var(--navy)', fontSize: '7pt' }}>Homeroom Teacher Comment{bi ? ' · Nhận xét GVCN' : ''}</div>
+            <div style={{ marginTop: 2, fontSize: '8pt', whiteSpace: 'pre-line', lineHeight: 1.3 }}>
+              <Bi en={report.homeroom_note || <span className="muted">—</span>} vi={report.homeroom_note_vi} bi={bi} />
+            </div>
           </div>
         </section>
 
@@ -103,15 +109,16 @@ export default function ReportDocument({ report, sections, student, settings, hi
           <div className="sec-h" style={{ fontSize: '8.5pt', padding: '3px 8px' }}><span>Academic Learning{bi && <span className="sub"> · Học tập</span>}</span></div>
           <table>
             <thead><tr>
-              <th style={{ width: '17%' }}>Learning area</th>
-              <th style={{ width: '9%', textAlign: 'center' }}>Level</th>
-              {showScores && <th style={{ width: '9%', textAlign: 'center' }}>Score</th>}
+              <th style={{ width: '13%' }}>Learning area</th>
+              <th style={{ width: '6%', textAlign: 'center' }}>Level</th>
+              {showScores && <th style={{ width: '6%', textAlign: 'center' }}>Score</th>}
               <th>Comment &amp; next focus</th>
             </tr></thead>
             <tbody>
               {academic.map((s) => {
                 const sub = subjectByKey(settings, s.subject_key)
                 const ref = refFor(s)
+                const note = noteFor(s.subject_key)
                 return (
                   <tr key={s.id}>
                     <td style={{ padding: '4px 5px' }}>
@@ -123,18 +130,23 @@ export default function ReportDocument({ report, sections, student, settings, hi
                         </div>
                       </div>
                     </td>
-                    <td style={{ textAlign: 'center', padding: '4px 3px' }}>
+                    <td style={{ textAlign: 'center', padding: '4px 2px' }}>
                       <Level settings={settings} value={s.level} />
                     </td>
                     {showScores && (
-                      <td style={{ textAlign: 'center', padding: '4px 3px' }}>
+                      <td style={{ textAlign: 'center', padding: '4px 2px' }}>
                         {scoredKeys.includes(s.subject_key) ? (<>
-                          <div style={{ fontWeight: 900, fontSize: '10pt', color: 'var(--navy)' }}>{hasNum(s.score_pct) ? `${s.score_pct}%` : '—'}</div>
+                          <div style={{ fontWeight: 900, fontSize: '9pt', color: 'var(--navy)' }}>{hasNum(s.score_pct) ? `${s.score_pct}%` : '—'}</div>
                           {ref != null && <div className="muted" style={{ fontSize: '6pt' }}>class {ref}%</div>}
                         </>) : <span className="muted">—</span>}
                       </td>
                     )}
                     <td style={{ fontSize: '8pt', padding: '4px 5px', lineHeight: 1.3 }}>
+                      {note?.description && (
+                        <div style={{ fontSize: '7pt', color: 'var(--muted)', marginBottom: 2, fontStyle: 'italic', lineHeight: 1.2 }}>
+                          <b style={{ fontStyle: 'normal' }}>Topics:</b> {note.description}
+                        </div>
+                      )}
                       <Bi en={s.comment || <span className="muted">—</span>} vi={s.comment_vi} bi={bi} />
                       {s.next_focus && <div style={{ marginTop: 1 }}><b>Next:</b> {s.next_focus}</div>}
                     </td>
@@ -145,11 +157,29 @@ export default function ReportDocument({ report, sections, student, settings, hi
           </table>
         </section>
 
+        {/* ---- academic progress charts (one per subject) ---- */}
+        {showScores && anyScore && (
+          <section style={{ padding: '3px 0' }}>
+            <div className="kicker" style={{ fontSize: '6.5pt', marginBottom: 3 }}>Academic Progress Review{bi ? ' · Tiến bộ học tập' : ''}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${chartSeries.length}, 1fr)`, gap: 6 }}>
+              {chartSeries.map((s) => (
+                <div key={s.name} style={{ border: '1px solid #e5e9ef', borderRadius: 4, padding: '3px 4px' }}>
+                  <div style={{ fontSize: '6.5pt', fontWeight: 700, color: s.color, marginBottom: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <span>{s.name}</span>
+                    <span style={{ fontSize: '5.5pt', color: 'var(--muted)', fontWeight: 400 }}>━ student <span style={{ opacity: 0.45 }}>┄</span> class avg</span>
+                  </div>
+                  <TrendChart periods={periods} series={[s]} width={200} height={70} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* ---- vocational learning ---- */}
         {vocational.length > 0 && (
           <section className="sec">
             <div className="sec-h" style={{ fontSize: '8.5pt', padding: '3px 8px' }}><span>Specialist &amp; Vocational{bi && <span className="sub"> · Chuyên môn</span>}</span></div>
-            <div className="sec-b" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(vocational.length, 5)}, 1fr)`, gap: 4, padding: '4px 6px' }}>
+            <div className="sec-b" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(vocational.length, 3)}, 1fr)`, gap: 4, padding: '4px 6px' }}>
               {vocational.map((s) => {
                 const sub = subjectByKey(settings, s.subject_key)
                 return (
@@ -159,7 +189,7 @@ export default function ReportDocument({ report, sections, student, settings, hi
                       <Level settings={settings} value={s.level} name={false} />
                       <span style={{ fontSize: '6.5pt', fontWeight: 700, color: 'var(--muted)' }}>{levelInfo(settings, s.level)?.name || 'Not yet'}</span>
                     </div>
-                    {(s.comment || '').trim() && <div style={{ fontSize: '7pt', lineHeight: 1.2 }}><Bi en={s.comment} vi={s.comment_vi} bi={bi} /></div>}
+                    {(s.comment || '').trim() && <div style={{ fontSize: '7.5pt', lineHeight: 1.25 }}><Bi en={s.comment} vi={s.comment_vi} bi={bi} /></div>}
                     {s.teacher_name && <div className="muted" style={{ fontSize: '6pt', textAlign: 'right' }}>– {s.teacher_name}</div>}
                   </div>
                 )
@@ -188,8 +218,8 @@ export default function ReportDocument({ report, sections, student, settings, hi
           </div>
         </section>
 
-        {/* ---- experiences + student voice + trend chart ---- */}
-        <section style={{ display: 'grid', gridTemplateColumns: showScores && anyScore ? '1.2fr 1fr 0.7fr' : '1.3fr 1fr', gap: 5 }}>
+        {/* ---- experiences + student voice ---- */}
+        <section style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 5 }}>
           <div>
             <div className="kicker" style={{ marginBottom: 2, fontSize: '6.5pt' }}>Experiences &amp; growth{bi ? ' · Trải nghiệm' : ''}</div>
             <ul className="bullets" style={{ fontSize: '7.5pt' }}>
@@ -201,15 +231,6 @@ export default function ReportDocument({ report, sections, student, settings, hi
             <div className="kicker" style={{ color: '#92400e', fontSize: '6.5pt' }}>In {nick}'s words</div>
             <div className="quote" style={{ marginTop: 2, fontSize: '8.5pt' }}>{report.student_voice ? `"${report.student_voice}"` : '—'}</div>
           </div>
-          {showScores && anyScore && (
-            <div>
-              <div style={{ display: 'flex', gap: 6, fontSize: '6pt', marginBottom: 1, color: 'var(--muted)' }}>
-                <span><span style={{ color: '#6f9f2f' }}>━</span> {nick}</span>
-                <span><span style={{ color: '#9aa5b1' }}>┄</span> Class</span>
-              </div>
-              <TrendChart periods={periods} student={seriesStudent} reference={seriesRef} width={180} height={58} />
-            </div>
-          )}
         </section>
 
         {/* ---- level key (inline) + signatures + footer ---- */}
