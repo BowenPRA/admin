@@ -101,3 +101,44 @@ teachers listed on the Teachers page can edit only their own learning areas.
 These rules are enforced in the database, not just hidden in the interface.
 Report wording, periods, the four progress levels, learning areas, templates and
 learner skills are edited under Progress reports → Report settings.
+
+## Families, Quarter 4 and emailing invoices (added 2026-09-14)
+
+Run [`supabase/updates-2026-09-14.sql`](supabase/updates-2026-09-14.sql) once in
+the SQL editor. It adds `q4_full` to students and the sent-email columns to invoices.
+
+- **Families.** Students → **Group into families** looks at the parents' emails and
+  phone numbers on the student records and proposes one family per set of siblings
+  (language guessed from the children's names; rename or fix anything afterwards).
+  Every student row also has a family dropdown, with "+ New family for this
+  student" at the bottom, and each family has an add-student button.
+- **Quarter 4.** Students enrolled when the 2026-2027 schedule came out pay the
+  reduced Quarter 4 from the fee table. Students added by hand from now on have
+  **Full-price Quarter 4** ticked, so their Q4 equals a normal quarter. Untick it
+  on the student if a newcomer was promised the old terms.
+- **Deleting invoices.** Trash icon on each row of the Invoices list, or tick several
+  and use **Delete selected**. Payments on a deleted invoice go with it.
+- **Send to parents.** On an invoice, **Send to parents** builds the PDF, fills in
+  the parents' addresses from the family / student records and a bilingual
+  message, and emails it from `admin@palmriveracademy.edu.vn`. The invoice is
+  marked sent with the date and recipients. **Download PDF** saves the same file.
+
+### One-time Google setup for direct sending
+
+Without this, the Send button still saves the PDF and opens a Gmail compose
+window with the message filled in; you attach the file by hand.
+
+1. https://console.cloud.google.com → create a project (e.g. "PRA Admin"), signed in
+   as admin@palmriveracademy.edu.vn.
+2. APIs & Services → Library → enable **Gmail API**.
+3. APIs & Services → OAuth consent screen → External, app name "PRA Admin", your
+   email as support/developer contact. Add `admin@palmriveracademy.edu.vn` (and any
+   other office account) under **Test users**. Scopes: add `.../auth/gmail.send`.
+4. APIs & Services → Credentials → Create credentials → **OAuth client ID** →
+   Web application. Authorized JavaScript origins:
+   `http://localhost:5179` and `https://bowenpra.github.io`.
+5. Copy the client ID into `.env` as `VITE_GOOGLE_CLIENT_ID=...`, then
+   `npm run dev` locally or `npm run deploy` to publish.
+
+The first send in a browser session pops up Google's sign-in for the admin@ account
+and asks permission to send mail on its behalf; after that sending is one click.

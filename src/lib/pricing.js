@@ -51,7 +51,13 @@ export function annualTuition(student, plan, fees, item = 'main') {
   if (plan === 'standard') return t.standard
   if (plan === 'earlyBird') return t.earlyBird
   // quarterly and everything else priced off the full-year quarterly total
-  return t.quarter * 3 + t.quarter4
+  return t.quarter * 3 + quarter4For(student, t)
+}
+
+// Students already enrolled when the 2026-2027 schedule was published pay a
+// reduced Quarter 4; students who join later (q4_full) pay a full quarter.
+function quarter4For(student, band) {
+  return student.q4_full ? band.quarter : band.quarter4
 }
 
 function quarterAmounts(student, fees) {
@@ -61,7 +67,7 @@ function quarterAmounts(student, fees) {
     return [a / 4, a / 4, a / 4, a / 4]
   }
   const t = fees.tuition[band]
-  return [t.quarter, t.quarter, t.quarter, t.quarter4]
+  return [t.quarter, t.quarter, t.quarter, quarter4For(student, t)]
 }
 
 export const PERIOD_OPTIONS = [

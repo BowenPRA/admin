@@ -7,9 +7,12 @@ import { useAuth } from '../lib/AuthContext'
 import { LEVELS, PROGRAMS } from '../lib/fees'
 import { ROSTER } from '../data/roster'
 import { resizeImage, photoSrc } from '../lib/report/photo'
+import { proposeFamilies, familyNameFor, looksVietnamese, emailsOf } from '../lib/families'
 import { Card, Field, TextInput, Select, Checkbox, Modal, Empty, Spinner } from '../components/ui'
 
-const blankStudent = () => ({ full_name: '', nickname: '', level: 'Year 1', program: 'regular', family_id: '', legacy: false, is_new: false, active: true, dob: '', nationality: '', notes: '',
+// New students added by hand from now on pay a full-price Quarter 4 (q4_full);
+// the roster loader turns it off for the students already enrolled.
+const blankStudent = () => ({ full_name: '', nickname: '', level: 'Year 1', program: 'regular', family_id: '', legacy: false, is_new: true, q4_full: true, active: true, dob: '', nationality: '', notes: '',
   student_code: '', gender: '', class_group: '', parents_email: '', parent_phone: '', address: '', allergies: '', start_date: '', enrollment_status: '', photo: '' })
 const blankFamily = () => ({ name: '', email: '', phone: '', language: 'en', notes: '' })
 
@@ -57,6 +60,7 @@ export function StudentForm({ value, onChange, families, t, lang }) {
       <div className="sm:col-span-2 flex flex-wrap gap-4">
         <Checkbox checked={value.legacy} onChange={set('legacy')} label={t('legacy')} />
         <Checkbox checked={value.is_new} onChange={set('is_new')} label={t('isNew')} />
+        <Checkbox checked={!!value.q4_full} onChange={set('q4_full')} label={t('q4Full')} />
         <Checkbox checked={value.active !== false} onChange={set('active')} label={t('active')} />
       </div>
       <Field label={t('notes')} className="sm:col-span-2"><TextInput value={value.notes || ''} onChange={set('notes')} /></Field>
@@ -147,7 +151,7 @@ export default function Students() {
     let added = 0, updated = 0
     for (const r of ROSTER) {
       const existing = students.find((s) => (r.student_code && s.student_code === r.student_code) || norm(s.full_name) === norm(r.full_name))
-      if (!existing) { rows.push({ ...blankStudent(), ...r, is_new: false }); added++; continue }
+      if (!existing) { rows.push({ ...blankStudent(), ...r, is_new: false, q4_full: false }); added++; continue }
       const patch = {}
       for (const [k, v] of Object.entries(r)) if (v && !existing[k]) patch[k] = v
       if (Object.keys(patch).length) { rows.push({ ...existing, ...patch }); updated++ }
@@ -158,7 +162,51 @@ export default function Students() {
     try { await db.students.saveMany(rows); await refresh() } catch (e) { alert(e.message) } finally { setBusy(false) }
   }
 
+  // Put a student into a family straight from the table. '__new' makes a
+  // family for that student first (named after them, language guessed from
+  // the name, parent email copied across).
+  const assignFamily = async (s, familyId) => {
+    setBusy(true)
+    try {
+      let fid = familyId || null
+      if (familyId === '__new') {
+        const fam = await db.families.save({ name: familyNameFor([s]), email: emailsOf(s).join(', '), phone: s.parent_phone || '', language: looksVietnamese([s]) ? 'vi' : 'en', notes: '' })
+        fid = fam.id
+      }
+      await db.students.save({ ...s, family_id: fid })
+      await refresh()
+    } catch (e) { alert(e.message) } finally { setBusy(false) }
+  }
+
+  // Group students who share a parent email / phone into families.
+  const buildFamilies = async () => {
+    const { create, attach } = proposeFamilies(students, families)
+    if (!create.length && !attach.length) { alert(t('buildFamiliesNone')); return }
+    const lines = [
+      ...create.map((c) => `• ${c.name} (${c.language.toUpperCase()}): ${c.names.join(', ')}`),
+      ...attach.map((a) => `• → ${a.familyName}: ${a.names.join(', ')}`),
+    ]
+    if (!confirm(`${t('buildFamiliesConfirm')}\n\n${lines.join('\n')}`)) return
+    setBusy(true)
+    try {
+      const updates = []
+      for (const c of create) {
+        const fam = await db.families.save({ name: c.name, email: c.email, phone: c.phone, language: c.language, notes: '' })
+        c.studentIds.forEach((id) => updates.push({ ...students.find((s) => s.id === id), family_id: fam.id }))
+      }
+      attach.forEach((a) => a.studentIds.forEach((id) => updates.push({ ...students.find((s) => s.id === id), family_id: a.familyId })))
+      await db.students.saveMany(updates)
+      await refresh()
+    } catch (e) { alert(e.message) } finally { setBusy(false) }
+  }
+
   if (loading) return <Spinner />
+
+  const familyOptions = [
+    { value: '', label: `— ${t('noFamily')} —` },
+    ...families.map((f) => ({ value: f.id, label: f.name })),
+    { value: '__new', label: t('newFamilyOption') },
+  ]
 
   return (
     <div className="space-y-6">
@@ -168,6 +216,7 @@ export default function Students() {
         <input className="input max-w-xs" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} />
         <Checkbox checked={showInactive} onChange={setShowInactive} label={t('inactive')} />
         {canEdit && <button className="btn-secondary" onClick={loadRoster} disabled={busy}><ClipboardList size={16} /> {t('loadRoster')}</button>}
+        {canEdit && <button className="btn-secondary" onClick={buildFamilies} disabled={busy}><Users size={16} /> {t('buildFamilies')}</button>}
         {canEdit && <button className="btn-secondary" onClick={() => setEditingFam(blankFamily())}><Users size={16} /> {t('addFamily')}</button>}
         {canEdit && <button className="btn-primary" onClick={() => setEditing(blankStudent())}><UserPlus size={16} /> {t('addStudent')}</button>}
       </div>
@@ -195,8 +244,14 @@ export default function Students() {
                       <td>{s.level}</td>
                       <td className="text-slate-500">{age != null ? age : '—'}</td>
                       <td className="text-slate-500">{(PROGRAMS.find((p) => p.id === s.program) || {})[lang === 'vi' ? 'vi' : 'en'] || s.program}</td>
-                      <td>{famById[s.family_id]?.name || <span className="text-slate-300">—</span>}</td>
-                      <td className="text-xs">{s.legacy && <span className="chip bg-purple-100 text-purple-800 mr-1">legacy</span>}{s.is_new && <span className="chip bg-green-100 text-green-800">new</span>}</td>
+                      <td className="min-w-[180px]">
+                        {canEdit ? (
+                          <select className={`input !py-1 text-xs ${s.family_id ? '' : 'text-amber-700 border-amber-300'}`} value={s.family_id || ''} disabled={busy} onChange={(e) => assignFamily(s, e.target.value)}>
+                            {familyOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                        ) : (famById[s.family_id]?.name || <span className="text-slate-300">—</span>)}
+                      </td>
+                      <td className="text-xs whitespace-nowrap">{s.legacy && <span className="chip bg-purple-100 text-purple-800 mr-1">legacy</span>}{s.is_new && <span className="chip bg-green-100 text-green-800 mr-1">new</span>}{s.q4_full && <span className="chip bg-slate-100 text-slate-600" title={t('q4Full')}>Q4 full</span>}</td>
                       <td className="whitespace-nowrap text-right">
                         {canEdit && <button className="btn-ghost p-1.5" onClick={() => setEditing({ ...blankStudent(), ...s })}><Pencil size={15} /></button>}
                         {canEdit && <button className="btn-ghost p-1.5 text-red-500" onClick={() => removeStudent(s)}><Trash2 size={15} /></button>}
@@ -223,6 +278,7 @@ export default function Students() {
                   <td className="text-slate-500">{students.filter((s) => s.family_id === f.id).map((s) => s.nickname || s.full_name).join(', ')}</td>
                   <td className="uppercase text-xs">{f.language}</td>
                   <td className="whitespace-nowrap text-right">
+                    {canEdit && <button className="btn-ghost p-1.5 text-pra-blue" title={t('addToFamily')} onClick={() => setEditing({ ...blankStudent(), family_id: f.id, parents_email: f.email || '' })}><UserPlus size={15} /></button>}
                     {canEdit && <button className="btn-ghost p-1.5" onClick={() => setEditingFam({ ...blankFamily(), ...f })}><Pencil size={15} /></button>}
                     {canEdit && <button className="btn-ghost p-1.5 text-red-500" onClick={() => removeFamily(f)}><Trash2 size={15} /></button>}
                   </td>

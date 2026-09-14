@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Printer, Save, Trash2, Plus, Copy, Settings2, Receipt, Ban, Send } from 'lucide-react'
+import { Printer, Save, Trash2, Plus, Copy, Settings2, Receipt, Ban, Send, Mail, Download } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { docTotals, recomputeRow, columnTotal } from '../lib/pricing'
 import { fmt, todayISO, fmtDate } from '../lib/money'
+import { emailsOf } from '../lib/families'
+import { nodeToPdfBlob, downloadBlob } from '../lib/pdf'
 import InvoiceDocument from '../components/InvoiceDocument'
+import SendInvoiceModal from '../components/SendInvoiceModal'
+import { invoiceFilename } from '../lib/invoiceEmail'
 import { Card, Field, TextInput, NumberInput, MoneyInput, Select, Checkbox, Modal, StatusChip, Spinner } from '../components/ui'
 
 let seq = 0
@@ -22,15 +26,40 @@ export default function InvoiceEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { t, lang: uiLang } = useT()
-  const { fees, loading } = useData()
+  const { fees, loading, families, students } = useData()
   const [inv, setInv] = useState(null)
   const [payments, setPayments] = useState([])
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
   const [editHeads, setEditHeads] = useState(false)
   const [payModal, setPayModal] = useState(null)
+  const [sendOpen, setSendOpen] = useState(false)
   const [scale, setScale] = useState(0.6)
   const previewRef = useRef(null)
+  const pdfRef = useRef(null)
+
+  // Where the invoice should go: the family's email, else the parents' emails
+  // on the students' records.
+  const defaultTo = useMemo(() => {
+    if (!inv) return ''
+    const fam = (families || []).find((f) => f.id === inv.family_id)
+    const fromFam = emailsOf({ parents_email: fam?.email || '' })
+    const fromKids = (students || []).filter((s) => (inv.student_ids || []).includes(s.id)).flatMap(emailsOf)
+    return [...new Set([...fromFam, ...fromKids])].join(', ')
+  }, [inv, families, students])
+
+  const downloadPdf = async () => {
+    setBusy(true)
+    try { downloadBlob(await nodeToPdfBlob(pdfRef.current), invoiceFilename(inv)) } catch (e) { alert(e.message) } finally { setBusy(false) }
+  }
+
+  // Called by the send modal once the email has gone (or the Gmail draft was opened).
+  const recordSent = async ({ to, cc, subject, manual }) => {
+    const entry = { at: new Date().toISOString(), to, cc, subject, manual: !!manual }
+    const next = { ...inv, total: docTotals(inv.doc).total, sent_at: entry.at, sent_to: to, send_log: [...(inv.send_log || []), entry], status: inv.status === 'draft' ? 'sent' : inv.status }
+    const saved = await db.invoices.save(next)
+    setInv(saved); setDirty(false)
+  }
 
   useEffect(() => {
     let alive = true
@@ -123,8 +152,18 @@ export default function InvoiceEditor() {
         <Link className="btn-secondary" to={`/invoices/new?copy=${id}`}><Copy size={16} /> {t('duplicate')}</Link>
         <Link className="btn-secondary" to={`/invoices/new?edit=${id}`} title={t('rebuild')}><Settings2 size={16} /> {t('rebuild')}</Link>
         <Link className="btn-secondary" to={`/print/invoice/${id}`} target="_blank"><Printer size={16} /> {t('print')}</Link>
+        <button className="btn-secondary" onClick={downloadPdf} disabled={busy}><Download size={16} /> {t('downloadPdf')}</button>
+        <button className="btn-green" onClick={() => setSendOpen(true)} disabled={busy || inv.status === 'void'}><Mail size={16} /> {t('sendInvoice')}</button>
         <button className="btn-primary" onClick={save} disabled={busy || !dirty}><Save size={16} /> {busy ? t('saving') : dirty ? t('save') : t('saved')}</button>
       </div>
+      {inv.sent_at && <div className="text-xs text-green-700">✉ {t('sentAt')}: {new Date(inv.sent_at).toLocaleString()} → {inv.sent_to}</div>}
+
+      {/* Full-size copy of the document, kept off-screen, that the PDF is rendered from. */}
+      <div aria-hidden style={{ position: 'absolute', left: -10000, top: 0, width: '210mm', pointerEvents: 'none' }}>
+        <div ref={pdfRef}><InvoiceDocument doc={doc} fees={fees} number={inv.number} issueDate={fmtDate(inv.issue_date, inv.lang)} /></div>
+      </div>
+
+      {sendOpen && <SendInvoiceModal open onClose={() => setSendOpen(false)} inv={inv} fees={fees} docNode={pdfRef} defaultTo={defaultTo} onSent={recordSent} />}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* ---------- Editor ---------- */}
