@@ -7,7 +7,7 @@ const TEACHERS = [
   { name: 'Bowen', title: 'Mr.', email: 'sbowen209@gmail.com', role: 'teacher', subjects: ['math', 'science', 'technology'], homeroom_groups: ['Year 7'], active: true },
   { name: 'David', title: 'Mr.', email: 'david@science.local', role: 'teacher', subjects: ['english'], homeroom_groups: [], active: true },
   { name: 'Seth', title: 'Mr.', email: 'seth@science.local', role: 'head', subjects: ['art_of_science'], homeroom_groups: ['*'], active: true },
-  { name: 'Kiu', title: 'Ms.', email: 'kiu@science.local', role: 'teacher', subjects: ['history', 'executive_function'], homeroom_groups: [], active: true },
+  { name: 'Kiu', title: 'Ms.', email: 'kiu@science.local', role: 'teacher', subjects: ['history', 'executive_function', 'wellbeing'], homeroom_groups: [], active: true },
 ]
 
 const SCORES = {
@@ -48,11 +48,11 @@ const FULL_COMMENTS = {
     math: { comment: 'Amada demonstrates a solid understanding of mathematical concepts and approaches problem-solving with growing confidence. She has shown particular strength in algebraic reasoning and is developing fluency with fraction operations. Amada actively participates in collaborative tasks and explains her thinking clearly to peers.', next_focus: 'Strengthening multi-step problem solving and applying mathematical reasoning to real-world contexts.' },
     english: { comment: 'Amada is a thoughtful and expressive writer who consistently crafts well-structured pieces with a strong personal voice. Her reading comprehension is excellent, and she engages deeply with texts during class discussions. Amada has developed confidence in presenting her ideas orally and supporting her arguments with evidence.', next_focus: 'Expanding use of literary techniques and developing critical analysis of more complex texts.' },
     science: { comment: 'Amada approaches scientific inquiry with curiosity and is building a strong foundation in experimental design. She records observations carefully and is learning to draw conclusions from data. While she sometimes needs prompting to connect concepts across topics, her effort and willingness to ask questions are commendable.', next_focus: 'Developing skills in forming and testing hypotheses independently.' },
-    art_of_science: { comment: 'Amada brings creativity and precision to her scientific art projects, producing detailed and visually engaging work.' },
-    history: { comment: 'Amada is developing her ability to analyse historical sources and form opinions supported by evidence.' },
-    executive_function: { comment: 'Amada is building organisational skills and learning to manage her time across multiple tasks effectively.' },
-    technology: { comment: 'Amada shows confidence with digital tools and applies her skills creatively in project-based learning.' },
-    wellbeing: { comment: 'Amada is a positive presence who supports her peers and demonstrates strong self-awareness.' },
+    art_of_science: { comment: 'Amada brings creativity and precision to her scientific art projects, producing detailed and visually engaging work. She takes care to research her subjects thoroughly and has developed a strong eye for colour and composition in her illustrations.' },
+    history: { comment: 'Amada is developing her ability to analyse historical sources and form opinions supported by evidence. She participates well in discussions about Vietnamese and world history and is learning to compare perspectives across time periods.' },
+    executive_function: { comment: 'Amada is building organisational skills and learning to manage her time across multiple tasks effectively. She has made good progress with her planner and is beginning to break larger assignments into manageable steps independently.' },
+    technology: { comment: 'Amada shows confidence with digital tools and applies her skills creatively in project-based learning. She has been particularly engaged with presentation software and is developing her understanding of responsible digital citizenship.' },
+    wellbeing: { comment: 'Amada is a positive presence who supports her peers and demonstrates strong self-awareness. She contributes thoughtfully to our wellbeing circles and is developing strategies to manage her emotions during challenging moments.' },
     report: {
       glance: 'Amada has settled in well this quarter and approaches her learning with enthusiasm and determination. She is a kind and supportive member of our learning community who contributes positively to class discussions.',
       homeroom_note: 'Amada has had a wonderful start to the year. She brings a positive attitude to every session and is always willing to help her classmates. Her organisational skills have improved significantly, and she is becoming more independent in managing her learning. Amada\'s creativity shines through in group projects, and she is a valued member of our community.',
@@ -65,11 +65,11 @@ const FULL_COMMENTS = {
     math: { comment: 'Lily has shown exceptional mathematical ability this quarter, consistently demonstrating deep understanding of complex concepts. She works efficiently and accurately, often finishing tasks ahead of her peers and eagerly taking on extension challenges. Lily explains her reasoning with clarity and serves as a strong mathematical role model for the class.', next_focus: 'Exploring advanced problem-solving strategies and mathematical proofs at a higher level.' },
     english: { comment: 'Lily is a confident communicator who expresses her ideas with clarity and maturity. Her written work is well-organised and demonstrates a strong command of grammar and vocabulary. Lily participates actively in literature discussions and shows genuine engagement with the texts we explore in class.', next_focus: 'Developing persuasive writing techniques and expanding her use of figurative language.' },
     science: { comment: 'Lily is an outstanding science learner who approaches every investigation with genuine curiosity and rigour. She designs thorough experiments, analyses data critically, and draws well-supported conclusions. Lily frequently makes insightful connections between topics and asks thoughtful questions that deepen the learning for everyone.', next_focus: 'Pursuing independent research projects and presenting scientific findings to wider audiences.' },
-    art_of_science: { comment: 'Lily combines scientific accuracy with artistic creativity, producing work that is both informative and visually striking.' },
-    history: { comment: 'Lily engages thoughtfully with historical topics and contributes well-reasoned arguments in class discussions.' },
-    executive_function: { comment: 'Lily demonstrates strong organisational skills and manages her time effectively across all learning areas.' },
-    technology: { comment: 'Lily is a confident and creative user of technology who often helps peers and explores new tools independently.' },
-    wellbeing: { comment: 'Lily is emotionally mature and a compassionate leader who actively supports the wellbeing of her peers.' },
+    art_of_science: { comment: 'Lily combines scientific accuracy with artistic creativity, producing work that is both informative and visually striking. Her detailed diagrams and scientific illustrations demonstrate a deep understanding of the concepts she is representing.' },
+    history: { comment: 'Lily engages thoughtfully with historical topics and contributes well-reasoned arguments in class discussions. She shows a genuine interest in understanding different perspectives and connects historical events to present-day issues with maturity.' },
+    executive_function: { comment: 'Lily demonstrates strong organisational skills and manages her time effectively across all learning areas. She sets clear goals for herself, uses her planner consistently, and is a role model for self-directed learning in the classroom.' },
+    technology: { comment: 'Lily is a confident and creative user of technology who often helps peers and explores new tools independently. She has taken a lead role in collaborative digital projects and shows excellent judgement in evaluating online sources.' },
+    wellbeing: { comment: 'Lily is emotionally mature and a compassionate leader who actively supports the wellbeing of her peers. She facilitates group discussions with empathy and is always the first to check in on classmates who may be having a difficult day.' },
     report: {
       glance: 'Lily has had an outstanding quarter, excelling across all her learning areas while remaining a supportive and humble member of our community. Her dedication and curiosity are truly inspiring.',
       homeroom_note: 'Lily continues to impress with her dedication, curiosity, and kindness. She approaches every challenge with a positive mindset and consistently produces work of the highest standard. Beyond her academic achievements, Lily is a natural leader who lifts those around her. She volunteers to help classmates, asks thoughtful questions, and brings joy to our learning environment every day.',
@@ -154,6 +154,8 @@ export async function seedYear7() {
       report = buildReport(student, period, template, settings, 'Mr. Bowen')
       secs = buildSections(report.id, template, settings)
     }
+
+    report.year_group = 'Year 7'
 
     // Fill in academic scores
     for (const sec of secs) {

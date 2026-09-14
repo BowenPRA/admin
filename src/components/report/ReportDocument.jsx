@@ -90,9 +90,9 @@ export default function ReportDocument({ report, sections, student, settings, hi
               ? <img className="photo" src={photoSrc(student.photo)} alt="" style={{ width: '18mm', height: '18mm' }} />
               : <div className="photo placeholder" style={{ width: '18mm', height: '18mm', fontSize: '14pt' }}>{initials}</div>}
             <div>
-              <div style={{ fontWeight: 900, fontSize: '11pt', lineHeight: 1.1 }}>{student?.full_name}</div>
+              <div style={{ fontWeight: 900, fontSize: '9.5pt', lineHeight: 1.1 }}>{student?.full_name}</div>
               {student?.nickname && <div className="muted" style={{ fontSize: '7.5pt' }}>"{student.nickname}"</div>}
-              <div style={{ marginTop: 2, fontSize: '7.5pt' }}><b>{report.year_group}</b>{report.class_name ? <> • {report.class_name}</> : null}</div>
+              <div style={{ marginTop: 2, fontSize: '7.5pt' }}><b>{report.year_group}</b></div>
               {report.homeroom_teacher && <div style={{ fontSize: '7.5pt' }}>Homeroom: <b>{report.homeroom_teacher}</b></div>}
             </div>
           </div>
@@ -109,7 +109,7 @@ export default function ReportDocument({ report, sections, student, settings, hi
           <div className="sec-h" style={{ fontSize: '8.5pt', padding: '3px 8px' }}><span>Academic Learning{bi && <span className="sub"> · Học tập</span>}</span></div>
           <table>
             <thead><tr>
-              <th style={{ width: '13%' }}>Learning area</th>
+              <th style={{ width: '11%' }}>Learning area</th>
               <th style={{ width: '6%', textAlign: 'center' }}>Level</th>
               {showScores && <th style={{ width: '6%', textAlign: 'center' }}>Score</th>}
               <th>Comment &amp; next focus</th>
@@ -179,18 +179,17 @@ export default function ReportDocument({ report, sections, student, settings, hi
         {vocational.length > 0 && (
           <section className="sec">
             <div className="sec-h" style={{ fontSize: '8.5pt', padding: '3px 8px' }}><span>Specialist &amp; Vocational{bi && <span className="sub"> · Chuyên môn</span>}</span></div>
-            <div className="sec-b" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(vocational.length, 3)}, 1fr)`, gap: 4, padding: '4px 6px' }}>
+            <div className="sec-b" style={{ display: 'grid', gridTemplateColumns: `repeat(${vocational.length}, 1fr)`, gap: 3, padding: '4px 5px' }}>
               {vocational.map((s) => {
                 const sub = subjectByKey(settings, s.subject_key)
                 return (
-                  <div key={s.id} className="voc" style={{ padding: '4px 5px', gap: 2 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontWeight: 800, fontSize: '7.5pt', color: 'var(--navy)' }}><Icon name={sub.icon} size={11} /> {sub.name}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div key={s.id} className="voc" style={{ padding: '3px 4px', gap: 2 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, fontWeight: 800, fontSize: '7pt', color: 'var(--navy)' }}><Icon name={sub.icon} size={10} /> {sub.name}{s.teacher_name && <span style={{ fontWeight: 400, fontSize: '6pt', color: 'var(--muted)' }}> · {s.teacher_name}</span>}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                       <Level settings={settings} value={s.level} name={false} />
-                      <span style={{ fontSize: '6.5pt', fontWeight: 700, color: 'var(--muted)' }}>{levelInfo(settings, s.level)?.name || 'Not yet'}</span>
+                      <span style={{ fontSize: '6pt', fontWeight: 700, color: 'var(--muted)' }}>{levelInfo(settings, s.level)?.name || 'Not yet'}</span>
                     </div>
-                    {(s.comment || '').trim() && <div style={{ fontSize: '7.5pt', lineHeight: 1.25 }}><Bi en={s.comment} vi={s.comment_vi} bi={bi} /></div>}
-                    {s.teacher_name && <div className="muted" style={{ fontSize: '6pt', textAlign: 'right' }}>– {s.teacher_name}</div>}
+                    {(s.comment || '').trim() && <div style={{ fontSize: '7pt', lineHeight: 1.2 }}><Bi en={s.comment} vi={s.comment_vi} bi={bi} /></div>}
                   </div>
                 )
               })}

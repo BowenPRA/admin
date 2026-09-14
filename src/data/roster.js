@@ -459,7 +459,7 @@ export const ROSTER = [
   },
   {
     "student_code": "PAL0136",
-    "level": "Year 5",
+    "level": "Year 7",
     "full_name": "Oliver Mian",
     "nickname": "Oliver",
     "gender": "male",
@@ -478,7 +478,7 @@ export const ROSTER = [
   },
   {
     "student_code": "PAL0024",
-    "level": "Year 6",
+    "level": "Year 7",
     "full_name": "Hoàng Vĩnh Khoa",
     "nickname": "Goku",
     "gender": "male",

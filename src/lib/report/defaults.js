@@ -18,7 +18,7 @@ export const LEVELS = [
 ]
 
 export const SUBJECTS = [
-  { key: 'math', kind: 'academic', name: 'Mathematics', name_vi: 'Toán học', icon: 'calculator', scored: true },
+  { key: 'math', kind: 'academic', name: 'Maths', name_vi: 'Toán học', icon: 'calculator', scored: true },
   { key: 'science', kind: 'academic', name: 'Science', name_vi: 'Khoa học', icon: 'flask', scored: true },
   { key: 'english', kind: 'academic', name: 'English', name_vi: 'Tiếng Anh', icon: 'book', scored: true },
   { key: 'art_of_science', kind: 'vocational', name: 'Art of Science', name_vi: 'Nghệ thuật Khoa học', icon: 'palette', scored: false },
