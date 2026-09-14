@@ -1,13 +1,15 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, PlusCircle, LogOut, Home, Database } from 'lucide-react'
+import { FileText, Users, Settings, PlusCircle, LogOut, Home, Database, ClipboardList, GraduationCap } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
+import { useAuth } from '../lib/AuthContext'
 
 export default function Layout() {
   const { t, lang, setLang } = useT()
   const navigate = useNavigate()
   const data = useData()
+  const { isHead, isOffice, displayName, me } = useAuth()
 
   const item = (to, Icon, label, end = false) => (
     <NavLink to={to} end={end}
@@ -25,11 +27,14 @@ export default function Layout() {
           </NavLink>
           <nav className="flex flex-1 items-center gap-1">
             {item('/', Home, t('home'), true)}
-            {item('/invoices', FileText, t('invoices'))}
+            {isOffice && item('/invoices', FileText, t('invoices'))}
+            {item('/reports', ClipboardList, t('reports'))}
             {item('/students', Users, t('students'))}
-            {item('/settings', Settings, t('settings'))}
+            {isHead && item('/teachers', GraduationCap, t('teachers'))}
+            {isOffice && item('/settings', Settings, t('settings'))}
           </nav>
-          <button className="btn-green" onClick={() => navigate('/invoices/new')}><PlusCircle size={18} /> <span className="hidden sm:inline">{t('newInvoice')}</span></button>
+          {isOffice && <button className="btn-green" onClick={() => navigate('/invoices/new')}><PlusCircle size={18} /> <span className="hidden sm:inline">{t('newInvoice')}</span></button>}
+          {me && <span className="hidden max-w-[160px] truncate text-xs font-semibold text-slate-500 md:inline" title={me.email}>{displayName}</span>}
           <div className="ml-1 flex overflow-hidden rounded-lg border border-slate-300 text-xs font-bold">
             <button className={`px-2.5 py-1.5 ${lang === 'en' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'}`} onClick={() => setLang('en')}>EN</button>
             <button className={`px-2.5 py-1.5 ${lang === 'vi' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'}`} onClick={() => setLang('vi')}>VI</button>

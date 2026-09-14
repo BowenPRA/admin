@@ -8,14 +8,15 @@ import { db } from './db'
 const Ctx = createContext(null)
 
 export function DataProvider({ children }) {
-  const [state, setState] = useState({ loading: true, error: null, families: [], students: [], fees: null, calendar: null })
+  const [state, setState] = useState({ loading: true, error: null, families: [], students: [], teachers: [], fees: null, calendar: null, reportSettings: null })
 
   const refresh = useCallback(async () => {
     try {
-      const [families, students, fees, calendar] = await Promise.all([
+      const [families, students, fees, calendar, teachers, reportSettings] = await Promise.all([
         db.families.list(), db.students.list(), db.getFees(), db.getCalendar(),
+        db.teachers.list().catch(() => []), db.getReportSettings(),
       ])
-      setState({ loading: false, error: null, families, students, fees, calendar })
+      setState({ loading: false, error: null, families, students, teachers, fees, calendar, reportSettings })
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e.message || String(e) }))
     }

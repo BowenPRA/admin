@@ -77,3 +77,27 @@ Invoice numbers look like `PRA-2627-0001`, receipts `PT-2627-0001`.
 
 Settings → Fee schedule: update the amounts, deadlines and the school-day counts
 per month, then save. Defaults for 2026-2027 live in `src/lib/fees.js`.
+
+## Progress reports
+
+The **Progress reports** tab writes, reviews and prints student learning
+progress reports (Lower Secondary first). Full details are in the code under
+`src/pages/reports/`; the short version:
+
+1. Run [`supabase/reports.sql`](supabase/reports.sql) once (after `schema.sql`).
+   It adds the report tables, extra student columns and the permission rules.
+2. Students → **Load 2026-2027 roster** fills in the student list from the office
+   workbook (`scripts/build_roster.py` regenerates `src/data/roster.js`).
+3. Teachers (head only) → add each teacher with their sign-in email and tick the
+   learning areas they may edit and/or the year groups they are homeroom for.
+   **Create login** makes a Supabase account with a temporary password.
+4. Progress reports → **Create reports** for a period and year groups, then each
+   teacher fills in their parts (auto-saved). **Update class references** averages
+   the year group's review scores; **Print all** prints a whole year group.
+
+Who can do what: office accounts (Supabase `app_metadata.role` teacher/admin)
+keep invoices and settings; `admin` accounts are head teachers for reports;
+teachers listed on the Teachers page can edit only their own learning areas.
+These rules are enforced in the database, not just hidden in the interface.
+Report wording, periods, the four progress levels, learning areas, templates and
+learner skills are edited under Progress reports → Report settings.

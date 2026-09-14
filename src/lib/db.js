@@ -7,6 +7,7 @@
 
 import { supabase, hasSupabase } from './supabaseClient.js'
 import { DEFAULT_FEES, DEFAULT_CALENDAR } from './fees.js'
+import { DEFAULT_REPORT_SETTINGS } from './report/defaults.js'
 
 const TABLES = {
   families: 'adm_families',
@@ -14,9 +15,20 @@ const TABLES = {
   invoices: 'adm_invoices',
   payments: 'adm_payments',
   settings: 'adm_settings',
+  // Progress reports
+  teachers: 'adm_teachers',
+  reports: 'adm_reports',
+  sections: 'adm_report_sections',
+  courseNotes: 'adm_course_notes',
 }
 
-const genId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`)
+// Rows that come straight from form inputs may hold '' where Postgres wants
+// null (date / numeric columns). Applied to the report tables and students.
+const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes])
+const cleanRow = (table, row) => (CLEAN.has(table) ? Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v === '' ? null : v])) : row)
+const matches = (row, filter) => Object.entries(filter || {}).every(([k, v]) => (Array.isArray(v) ? v.includes(row[k]) : row[k] === v))
+
+export const genId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`)
 
 // ---------------- localStorage adapter ----------------
 const LS_KEY = 'pra-admin-db-v1'
@@ -27,9 +39,9 @@ function lsWrite(data) { localStorage.setItem(LS_KEY, JSON.stringify(data)) }
 
 const localAdapter = {
   mode: 'local',
-  async list(table) {
+  async list(table, filter) {
     const d = lsRead()
-    return (d[table] || []).slice()
+    return (d[table] || []).filter((r) => matches(r, filter))
   },
   async get(table, id) {
     const d = lsRead()
@@ -46,10 +58,12 @@ const localAdapter = {
     lsWrite(d)
     return r
   },
+  async upsertMany(table, rows) { const out = []; for (const r of rows) out.push(await this.upsert(table, r)); return out },
   async remove(table, id) {
     const d = lsRead()
     d[table] = (d[table] || []).filter((r) => r.id !== id)
     if (table === TABLES.invoices) d[TABLES.payments] = (d[TABLES.payments] || []).filter((p) => p.invoice_id !== id)
+    if (table === TABLES.reports) d[TABLES.sections] = (d[TABLES.sections] || []).filter((p) => p.report_id !== id)
     lsWrite(d)
   },
   async getSetting(key) {
@@ -69,8 +83,10 @@ function throwIf(error) { if (error) throw new Error(error.message || String(err
 
 const supaAdapter = {
   mode: 'supabase',
-  async list(table) {
-    const { data, error } = await supabase.from(table).select('*').order('created_at', { ascending: true })
+  async list(table, filter) {
+    let q = supabase.from(table).select('*')
+    for (const [k, v] of Object.entries(filter || {})) q = Array.isArray(v) ? q.in(k, v) : q.eq(k, v)
+    const { data, error } = await q.order('created_at', { ascending: true })
     throwIf(error)
     return data || []
   },
@@ -80,11 +96,19 @@ const supaAdapter = {
     return data
   },
   async upsert(table, row) {
-    const r = { ...row, id: row.id || genId(), updated_at: new Date().toISOString() }
+    const r = cleanRow(table, { ...row, id: row.id || genId(), updated_at: new Date().toISOString() })
     delete r.created_at
     const { data, error } = await supabase.from(table).upsert(r).select().single()
     throwIf(error)
     return data
+  },
+  async upsertMany(table, rows) {
+    if (!rows.length) return []
+    const now = new Date().toISOString()
+    const rs = rows.map((row) => { const r = cleanRow(table, { ...row, id: row.id || genId(), updated_at: now }); delete r.created_at; return r })
+    const { data, error } = await supabase.from(table).upsert(rs).select()
+    throwIf(error)
+    return data || []
   },
   async remove(table, id) {
     const { error } = await supabase.from(table).delete().eq('id', id)
@@ -105,19 +129,21 @@ const A = hasSupabase ? supaAdapter : localAdapter
 export const dbMode = A.mode
 
 // ---------------- Public API ----------------
+const crud = (table) => ({
+  list: (filter) => A.list(table, filter),
+  get: (id) => A.get(table, id),
+  save: (row) => A.upsert(table, row),
+  saveMany: (rows) => A.upsertMany(table, rows),
+  remove: (id) => A.remove(table, id),
+})
+
 export const db = {
-  families: {
-    list: () => A.list(TABLES.families),
-    get: (id) => A.get(TABLES.families, id),
-    save: (row) => A.upsert(TABLES.families, row),
-    remove: (id) => A.remove(TABLES.families, id),
-  },
-  students: {
-    list: () => A.list(TABLES.students),
-    get: (id) => A.get(TABLES.students, id),
-    save: (row) => A.upsert(TABLES.students, row),
-    remove: (id) => A.remove(TABLES.students, id),
-  },
+  families: crud(TABLES.families),
+  students: crud(TABLES.students),
+  teachers: crud(TABLES.teachers),
+  reports: crud(TABLES.reports),
+  sections: crud(TABLES.sections),
+  courseNotes: crud(TABLES.courseNotes),
   invoices: {
     list: () => A.list(TABLES.invoices),
     get: (id) => A.get(TABLES.invoices, id),
@@ -140,6 +166,13 @@ export const db = {
     return v || DEFAULT_CALENDAR
   },
   setCalendar: (v) => A.setSetting('calendar', v),
+  // Progress-report configuration: one JSON document; missing keys fall back
+  // to the defaults so new options appear without migration.
+  async getReportSettings() {
+    const v = (await A.getSetting('reports')) || {}
+    return { ...DEFAULT_REPORT_SETTINGS, ...v, org: { ...DEFAULT_REPORT_SETTINGS.org, ...(v.org || {}) } }
+  },
+  setReportSettings: (v) => A.setSetting('reports', v),
 
   // Sequential document numbers: PRA-2627-0001 / PT-2627-0001
   async nextNumber(kind, schoolYear) {
