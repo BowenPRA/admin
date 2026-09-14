@@ -37,7 +37,11 @@ export default function Teachers() {
     if (!confirm(`Remove ${t.name} from the teacher list? Their login (if any) stays in Supabase but loses all report editing rights.`)) return
     await db.teachers.remove(t.id); await refresh(); setEditing(null)
   }
-  const subjName = (k) => (settings.subjects.find((s) => s.key === k) || { name: k }).name
+  const subjName = (k) => {
+    const [key] = k.split(':')
+    return (settings.subjects.find((s) => s.key === key) || { name: key }).name
+  }
+  const shortLevel = (g) => g === 'Nursery' ? 'N' : g === 'Kindergarten' ? 'K' : g === 'Upper Secondary' ? 'US' : g.replace('Year ', 'Y')
 
   return (
     <div className="space-y-4">
@@ -59,7 +63,14 @@ export default function Teachers() {
                   <td>
                     <div className="flex flex-wrap gap-1 py-1">
                       {t.role === 'head' ? <Chip tone="green">Everything</Chip> : (<>
-                        {(t.subjects || []).map((k) => <Chip key={k} tone="sky">{subjName(k)}</Chip>)}
+                        {Object.entries((t.subjects || []).reduce((acc, s) => {
+                          const [key, group] = s.includes(':') ? s.split(':') : [s, null]
+                          if (!acc[key]) acc[key] = []
+                          if (group) acc[key].push(group)
+                          return acc
+                        }, {})).map(([key, groups]) => (
+                          <Chip key={key} tone="sky">{subjName(key)}{groups.length ? ` · ${groups.map(shortLevel).join(', ')}` : ''}</Chip>
+                        ))}
                         {(t.homeroom_groups || []).map((g) => <Chip key={g} tone="amber">Homeroom · {g === '*' ? 'all' : g}</Chip>)}
                         {!(t.subjects || []).length && !(t.homeroom_groups || []).length && <span className="text-xs text-slate-400">view only</span>}
                       </>)}
@@ -113,9 +124,31 @@ function TeacherForm({ value: t, onChange, settings, onSave, onDelete, busy }) {
       {t.role !== 'head' && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <div className="label">Learning areas this teacher may edit</div>
-            <div className="grid gap-1.5">
-              {settings.subjects.map((s) => <Checkbox key={s.key} checked={(t.subjects || []).includes(s.key)} onChange={toggle('subjects', s.key)} label={`${s.name} (${s.kind})`} />)}
+            <div className="label">Subject assignments by year group</div>
+            <p className="mb-2 text-xs text-slate-500">Click year groups to grant editing access for each learning area.</p>
+            <div className="space-y-2">
+              {settings.subjects.map((s) => {
+                const active = (t.subjects || []).filter(x => x.startsWith(s.key + ':'))
+                return (
+                  <div key={s.key} className={`rounded-lg border p-2 ${active.length ? 'border-sky-200 bg-sky-50/50' : 'border-slate-200'}`}>
+                    <div className="text-xs font-semibold text-slate-700">{s.name} <span className="font-normal text-slate-400">({s.kind})</span></div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {LEVELS.map((g) => {
+                        const compound = `${s.key}:${g}`
+                        const on = (t.subjects || []).includes(compound)
+                        const short = g === 'Nursery' ? 'N' : g === 'Kindergarten' ? 'K' : g === 'Upper Secondary' ? 'US' : g.replace('Year ', 'Y')
+                        return (
+                          <button key={g} type="button" title={g}
+                            className={`rounded px-1.5 py-0.5 text-[11px] font-semibold transition-colors ${on ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'}`}
+                            onClick={() => onChange({ ...t, subjects: on ? (t.subjects || []).filter(x => x !== compound) : [...(t.subjects || []), compound] })}>
+                            {short}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
           <div>

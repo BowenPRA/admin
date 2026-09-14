@@ -62,7 +62,7 @@ function ReportsList({ settings }) {
     const out = []
     for (const r of reports || []) {
       if (r.status === 'published') continue
-      const mine = sections.filter((s) => s.report_id === r.id && canSubject(s.subject_key) && (!s.level || !(s.comment || '').trim()))
+      const mine = sections.filter((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group) && (!s.level || !(s.comment || '').trim()))
       const overview = canHomeroom(r) && (!(r.glance || '').trim() || !(r.homeroom_note || '').trim())
       if (mine.length || overview) out.push({ report: r, parts: [...mine.map((s) => subjectByKey(settings, s.subject_key).name), overview ? 'overview / homeroom note' : null].filter(Boolean) })
     }

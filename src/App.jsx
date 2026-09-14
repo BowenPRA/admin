@@ -15,6 +15,7 @@ import PrintReport from './pages/reports/PrintReport'
 import PrintBatch from './pages/reports/PrintBatch'
 import Teachers from './pages/reports/Teachers'
 import ReportSettings from './pages/reports/ReportSettings'
+import Attendance from './pages/Attendance'
 import { DataProvider } from './lib/DataContext'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { Spinner } from './components/ui'
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/reports/:id" element={<ReportEditor />} />
           <Route path="/teachers" element={<Teachers />} />
           <Route path="/students" element={<Students />} />
+          <Route path="/attendance" element={<Attendance />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

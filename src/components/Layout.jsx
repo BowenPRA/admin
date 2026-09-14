@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, PlusCircle, LogOut, Home, Database, ClipboardList, GraduationCap } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -31,9 +31,9 @@ export default function Layout() {
             {item('/reports', ClipboardList, t('reports'))}
             {item('/students', Users, t('students'))}
             {isHead && item('/teachers', GraduationCap, t('teachers'))}
+            {item('/attendance', CalendarCheck, t('attendance'))}
             {isOffice && item('/settings', Settings, t('settings'))}
           </nav>
-          {isOffice && <button className="btn-green" onClick={() => navigate('/invoices/new')}><PlusCircle size={18} /> <span className="hidden sm:inline">{t('newInvoice')}</span></button>}
           {me && <span className="hidden max-w-[160px] truncate text-xs font-semibold text-slate-500 md:inline" title={me.email}>{displayName}</span>}
           <div className="ml-1 flex overflow-hidden rounded-lg border border-slate-300 text-xs font-bold">
             <button className={`px-2.5 py-1.5 ${lang === 'en' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'}`} onClick={() => setLang('en')}>EN</button>

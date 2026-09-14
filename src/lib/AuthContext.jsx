@@ -48,7 +48,12 @@ export function AuthProvider({ children }) {
 
   const me = state.me
   const isHead = me?.role === 'head'
-  const canSubject = (key) => isHead || (me?.subjects || []).includes(key)
+  const canSubject = (key, yearGroup) => {
+    if (isHead) return true
+    const subs = me?.subjects || []
+    if (!yearGroup) return subs.some(s => s === key || s.startsWith(key + ':'))
+    return subs.includes(`${key}:${yearGroup}`)
+  }
   const canHomeroom = (report) => isHead || (me?.homeroom_groups || []).includes('*') || (!!report && (me?.homeroom_groups || []).includes(report.year_group))
   const refreshMe = () => resolve(state.session)
   const displayName = me ? `${me.title ? me.title + ' ' : ''}${me.name}` : ''

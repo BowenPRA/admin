@@ -78,7 +78,7 @@ export default function ReportEditor() {
   const student = bundle.student
   const published = report.status === 'published'
   const homeroomOk = canHomeroom(report) && (!published || isHead)
-  const subjectOk = (key) => canSubject(key) && (!published || isHead)
+  const subjectOk = (key) => canSubject(key, report.year_group) && (!published || isHead)
   const levels = settings.levels || []
   const bi = report.lang === 'bi'
   const academic = sections.filter((s) => s.kind === 'academic'), vocational = sections.filter((s) => s.kind !== 'academic')

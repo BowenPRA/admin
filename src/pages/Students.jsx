@@ -265,16 +265,18 @@ export default function Students() {
         )}
       </Card>
 
-      <Card title={t('families')}>
-        {families.length === 0 ? <Empty text={t('noData')} /> : (
+      {(() => {
+        const activeFams = families.filter((f) => students.some((s) => s.family_id === f.id && s.active !== false)).sort((a, b) => a.name.localeCompare(b.name))
+        const inactiveFams = families.filter((f) => !students.some((s) => s.family_id === f.id && s.active !== false)).sort((a, b) => a.name.localeCompare(b.name))
+        const FamilyTable = ({ fams, dim }) => (
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2">{t('parentName')}</th><th>{t('email')}</th><th>{t('phone')}</th><th>{t('students')}</th><th>{t('language')}</th><th></th></tr></thead>
             <tbody>
-              {families.map((f) => (
-                <tr key={f.id} className="border-t border-slate-100 hover:bg-slate-50">
+              {fams.map((f) => (
+                <tr key={f.id} className={`border-t border-slate-100 hover:bg-slate-50 ${dim ? 'opacity-50' : ''}`}>
                   <td className="py-2 font-semibold">{f.name}</td>
-                  <td>{f.email}</td>
-                  <td>{f.phone}</td>
+                  <td className="max-w-[200px] truncate text-slate-600" title={f.email}>{f.email}</td>
+                  <td className="text-slate-600">{f.phone}</td>
                   <td className="text-slate-500">{students.filter((s) => s.family_id === f.id).map((s) => s.nickname || s.full_name).join(', ')}</td>
                   <td className="uppercase text-xs">{f.language}</td>
                   <td className="whitespace-nowrap text-right">
@@ -286,8 +288,20 @@ export default function Students() {
               ))}
             </tbody>
           </table>
-        )}
-      </Card>
+        )
+        return (
+          <>
+            <Card title={`${t('families')} — Active (${activeFams.length})`}>
+              {activeFams.length === 0 ? <Empty text={t('noData')} /> : <FamilyTable fams={activeFams} />}
+            </Card>
+            {showInactive && inactiveFams.length > 0 && (
+              <Card title={`${t('families')} — Inactive (${inactiveFams.length})`}>
+                <FamilyTable fams={inactiveFams} dim />
+              </Card>
+            )}
+          </>
+        )
+      })()}
 
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? t('edit') : t('addStudent')} wide>
         {editing && <StudentForm value={editing} onChange={setEditing} families={families} t={t} lang={lang} />}

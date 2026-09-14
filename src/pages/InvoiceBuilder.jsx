@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Trash2, Plus, ChevronRight } from 'lucide-react'
+import { Trash2, Plus, ChevronRight, RotateCcw } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
-import { LEVELS, periodInfo, mealRateFor } from '../lib/fees'
+import { LEVELS, PROGRAMS, periodInfo, mealRateFor, bandFor } from '../lib/fees'
 import { buildDocument, defaultStudentOptions, docTotals, PERIOD_OPTIONS, PLAN_OPTIONS, studentDisplayName } from '../lib/pricing'
 import { fmt, todayISO } from '../lib/money'
 import { Card, Field, TextInput, NumberInput, MoneyInput, Select, Checkbox, Spinner } from '../components/ui'
@@ -38,12 +38,13 @@ export default function InvoiceBuilder() {
   const { t, lang: uiLang } = useT()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const { loading, students, families, fees, calendar } = useData()
+  const { loading, students, families, fees, calendar, refresh } = useData()
   const [inputs, setInputs] = useState(() => blankInputs(uiLang))
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [editId, setEditId] = useState(null)
   const [loadedFrom, setLoadedFrom] = useState(null)
+  const [showInactive, setShowInactive] = useState(false)
 
   // ?edit=<id> re-opens an existing invoice's options; ?copy=<id> duplicates.
   useEffect(() => {
@@ -73,6 +74,36 @@ export default function InvoiceBuilder() {
   const pickFamily = (f) => {
     const kids = students.filter((s) => s.family_id === f.id && s.active !== false)
     set({ students: kids.map((s) => ({ student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) })), lang: f.language || inputs.lang })
+  }
+  const pickInactiveFamily = async (f) => {
+    const kids = students.filter((s) => s.family_id === f.id)
+    if (!kids.length) return
+    if (!confirm(t('reactivateConfirm'))) return
+    setBusy(true)
+    try {
+      await db.students.saveMany(kids.map((s) => ({ ...s, active: true })))
+      await refresh()
+      const reactivated = kids.map((s) => ({ ...s, active: true }))
+      set({ students: reactivated.map((s) => ({ student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) })), lang: f.language || inputs.lang })
+    } catch (e) { alert(e.message) } finally { setBusy(false) }
+  }
+  const setStudentProgram = (studentId, programId) => {
+    set({
+      students: inputs.students.map((e) => {
+        if (e.student.id !== studentId) return e
+        const s = { ...e.student, program: programId }
+        const upper = bandFor(s.level) === 'upper' || ['hybrid', 'independent'].includes(programId)
+        return {
+          student: s,
+          opts: {
+            ...e.opts,
+            upper,
+            mealRate: mealRateFor(s.level, programId, fees),
+            weeklyRate: upper ? fees.weekly.summerUpper : (bandFor(s.level) === 'y7_9' ? fees.weekly.vocationalY7_9 : bandFor(s.level) === 'nursery' ? fees.weekly.globalNursery : fees.weekly.vocationalY1_6),
+          },
+        }
+      }),
+    })
   }
   const setOpts = (id, patch) => set({ students: inputs.students.map((e) => (e.student.id === id ? { ...e, opts: { ...e.opts, ...patch } } : e)) })
 
@@ -129,7 +160,7 @@ export default function InvoiceBuilder() {
   if (loading || !fees || !calendar) return <Spinner />
 
   const needle = q.trim().toLowerCase()
-  const visible = students.filter((s) => s.active !== false).filter((s) => !needle || `${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''}`.toLowerCase().includes(needle))
+  const visible = students.filter((s) => showInactive || s.active !== false).filter((s) => !needle || `${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''}`.toLowerCase().includes(needle))
     .sort((a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level) || a.full_name.localeCompare(b.full_name))
 
   const quarterlyLike = inputs.plan === 'quarterly'
@@ -143,21 +174,77 @@ export default function InvoiceBuilder() {
         {/* 1. Students */}
         <Card title={t('chooseStudents')}>
           <p className="mb-3 text-xs text-slate-500">{t('selectFamilyHint')}</p>
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            {families.map((f) => (
-              <button key={f.id} onClick={() => pickFamily(f)} className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold hover:border-pra-blue hover:text-pra-blue">{f.name}</button>
-            ))}
+          <div className="mb-3 flex items-center gap-3">
+            <input className="input flex-1" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} />
+            <label className="inline-flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none whitespace-nowrap">
+              <input type="checkbox" className="h-3.5 w-3.5 rounded border-slate-300" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
+              {t('showInactiveFamilies')}
+            </label>
           </div>
-          <input className="input mb-2" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} />
+          {(() => {
+            const activeFamilies = families
+              .filter((f) => students.some((s) => s.family_id === f.id && s.active !== false))
+              .filter((f) => !needle || f.name.toLowerCase().includes(needle) || students.some((s) => s.family_id === f.id && `${s.full_name} ${s.nickname}`.toLowerCase().includes(needle)))
+              .sort((a, b) => a.name.localeCompare(b.name))
+            const inactiveFamilies = showInactive ? families
+              .filter((f) => !students.some((s) => s.family_id === f.id && s.active !== false))
+              .filter((f) => students.some((s) => s.family_id === f.id))
+              .filter((f) => !needle || f.name.toLowerCase().includes(needle) || students.some((s) => s.family_id === f.id && `${s.full_name} ${s.nickname}`.toLowerCase().includes(needle)))
+              .sort((a, b) => a.name.localeCompare(b.name)) : []
+            return (
+              <>
+                {activeFamilies.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-1.5">
+                    {activeFamilies.map((f) => {
+                      const kids = students.filter((s) => s.family_id === f.id && s.active !== false)
+                      const allSelected = kids.every((s) => selectedIds.includes(s.id))
+                      return (
+                        <button key={f.id} onClick={() => pickFamily(f)}
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${allSelected ? 'border-pra-blue bg-pra-blue text-white' : 'border-slate-300 bg-white hover:border-pra-blue hover:text-pra-blue'}`}
+                          title={kids.map((s) => `${s.nickname || s.full_name} (${s.level})`).join(', ')}>
+                          {f.name}
+                          {kids.length > 1 && <span className="ml-1 opacity-60">×{kids.length}</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {inactiveFamilies.length > 0 && (
+                  <div className="mb-3">
+                    <span className="mb-1.5 block text-xs font-medium text-slate-400">{t('inactive')}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {inactiveFamilies.map((f) => {
+                        const kids = students.filter((s) => s.family_id === f.id)
+                        return (
+                          <button key={f.id} onClick={() => pickInactiveFamily(f)} disabled={busy}
+                            className="rounded-full border border-dashed border-amber-400 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 transition-colors hover:border-amber-500 hover:bg-amber-100 disabled:opacity-50"
+                            title={kids.map((s) => `${s.nickname || s.full_name} (${s.level})`).join(', ')}>
+                            <RotateCcw size={11} className="mr-1 inline" />
+                            {f.name}
+                            {kids.length > 1 && <span className="ml-1 opacity-60">×{kids.length}</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            )
+          })()}
           <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200">
-            {visible.map((s) => (
-              <label key={s.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-1.5 text-sm hover:bg-slate-50 ${selectedIds.includes(s.id) ? 'bg-sky-50' : ''}`}>
-                <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s)} />
-                <span className="font-semibold">{s.full_name}</span>
-                {s.nickname && <span className="text-slate-500">({s.nickname})</span>}
-                <span className="ml-auto text-xs text-slate-500">{s.level} · {famById[s.family_id]?.name || '—'}</span>
-              </label>
-            ))}
+            {visible.map((s) => {
+              const prog = PROGRAMS.find((p) => p.id === s.program)
+              const progLabel = prog ? (uiLang === 'vi' ? prog.vi : prog.en) : s.program
+              return (
+                <label key={s.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-1.5 text-sm hover:bg-slate-50 ${selectedIds.includes(s.id) ? 'bg-sky-50' : ''} ${s.active === false ? 'opacity-50' : ''}`}>
+                  <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s)} />
+                  <span className="font-semibold">{s.full_name}</span>
+                  {s.nickname && <span className="text-slate-500">({s.nickname})</span>}
+                  {s.active === false && <span className="chip bg-amber-100 text-amber-700 text-[10px]">{t('inactive')}</span>}
+                  <span className="ml-auto text-xs text-slate-500">{s.level} · {progLabel} · {famById[s.family_id]?.name || '—'}</span>
+                </label>
+              )
+            })}
             {visible.length === 0 && <div className="p-4 text-center text-sm text-slate-400">{t('noData')}</div>}
           </div>
         </Card>
@@ -229,6 +316,12 @@ export default function InvoiceBuilder() {
                     <span className="text-xs text-slate-500">{s.level}</span>
                     {s.legacy && <span className="chip bg-purple-100 text-purple-800">legacy</span>}
                     <button className="btn-ghost ml-auto p-1 text-red-500" onClick={() => toggleStudent(s)}><Trash2 size={14} /></button>
+                  </div>
+                  <div className="mb-3">
+                    <Field label={t('programForInvoice')}>
+                      <Select value={s.program || 'regular'} onChange={(v) => setStudentProgram(s.id, v)}
+                        options={PROGRAMS.map((p) => ({ value: p.id, label: uiLang === 'vi' ? p.vi : p.en }))} />
+                    </Field>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-3">
                     {showTuitionOpts && inputs.plan !== 'weekly' && (
