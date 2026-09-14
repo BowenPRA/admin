@@ -95,17 +95,18 @@ export async function seedYear7() {
     await db.students.saveMany(rows)
     students = await db.students.list()
   }
-  // Sync photo field from roster to all existing student records
-  const photoUpdates = []
+  // Sync key fields from roster to all existing student records
+  const rosterUpdates = []
   for (const r of ROSTER) {
-    if (!r.photo) continue
     const existing = students.find((s) => s.student_code === r.student_code || norm(s.full_name) === norm(r.full_name))
-    if (existing && existing.photo !== r.photo) {
-      existing.photo = r.photo
-      photoUpdates.push(existing)
+    if (!existing) continue
+    let changed = false
+    for (const k of ['photo', 'level', 'class_group']) {
+      if (r[k] && existing[k] !== r[k]) { existing[k] = r[k]; changed = true }
     }
+    if (changed) rosterUpdates.push(existing)
   }
-  if (photoUpdates.length) await db.students.saveMany(photoUpdates)
+  if (rosterUpdates.length) await db.students.saveMany(rosterUpdates)
 
   const y7Students = students.filter((s) => s.class_group === 'Year 7' || y7Roster.some((r) => r.student_code === s.student_code))
 
