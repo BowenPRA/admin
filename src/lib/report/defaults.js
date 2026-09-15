@@ -47,26 +47,22 @@ export const SUBJECTS = [
   { key: 'wellbeing', kind: 'vocational', name: 'Wellbeing', name_vi: 'Sức khỏe tinh thần', icon: 'heart', scored: false },
 ]
 
-// Character limits for the printed boxes. The report is one A4 page; each limit
-// is sized so realistic English at the limit fits its box in ReportDocument
-// (checked with 3 academic, 3 specialist and 3 vocational areas). Change them
-// only together with that layout.
+// Character limits for the printed boxes. The report is one A4 page, printed
+// in English or in Vietnamese (never both on one page), so the same limit
+// applies to each language. Each limit is sized so realistic text at the limit
+// fits its box in ReportDocument in both languages (checked with 3 academic,
+// 3 specialist and 3 vocational areas). Change them only with that layout.
 export const TEXT_LIMITS = {
-  homeroom_note: 380,
+  homeroom_note: 390,
   academic_topics: 115,
   academic_comment: 480,
-  next_focus: 100,
+  next_focus: 110,
   specialist_comment: 320,
-  vocational_topics: 230,
-  student_voice: 180,
+  vocational_topics: 220,
+  student_voice: 190,
   experience: 50,
+  experience_lines: 5,
 }
-
-// A bilingual report prints English and Vietnamese in the same box in smaller
-// type, so each language gets a shorter limit (next focus, student voice and
-// experiences print in English only).
-const BILINGUAL_SHARE = { homeroom_note: 0.57, academic_topics: 0.57, academic_comment: 0.57, specialist_comment: 0.57, vocational_topics: 0.5 }
-export const textLimit = (key, bi) => (bi && BILINGUAL_SHARE[key] ? Math.floor((TEXT_LIMITS[key] * BILINGUAL_SHARE[key]) / 10) * 10 : TEXT_LIMITS[key])
 
 export const SKILL_GROUPS = [
   { key: 'foundational', name: 'Foundational Learning Skills', name_vi: 'Kỹ năng học tập cơ bản', items: [
@@ -89,7 +85,7 @@ export const SKILL_GROUPS = [
 // tier. (Templates saved before tiers had `academic` / `vocational` lists.)
 export const TEMPLATES = {
   lower_secondary: {
-    key: 'lower_secondary', name: 'Lower Secondary', program: 'Lower Secondary Program',
+    key: 'lower_secondary', name: 'Lower Secondary', program: 'Lower Secondary Program', program_vi: 'Chương trình Trung học cơ sở',
     yearGroups: ['Year 7', 'Year 8', 'Year 9'],
     areas: ['math', 'science', 'english', 'art_of_science', 'history', 'movement', 'executive_function', 'technology', 'wellbeing'],
   },
@@ -113,6 +109,7 @@ export const DEFAULT_REPORT_SETTINGS = {
     docTitle: 'Learning Progress Report',
     docTitle_vi: 'Báo cáo Tiến bộ Học tập',
     closing: "We celebrate learning in all its forms. Thank you for your partnership in {nickname}'s learning journey.",
+    closing_vi: 'Chúng tôi trân trọng mọi hình thức học tập. Cảm ơn quý phụ huynh đã đồng hành cùng {nickname}.',
   },
   schoolYear: '2026-2027',
   periods: PERIODS,
@@ -155,6 +152,7 @@ export function normalizeReportSettings(stored) {
   for (const sub of subjects) if (!tierKeys.includes(sub.kind)) sub.kind = 'vocational'
   for (const [k, t] of Object.entries(templates)) {
     if (!t.areas) templates[k] = { ...t, areas: [...(t.academic || []), ...(t.specialist || []), ...(t.vocational || [])] }
+    if (templates[k].program_vi == null && TEMPLATES[k]?.program_vi) templates[k].program_vi = TEMPLATES[k].program_vi
     delete templates[k].academic; delete templates[k].specialist; delete templates[k].vocational
   }
   return { ...s, subjects, templates, version: SETTINGS_VERSION }

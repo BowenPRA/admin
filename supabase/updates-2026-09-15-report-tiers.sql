@@ -1,11 +1,20 @@
--- PRA Admin: progress report tiers, Movement for Year 7, summative review score.
--- Run once in Supabase > SQL Editor, after updates-2026-09-15.sql. Safe to run
--- again: every step checks what is already there.
+-- PRA Admin: progress report tiers, Movement for Year 7, summative end-of-year
+-- test score, and Vietnamese versions of every printed text.
+-- Run in Supabase > SQL Editor, after updates-2026-09-15.sql. Safe to run
+-- again (including if an earlier copy of this file was already run): every
+-- step checks what is already there.
 
--- 1. Summative review score (entered on the last quarter's report, shown in
---    the Q1-Q4 + Summative table on every report).
+-- 1. Summative end-of-year test score (entered on the last quarter's report,
+--    shown in the Q1-Q4 + Summative table on every report).
 alter table adm_report_sections add column if not exists summative_raw text;
 alter table adm_report_sections add column if not exists summative_pct numeric;
+
+-- 1b. Vietnamese reports print as their own page, so every printed text has a
+--     Vietnamese version (comment_vi, homeroom_note_vi and description_vi
+--     already exist).
+alter table adm_report_sections add column if not exists next_focus_vi text;
+alter table adm_reports add column if not exists student_voice_vi text;
+alter table adm_reports add column if not exists experiences_vi jsonb default '[]';
 
 -- 2. Art of Science and History are now specialist areas (level + comment);
 --    Executive Function, Technology and Wellbeing stay vocational (level +

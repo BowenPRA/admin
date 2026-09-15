@@ -55,6 +55,7 @@ function SettingsForm({ initial }) {
           <Field label="Tagline under the logo"><TextInput value={s.org.tagline} onChange={(v) => set('org.tagline', v)} /></Field>
           <Field label="Footer line (legal name)"><TextInput value={s.org.legalLine} onChange={(v) => set('org.legalLine', v)} /></Field>
           <Field label="Closing message" className="sm:col-span-2" hint="{nickname} is replaced by the student's nickname. Leave blank to print none."><TextInput value={s.org.closing} onChange={(v) => set('org.closing', v)} /></Field>
+          <Field label="Closing message (Vietnamese report)" className="sm:col-span-2"><TextInput value={s.org.closing_vi || ''} onChange={(v) => set('org.closing_vi', v)} /></Field>
         </div>
       </Card>
 
@@ -114,7 +115,7 @@ function SettingsForm({ initial }) {
                   })}
                 </div>
               </div>
-              {sub.kind === 'academic' && <div className="sm:col-span-6"><Checkbox checked={sub.scored !== false} onChange={(v) => set(`subjects.${i}.scored`, v)} label="Has a progress review score (shown in the Q1–Q4 and summative table)" /></div>}
+              {sub.kind === 'academic' && <div className="sm:col-span-6"><Checkbox checked={sub.scored !== false} onChange={(v) => set(`subjects.${i}.scored`, v)} label="Has scores (Q1–Q4 quarterly reviews and the end-of-year summative test)" /></div>}
             </div>
           ))}
           <button className="btn-secondary text-xs" onClick={() => add('subjects', { key: `subject_${s.subjects.length + 1}`, kind: 'specialist', name: 'New area', name_vi: '', icon: 'star', scored: false })}><Plus size={14} /> Add learning area</button>
@@ -128,9 +129,10 @@ function SettingsForm({ initial }) {
             const toggleArea = (key) => (on) => set(`templates.${k}.areas`, on ? s.subjects.map((x) => x.key).filter((x) => x === key || (t.areas || []).includes(x)) : (t.areas || []).filter((x) => x !== key))
             return (
               <div key={k} className="rounded-xl border border-slate-200 p-3">
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-4">
                   <Field label="Template name"><TextInput value={t.name} onChange={(v) => set(`templates.${k}.name`, v)} /></Field>
                   <Field label="Program line (header badge)"><TextInput value={t.program || ''} onChange={(v) => set(`templates.${k}.program`, v)} /></Field>
+                  <Field label="Program line (Vietnamese)"><TextInput value={t.program_vi || ''} onChange={(v) => set(`templates.${k}.program_vi`, v)} /></Field>
                   <div className="flex items-end justify-end pb-1"><button className="btn-danger text-xs" onClick={() => { if (confirm(`Remove template "${t.name}"?`)) setS((cur) => { const n = clone(cur); delete n.templates[k]; return n }) }}><Trash2 size={14} /> Remove</button></div>
                 </div>
                 <div className="mt-3 grid gap-4 sm:grid-cols-3">

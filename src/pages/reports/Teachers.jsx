@@ -232,12 +232,16 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
         <Checkbox checked={t.active !== false} onChange={set('active')} label="Active" />
       </div>
 
-      {t.role !== 'head' && (<>
+      <>
         <div>
           <div className="mb-1 flex flex-wrap items-end justify-between gap-2">
             <div>
               <div className="label !mb-0">Learning areas they teach</div>
-              <p className="text-xs text-slate-500">Tick each learning area in each year group. Only those sections of a report open for editing.</p>
+              <p className="text-xs text-slate-500">
+                {t.role === 'head'
+                  ? 'Head teachers can edit every report anyway. Tick the classes they actually teach so they are named as the teacher on new reports and appear in "Who teaches what".'
+                  : 'Tick each learning area in each year group. Only those sections of a report open for editing.'}
+              </p>
             </div>
             <Checkbox checked={allGroups} onChange={setAllGroups} label="Show every year group" className="text-xs" />
           </div>
@@ -284,7 +288,7 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
           </div>
           <div className="mt-2"><Checkbox checked={(t.homeroom_groups || []).includes('*')} onChange={() => toggleHomeroom('*')} label="Homeroom for all year groups" className="text-xs" /></div>
         </div>
-      </>)}
+      </>
 
       <details className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <summary className="flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700"><KeyRound size={16} /> Create a login for this teacher</summary>

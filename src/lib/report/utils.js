@@ -146,7 +146,8 @@ export const isNA = (raw) => /^\s*n\s*\/?\s*a\s*$/i.test(raw || '')
  *   tbd    still to come: a later quarter, or this quarter's score not entered yet
  *   na     not enrolled that quarter (no report), or N/A typed as the score
  *   blank  an earlier report exists but no score was recorded
- * The summative review is entered on the last period's report.
+ * The summative is the end-of-year test, entered on the last period's report
+ * (earlier reports show TBD).
  */
 export function reviewRows(settings, { report, sections, history = [], cohortAvg = {}, summativeAvg = {} }) {
   const periods = settings?.periods || []

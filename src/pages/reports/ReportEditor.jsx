@@ -6,7 +6,7 @@ import { useAuth } from '../../lib/AuthContext'
 import { db, genId } from '../../lib/db'
 import { loadReportBundle } from '../../lib/report/loaders'
 import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA } from '../../lib/report/utils'
-import { TIERS, TEXT_LIMITS, textLimit } from '../../lib/report/defaults'
+import { TIERS, TEXT_LIMITS } from '../../lib/report/defaults'
 import { Card, Field, TextInput, TextArea, NumberInput, Select, Spinner, LevelPicker, SaveState, BulletList, ReportStatusChip } from '../../components/ui'
 import { Icon } from '../../components/report/icons'
 import ReportDocument from '../../components/report/ReportDocument'
@@ -31,7 +31,8 @@ export default function ReportEditor() {
   const [err, setErr] = useState('')
   const [saveState, setSaveState] = useState('idle')
   const [preview, setPreview] = useState(false)
-  const [overflow, setOverflow] = useState(0)
+  const [previewLang, setPreviewLang] = useState('en')
+  const [check, setCheck] = useState({ overflow: 0, untranslated: 0 })
   const [showHomeroom, setShowHomeroom] = useState(false)
 
   // `latest` mirrors the three pieces of state so rapid keystrokes always build
@@ -98,7 +99,9 @@ export default function ReportEditor() {
   const homeroomOk = canHomeroom(report) && (!published || isHead)
   const subjectOk = (key) => canSubject(key, report.year_group) && (!published || isHead)
   const levels = settings.levels || []
+  // 'bi' = this student also gets a Vietnamese report (printed as its own page)
   const bi = report.lang === 'bi'
+  const shownLang = bi ? previewLang : 'en'
   const tiers = sectionsByTier(settings, sections)
   const comp = completion(report, sections, settings)
   const periods = settings.periods || []
@@ -127,10 +130,12 @@ export default function ReportEditor() {
               </select>
             ) : <ReportStatusChip status={report.status} />}
             <button className="btn-secondary hidden xl:inline-flex" onClick={() => setPreview((v) => !v)}>{preview ? <EyeOff size={16} /> : <Eye size={16} />} Preview</button>
-            <Link to={`/print/report/${id}`} target="_blank" className="btn-primary"><Printer size={16} /> Print</Link>
+            <Link to={`/print/report/${id}`} target="_blank" className="btn-primary"><Printer size={16} /> {bi ? 'English' : 'Print'}</Link>
+            {bi && <Link to={`/print/report/${id}?lang=vi`} target="_blank" className="btn-primary"><Printer size={16} /> Tiếng Việt</Link>}
           </div>
           {published && !isHead && <div className="mt-1 text-xs font-semibold text-amber-700">This report is published. Only the head teacher can change it now.</div>}
-          {preview && overflow > 0 && <div className="mt-1 hidden text-xs font-semibold text-red-600 xl:block">{overflow} box{overflow === 1 ? ' is' : 'es are'} too full for the page (outlined in red in the preview).</div>}
+          {preview && check.overflow > 0 && <div className="mt-1 hidden text-xs font-semibold text-red-600 xl:block">{check.overflow} box{check.overflow === 1 ? ' is' : 'es are'} too full for the page (outlined in red in the preview).</div>}
+          {preview && shownLang === 'vi' && check.untranslated > 0 && <div className="mt-1 hidden text-xs font-semibold text-amber-700 xl:block">{check.untranslated} part{check.untranslated === 1 ? ' has' : 's have'} no Vietnamese yet and would print in English (highlighted in the preview).</div>}
         </div>
 
         {!isHead && !published && (() => {
@@ -167,12 +172,12 @@ export default function ReportEditor() {
               <Field label="Report date"><TextInput type="date" value={report.report_date || ''} onChange={(v) => patchReport({ report_date: v })} disabled={!homeroomOk} /></Field>
               <Field label="Homeroom teacher"><input className="input" list="teacher-names" value={report.homeroom_teacher || ''} onChange={(e) => patchReport({ homeroom_teacher: e.target.value })} disabled={!homeroomOk} /><datalist id="teacher-names">{teacherNames.map((n) => <option key={n} value={n} />)}</datalist></Field>
               <Field label="Class name" hint="Optional, e.g. Secondary"><TextInput value={report.class_name} onChange={(v) => patchReport({ class_name: v })} disabled={!homeroomOk} /></Field>
-              <Field label="Printed language"><Select value={report.lang || 'en'} onChange={(v) => patchReport({ lang: v })} disabled={!homeroomOk} options={[{ value: 'en', label: 'English' }, { value: 'bi', label: 'English + Vietnamese' }]} /></Field>
+              <Field label="Reports" hint={bi ? 'Vietnamese prints as its own page' : undefined}><Select value={report.lang || 'en'} onChange={(v) => patchReport({ lang: v })} disabled={!homeroomOk} options={[{ value: 'en', label: 'English only' }, { value: 'bi', label: 'English and Vietnamese' }]} /></Field>
             </div>
-            <Field label="Homeroom teacher comment" className="mt-3" right={<Count text={report.homeroom_note} max={textLimit('homeroom_note', bi)} />}>
+            <Field label="Homeroom teacher comment" className="mt-3" right={<Count text={report.homeroom_note} max={TEXT_LIMITS.homeroom_note} />}>
               <TextArea rows={4} value={report.homeroom_note} onChange={(v) => patchReport({ homeroom_note: v })} disabled={!homeroomOk} placeholder={`How has ${student?.nickname || 'the student'} settled in and approached learning this quarter?`} />
             </Field>
-            {bi && <Field label="Vietnamese" className="mt-3" right={<Count text={report.homeroom_note_vi} max={textLimit('homeroom_note', bi)} />}><TextArea rows={4} value={report.homeroom_note_vi} onChange={(v) => patchReport({ homeroom_note_vi: v })} disabled={!homeroomOk} /></Field>}
+            {bi && <Field label="Vietnamese version" className="mt-3" right={<Count text={report.homeroom_note_vi} max={TEXT_LIMITS.homeroom_note} />}><TextArea rows={4} value={report.homeroom_note_vi} onChange={(v) => patchReport({ homeroom_note_vi: v })} disabled={!homeroomOk} /></Field>}
           </Card>
         )}
 
@@ -211,13 +216,18 @@ export default function ReportEditor() {
           <Card title="Experiences and student voice" locked={!homeroomOk}>
             <div className="mb-1 flex items-center justify-between">
               <span className="label !mb-0">Experiences &amp; growth this quarter</span>
-              <span className="text-xs text-slate-400">Up to 4 lines · {TEXT_LIMITS.experience} characters each</span>
+              <span className="text-xs text-slate-400">Up to {TEXT_LIMITS.experience_lines} lines · {TEXT_LIMITS.experience} characters each</span>
             </div>
-            <BulletList items={report.experiences} onChange={(v) => patchReport({ experiences: v })} disabled={!homeroomOk} placeholder="Add an experience" max={4} />
-            {(report.experiences || []).some((e) => charCount(e) > TEXT_LIMITS.experience) && <p className="mt-1 text-xs font-semibold text-red-600">A line is longer than {TEXT_LIMITS.experience} characters and may not fit.</p>}
+            <BulletList items={report.experiences} onChange={(v) => patchReport({ experiences: v })} disabled={!homeroomOk} placeholder="Add an experience" max={TEXT_LIMITS.experience_lines} />
+            {[...(report.experiences || []), ...(bi ? report.experiences_vi || [] : [])].some((e) => charCount(e) > TEXT_LIMITS.experience) && <p className="mt-1 text-xs font-semibold text-red-600">A line is longer than {TEXT_LIMITS.experience} characters and may not fit.</p>}
+            {bi && (<>
+              <div className="label mt-3">Vietnamese version</div>
+              <BulletList items={report.experiences_vi} onChange={(v) => patchReport({ experiences_vi: v })} disabled={!homeroomOk} placeholder="Thêm trải nghiệm" max={TEXT_LIMITS.experience_lines} />
+            </>)}
             <Field label="In the student's words" className="mt-4" hint="What they enjoyed most this quarter." right={<Count text={report.student_voice} max={TEXT_LIMITS.student_voice} />}>
               <TextArea rows={2} value={report.student_voice} onChange={(v) => patchReport({ student_voice: v })} disabled={!homeroomOk} />
             </Field>
+            {bi && <Field label="Vietnamese version" className="mt-3" right={<Count text={report.student_voice_vi} max={TEXT_LIMITS.student_voice} />}><TextArea rows={2} value={report.student_voice_vi} onChange={(v) => patchReport({ student_voice_vi: v })} disabled={!homeroomOk} /></Field>}
           </Card>
 
           <Card title="Signatures" locked={!homeroomOk} subtitle="Names printed on the signature lines.">
@@ -233,7 +243,13 @@ export default function ReportEditor() {
       {preview && (
         <div className="hidden xl:block">
           <div className="sticky top-[70px] max-h-[calc(100vh-80px)] overflow-auto rounded-xl border border-slate-300 bg-slate-200 p-3 shadow-inner" style={{ width: 'calc(210mm * 0.62 + 24px)' }}>
-            <div style={{ zoom: 0.62 }}><ReportDocument {...docProps} onOverflow={(n) => setOverflow((cur) => (cur === n ? cur : n))} /></div>
+            {bi && (
+              <div className="seg mb-2" role="group">
+                <button type="button" aria-pressed={previewLang === 'en'} onClick={() => setPreviewLang('en')}>English</button>
+                <button type="button" aria-pressed={previewLang === 'vi'} onClick={() => setPreviewLang('vi')}>Tiếng Việt</button>
+              </div>
+            )}
+            <div style={{ zoom: 0.62 }}><ReportDocument {...docProps} lang={shownLang} onCheck={(c) => setCheck((cur) => (cur.overflow === c.overflow && cur.untranslated === c.untranslated ? cur : c))} /></div>
           </div>
         </div>
       )}
@@ -277,7 +293,7 @@ function SubjectCard({ tier, section: s, settings, levels, bi, editable, onPatch
     if (rawKey === 'score_raw' && patch.score_pct != null && cohortAvg != null && !hasNum(s.class_avg)) patch.class_avg = cohortAvg
     onPatch(patch)
   }
-  const commentMax = textLimit(tier === 'academic' ? 'academic_comment' : 'specialist_comment', bi)
+  const commentMax = tier === 'academic' ? TEXT_LIMITS.academic_comment : TEXT_LIMITS.specialist_comment
   const topicsKey = tier === 'academic' ? 'academic_topics' : 'vocational_topics'
 
   return (
@@ -305,11 +321,14 @@ function SubjectCard({ tier, section: s, settings, levels, bi, editable, onPatch
                   <NumberInput value={hasNum(s.class_avg) ? s.class_avg : cohortAvg ?? ''} onChange={(v) => onPatch({ class_avg: v })} min={0} max={100} />
                 </Field>
                 {isLastPeriod ? (
-                  <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-2">
-                    <Field label="Summative raw"><TextInput value={s.summative_raw} onChange={(v) => rawPatch(v, 'summative_raw', 'summative_pct')} placeholder="88/100" /></Field>
-                    <Field label="Summative %"><NumberInput value={s.summative_pct} onChange={(v) => onPatch({ summative_pct: v })} disabled={isNA(s.summative_raw)} min={0} max={100} /></Field>
+                  <div className="border-t border-slate-200 pt-2">
+                    <div className="label !mb-1">Summative (end-of-year test)</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Raw score"><TextInput value={s.summative_raw} onChange={(v) => rawPatch(v, 'summative_raw', 'summative_pct')} placeholder="88/100" /></Field>
+                      <Field label="%" hint="Type N/A if not taken"><NumberInput value={s.summative_pct} onChange={(v) => onPatch({ summative_pct: v })} disabled={isNA(s.summative_raw)} min={0} max={100} /></Field>
+                    </div>
                   </div>
-                ) : <p className="max-w-[16rem] text-[11px] text-slate-400">Type N/A if the student was not reviewed. The summative review is entered on the {lastLabel} report.</p>}
+                ) : <p className="max-w-[16rem] text-[11px] text-slate-400">Type N/A if the student was not reviewed. The summative end-of-year test score is entered on the {lastLabel} report.</p>}
               </div>
             )}
           </div>
@@ -317,10 +336,10 @@ function SubjectCard({ tier, section: s, settings, levels, bi, editable, onPatch
           <div className="space-y-3">
             {tier !== 'specialist' && (
               <div className="space-y-2 rounded-lg border border-dashed border-slate-300 p-3">
-                <Field label={tier === 'academic' ? 'Topics covered this quarter (optional)' : 'Topics covered this quarter'} right={<Count text={note?.description} max={textLimit(topicsKey, bi)} />}>
+                <Field label={tier === 'academic' ? 'Topics covered this quarter (optional)' : 'Topics covered this quarter'} right={<Count text={note?.description} max={TEXT_LIMITS[topicsKey]} />}>
                   <TextArea rows={tier === 'academic' ? 2 : 3} value={note?.description || ''} onChange={(v) => onNote({ description: v, teacher_name: s.teacher_name || note?.teacher_name || '' })} placeholder={`What the ${yearGroup} group explored in ${sub.name} this quarter…`} />
                 </Field>
-                {bi && <Field label="Vietnamese" right={<Count text={note?.description_vi} max={textLimit(topicsKey, bi)} />}><TextArea rows={2} value={note?.description_vi || ''} onChange={(v) => onNote({ description_vi: v })} /></Field>}
+                {bi && <Field label="Vietnamese version" right={<Count text={note?.description_vi} max={TEXT_LIMITS[topicsKey]} />}><TextArea rows={tier === 'academic' ? 2 : 3} value={note?.description_vi || ''} onChange={(v) => onNote({ description_vi: v })} /></Field>}
                 <p className="flex items-center gap-1 text-xs text-slate-500">
                   <Users size={13} /> Shared by every {yearGroup} report this quarter, so it only needs writing once.
                   {tier === 'vocational' ? ` It prints as the course description; there is no individual comment for ${sub.name}.` : ' It prints above the comment.'}
@@ -331,15 +350,20 @@ function SubjectCard({ tier, section: s, settings, levels, bi, editable, onPatch
               <Field label="Teacher comment" right={<Count text={s.comment} max={commentMax} />}>
                 <TextArea rows={tier === 'academic' ? 5 : 4} value={s.comment} onChange={(v) => onPatch({ comment: v })} placeholder="Strengths, progress and evidence from this quarter…" />
               </Field>
-              {bi && <Field label="Vietnamese" right={<Count text={s.comment_vi} max={commentMax} />}><TextArea rows={tier === 'academic' ? 5 : 4} value={s.comment_vi} onChange={(v) => onPatch({ comment_vi: v })} /></Field>}
+              {bi && <Field label="Vietnamese version" right={<Count text={s.comment_vi} max={commentMax} />}><TextArea rows={tier === 'academic' ? 5 : 4} value={s.comment_vi} onChange={(v) => onPatch({ comment_vi: v })} /></Field>}
             </>)}
             <div className={`grid gap-3 ${tier === 'academic' ? 'sm:grid-cols-[1fr_auto]' : 'sm:max-w-xs'}`}>
               {tier === 'academic' && (
-                <Field label="Next focus" hint="One short sentence." right={<Count text={s.next_focus} max={textLimit('next_focus', bi)} />}>
+                <Field label="Next focus" hint="One short sentence." right={<Count text={s.next_focus} max={TEXT_LIMITS.next_focus} />}>
                   <TextInput value={s.next_focus} onChange={(v) => onPatch({ next_focus: v })} />
                 </Field>
               )}
               <Field label="Teacher"><TextInput value={s.teacher_name} onChange={(v) => onPatch({ teacher_name: v })} placeholder="Mr. Alex" /></Field>
+              {tier === 'academic' && bi && (
+                <Field label="Next focus (Vietnamese version)" right={<Count text={s.next_focus_vi} max={TEXT_LIMITS.next_focus} />}>
+                  <TextInput value={s.next_focus_vi} onChange={(v) => onPatch({ next_focus_vi: v })} />
+                </Field>
+              )}
             </div>
           </div>
         </div>

@@ -70,6 +70,24 @@ const FULL_COMMENTS = {
   },
 }
 
+// Vietnamese versions for the demo (Amada's report prints in English and Vietnamese)
+const VIETNAMESE = {
+  Amada: {
+    math: { comment_vi: 'Amada hiểu vững các khái niệm toán học và ngày càng tự tin khi giải quyết vấn đề. Em thể hiện thế mạnh đặc biệt trong tư duy đại số và đang thành thạo hơn với các phép tính phân số. Amada tích cực tham gia các hoạt động hợp tác và giải thích rõ ràng cách suy nghĩ của mình cho các bạn.', next_focus_vi: 'Củng cố kỹ năng giải toán nhiều bước và vận dụng tư duy toán học vào tình huống thực tế.' },
+    english: { comment_vi: 'Amada là một người viết chu đáo và giàu cảm xúc, luôn tạo ra những bài viết có cấu trúc tốt với giọng văn riêng. Khả năng đọc hiểu của em rất tốt, và em tham gia sâu vào các buổi thảo luận về văn bản. Amada đã tự tin hơn khi trình bày ý tưởng bằng lời nói và dùng dẫn chứng để bảo vệ lập luận.', next_focus_vi: 'Sử dụng thêm các biện pháp tu từ và phân tích sâu hơn những văn bản phức tạp.' },
+    science: { comment_vi: 'Amada tiếp cận khoa học với sự tò mò và đang xây dựng nền tảng vững chắc về thiết kế thí nghiệm. Em ghi chép quan sát cẩn thận và đang học cách rút ra kết luận từ dữ liệu. Dù đôi khi cần được gợi ý để liên kết các chủ đề, sự nỗ lực và tinh thần đặt câu hỏi của em rất đáng khen.', next_focus_vi: 'Phát triển kỹ năng tự đặt và kiểm chứng giả thuyết.' },
+    art_of_science: { comment_vi: 'Amada mang sự sáng tạo và tỉ mỉ vào các dự án nghệ thuật khoa học, tạo ra những sản phẩm chi tiết và thu hút. Em tìm hiểu kỹ chủ đề và có con mắt tinh tế về màu sắc và bố cục trong các bức minh họa.' },
+    history: { comment_vi: 'Amada đang phát triển khả năng phân tích nguồn tư liệu lịch sử và đưa ra ý kiến có dẫn chứng. Em tham gia tốt các buổi thảo luận về lịch sử Việt Nam và thế giới, và đang học cách so sánh các góc nhìn qua từng thời kỳ.' },
+    movement: { comment_vi: 'Amada tham gia mọi buổi Vận động với năng lượng và tinh thần sẵn sàng thử điều mới. Em đang cải thiện khả năng phối hợp và thăng bằng qua các bài tập và trò chơi đồng đội, và luôn cổ vũ các bạn nhiệt tình. Em đang học cách phân bổ sức để duy trì nỗ lực đến cuối buổi.' },
+    report: {
+      lang: 'bi',
+      homeroom_note_vi: 'Amada đã có một khởi đầu năm học tuyệt vời. Em luôn mang đến thái độ tích cực trong mỗi buổi học và sẵn sàng giúp đỡ các bạn. Kỹ năng sắp xếp của em đã tiến bộ rõ rệt, và em ngày càng tự chủ hơn trong việc học. Sự sáng tạo của Amada tỏa sáng trong các dự án nhóm, và em là một thành viên đáng quý của cộng đồng chúng ta.',
+      experiences_vi: ['Tham gia dự án vườn cộng đồng', 'Thuyết trình về di sản văn hóa Việt Nam', 'Góp phần vào hội chợ khoa học Quý 1'],
+      student_voice_vi: 'Em rất thích các thí nghiệm khoa học trong quý này, nhất là khi được làm việc cùng các bạn trong nhóm.',
+    },
+  },
+}
+
 export async function seedYear7() {
   const settings = await db.getReportSettings()
   const period = settings.periods[0]
@@ -173,6 +191,7 @@ export async function seedYear7() {
       if (full && full[sec.subject_key]) {
         sec.comment = full[sec.subject_key].comment
         if (full[sec.subject_key].next_focus) sec.next_focus = full[sec.subject_key].next_focus
+        Object.assign(sec, VIETNAMESE[nick]?.[sec.subject_key] || {})
       }
     }
 
@@ -184,6 +203,7 @@ export async function seedYear7() {
       report.skills = full.report.skills
       report.experiences = full.report.experiences
       report.student_voice = full.report.student_voice
+      Object.assign(report, VIETNAMESE[nick]?.report || {})
       report.report_date = '2026-10-08'
       report.homeroom_teacher = 'Mr. Bowen'
       report.signatures = [{ role: 'Homeroom Teacher', name: 'Mr. Bowen' }, { role: 'Head Teacher', name: 'Mr. Seth' }]
@@ -209,6 +229,14 @@ export async function seedYear7() {
 
   // 5. Topics covered this quarter (shared by the year group): a line above
   //    each academic comment, and the whole card for vocational areas
+  const COURSE_NOTES_VI = {
+    math: 'Phương trình đại số; phân số và số thập phân; tỉ lệ; diện tích và chu vi; xử lý dữ liệu.',
+    science: 'Phương pháp khoa học và thí nghiệm công bằng; các trạng thái của vật chất; lực và chuyển động; hệ sinh thái.',
+    english: 'Viết văn tự sự; chiến lược đọc hiểu; ngữ pháp và cấu trúc câu; thuyết trình.',
+    executive_function: 'Sử dụng sổ kế hoạch tuần; chia dự án thành các bước nhỏ; đặt và xem lại mục tiêu học tập; quản lý thời gian khi tự học; suy ngẫm về điều giúp em tập trung.',
+    technology: 'Công dân số và an toàn trên mạng; sắp xếp tệp trong ổ đĩa chung; làm bài trình chiếu; làm quen lập trình kéo thả; kiểm tra độ tin cậy của nguồn tin.',
+    wellbeing: 'Nhận biết và quản lý cảm xúc; cách bình tĩnh khi căng thẳng; xây dựng tình bạn và giải quyết mâu thuẫn; thói quen ngủ và dùng màn hình lành mạnh.',
+  }
   const COURSE_NOTES = {
     math: 'Algebraic equations; fractions and decimals; ratio and proportion; area and perimeter; data handling.',
     science: 'Scientific method and fair tests; states of matter; forces and motion; ecosystems and food chains.',
@@ -220,8 +248,9 @@ export async function seedYear7() {
   const existingNotes = await db.courseNotes.list({ school_year: settings.schoolYear, period_label: period.label, year_group: 'Year 7' })
   for (const [key, description] of Object.entries(COURSE_NOTES)) {
     const note = existingNotes.find((n) => n.subject_key === key)
-    if (!note) await db.courseNotes.save({ id: genId(), school_year: settings.schoolYear, period_label: period.label, year_group: 'Year 7', subject_key: key, description, description_vi: '', teacher_name: teacherFor(key) })
-    else if (note.description !== description) await db.courseNotes.save({ ...note, description })
+    const description_vi = COURSE_NOTES_VI[key] || ''
+    if (!note) await db.courseNotes.save({ id: genId(), school_year: settings.schoolYear, period_label: period.label, year_group: 'Year 7', subject_key: key, description, description_vi, teacher_name: teacherFor(key) })
+    else if (note.description !== description || note.description_vi !== description_vi) await db.courseNotes.save({ ...note, description, description_vi })
   }
 
   const total = allReports.length + updatedReports.length

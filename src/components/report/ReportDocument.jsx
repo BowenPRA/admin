@@ -1,13 +1,15 @@
 import { useLayoutEffect, useRef } from 'react'
 import { Icon } from './icons'
-import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, fmtDate } from '../../lib/report/utils'
-import { TIERS } from '../../lib/report/defaults'
+import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows } from '../../lib/report/utils'
+import { reportStrings, periodLabel, yearGroupLabel, roleLabel, pickText } from '../../lib/report/strings'
 import { photoSrc } from '../../lib/report/photo'
 
-function LevelPill({ settings, value }) {
+const nameIn = (item, vi) => (vi && item?.name_vi) || item?.name || ''
+
+function LevelPill({ settings, value, vi, t }) {
   const l = levelInfo(settings, value)
-  if (!l) return <span className="pill empty">Not yet</span>
-  return <span className="pill" style={{ background: l.color }}><b>{l.code}</b>{l.name}</span>
+  if (!l) return <span className="pill empty">{t.notYet}</span>
+  return <span className="pill" style={{ background: l.color }}><b>{l.code}</b>{nameIn(l, vi)}</span>
 }
 
 function Dot({ settings, value }) {
@@ -15,60 +17,65 @@ function Dot({ settings, value }) {
   return l ? <span className="dot" style={{ background: l.color }}>{l.code}</span> : <span className="dot empty">–</span>
 }
 
-/** English (and Vietnamese on bilingual reports), with an optional run-in label such as "Comment:". */
-function Bi({ en, vi, bi, label, tone }) {
+/** A text box's content, with an optional run-in label such as "Comment:". Untranslated text is flagged on screen. */
+function Text({ picked, label, tone, className = 'fit txt', style }) {
   return (
-    <>
-      <div>{label && <b className={`runin ${tone || ''}`}>{label}</b>}{en || <span className="muted">—</span>}</div>
-      {bi && vi && <div className="vi">{vi}</div>}
-    </>
+    <div className={className} style={style} data-untranslated={picked.missing ? '' : undefined}>
+      {label && <b className={`runin ${tone || ''}`}>{label}</b>}{picked.text || <span className="muted">—</span>}
+    </div>
   )
 }
 
-function ScoreCell({ cell }) {
-  if (cell.state === 'score') return <><div className="score">{cell.pct}%</div>{cell.ref != null && <div className="ref">class {cell.ref}%</div>}</>
+function ScoreCell({ cell, t }) {
+  if (cell.state === 'score') return <><div className="score">{cell.pct}%</div>{cell.ref != null && <div className="ref">{t.classAvg} {cell.ref}%</div>}</>
   return <span className="tag">{cell.state === 'na' ? 'N/A' : cell.state === 'tbd' ? 'TBD' : '—'}</span>
 }
 
-const tierTitle = (key, bi) => {
-  const t = TIERS.find((x) => x.key === key)
-  return <span>{t.name}{bi && <span className="sub"> · {t.name_vi}</span>}</span>
-}
-
 /**
- * The printed Learning Progress Report: always one A4 page.
- * `onOverflow(n)` reports how many text boxes are too full to print completely.
+ * The printed Learning Progress Report: always one A4 page, in English
+ * (`lang` 'en') or Vietnamese ('vi'). Vietnamese pages use the _vi fields and
+ * fall back to the English text where no translation has been written.
+ * `onCheck({ overflow, untranslated })` reports text boxes that are too full
+ * and parts still waiting for a translation.
  */
-export default function ReportDocument({ report, sections, student, settings, history = [], cohortAvg = {}, summativeAvg = {}, courseNotes = [], compact = false, onOverflow }) {
+export default function ReportDocument({ report, sections, student, settings, history = [], cohortAvg = {}, summativeAvg = {}, courseNotes = [], compact = false, lang = 'en', onCheck }) {
+  const vi = lang === 'vi'
+  const t = reportStrings(lang)
+  const pick = (en, viText) => pickText(lang, en, viText)
   const org = settings.org || {}
-  const bi = report.lang === 'bi'
   const levels = settings.levels || []
   const tiers = sectionsByTier(settings, sections)
   const nick = firstName(student)
   const template = settings.templates?.[report.template] || {}
+  const yearGroup = yearGroupLabel(report.year_group, lang)
   const initials = (student?.full_name || '?').split(' ').filter(Boolean).map((w) => w[0]).slice(-2).join('')
   const logo = `${import.meta.env.BASE_URL}logo.png`
   const periods = (settings.periods || []).map((p) => ({ ...p, short: p.label.replace(/Quarter\s*/i, 'Q').replace(/Semester\s*/i, 'S').replace(/Term\s*/i, 'T') }))
   const rows = reviewRows(settings, { report, sections, history, cohortAvg, summativeAvg })
   const noteFor = (key) => courseNotes.find((n) => n.subject_key === key)
-  const closing = (org.closing || '').replace('{nickname}', nick).replace('{name}', student?.full_name || '')
-  const experiences = (report.experiences || []).filter((e) => (e || '').trim())
+  const closing = ((vi && org.closing_vi) || org.closing || '').replace('{nickname}', nick).replace('{name}', student?.full_name || '')
+  const clean = (list) => (list || []).filter((e) => (e || '').trim())
+  const experiences = pick(clean(report.experiences).join('\n'), clean(report.experiences_vi).join('\n'))
+  const voice = pick(report.student_voice, report.student_voice_vi)
   const cardTiers = ['specialist', 'vocational'].filter((k) => tiers[k].length)
   const cols = Math.max(3, ...cardTiers.map((k) => tiers[k].length))
+  const reportDate = report.report_date
+    ? new Date(`${report.report_date}T00:00:00`).toLocaleDateString(vi ? 'vi-VN' : 'en-GB', { day: 'numeric', month: vi ? 'numeric' : 'short', year: 'numeric' })
+    : ''
 
-  // Mark text boxes whose content is clipped (screen only).
+  // Mark text boxes whose content is clipped, and count untranslated parts (screen only).
   const root = useRef(null)
   useLayoutEffect(() => {
-    let over = 0
+    let overflow = 0
     root.current?.querySelectorAll('.fit').forEach((el) => {
       const clipped = el.scrollHeight > el.clientHeight + 1
-      if (clipped) { over++; el.setAttribute('data-over', '') } else el.removeAttribute('data-over')
+      if (clipped) { overflow++; el.setAttribute('data-over', '') } else el.removeAttribute('data-over')
     })
-    onOverflow?.(over)
+    onCheck?.({ overflow, untranslated: root.current?.querySelectorAll('[data-untranslated]').length || 0 })
   })
 
   return (
-    <div ref={root} className={`rpt ${compact ? 'compact' : ''} ${bi ? 'bi' : ''}`}>
+    <div ref={root} lang={vi ? 'vi' : 'en'} className={`rpt ${compact ? 'compact' : ''} ${vi ? 'vi' : ''}`}>
       <div className="sheet">
         {/* ---- header ---- */}
         <header style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr 1fr', alignItems: 'center', gap: 8, borderBottom: '2px solid var(--navy)', paddingBottom: 4, flex: 'none' }}>
@@ -77,14 +84,13 @@ export default function ReportDocument({ report, sections, student, settings, hi
             <div style={{ fontSize: '6.2pt', color: 'var(--blue)', fontWeight: 600, marginTop: 1 }}>{org.tagline}</div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '15pt', fontWeight: 900, letterSpacing: '.02em', color: 'var(--navy)', lineHeight: 1.05, textTransform: 'uppercase' }}>{org.docTitle}</div>
-            <div style={{ fontSize: '9pt', fontWeight: 700, color: 'var(--blue)', marginTop: 2 }}>{report.period_label} <span style={{ color: '#94a3b8' }}>•</span> {report.school_year}</div>
-            {bi && <div className="muted" style={{ fontSize: '6.8pt', fontStyle: 'italic' }}>{org.docTitle_vi}</div>}
+            <div style={{ fontSize: '15pt', fontWeight: 900, letterSpacing: '.02em', color: 'var(--navy)', lineHeight: 1.1, textTransform: 'uppercase' }}>{(vi && org.docTitle_vi) || org.docTitle}</div>
+            <div style={{ fontSize: '9pt', fontWeight: 700, color: 'var(--blue)', marginTop: 2 }}>{periodLabel(report.period_label, lang)} <span style={{ color: '#94a3b8' }}>•</span> {report.school_year}</div>
           </div>
           <div className="badge" style={{ justifySelf: 'end', minWidth: '34mm', textAlign: 'right' }}>
-            <div style={{ fontWeight: 900, fontSize: '10.5pt', letterSpacing: '.03em' }}>{(report.year_group || '').toUpperCase()}</div>
-            <div style={{ fontSize: '6.8pt', fontWeight: 600 }}>{template.program || template.name || ''}</div>
-            {report.report_date && <div style={{ fontSize: '6.2pt', opacity: 0.85, marginTop: 1 }}>{fmtDate(report.report_date)}</div>}
+            <div style={{ fontWeight: 900, fontSize: '10.5pt', letterSpacing: '.03em' }}>{yearGroup.toUpperCase()}</div>
+            <div style={{ fontSize: '6.8pt', fontWeight: 600 }}>{(vi && template.program_vi) || template.program || template.name || ''}</div>
+            {reportDate && <div style={{ fontSize: '6.2pt', opacity: 0.85, marginTop: 1 }}>{reportDate}</div>}
           </div>
         </header>
 
@@ -97,13 +103,13 @@ export default function ReportDocument({ report, sections, student, settings, hi
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 900, fontSize: '9.5pt', lineHeight: 1.12 }}>{student?.full_name}</div>
               {student?.nickname && <div className="muted" style={{ fontSize: '7.4pt' }}>"{student.nickname}"</div>}
-              <div style={{ marginTop: 2, fontSize: '7.4pt' }}><b>{report.year_group}</b></div>
-              {report.homeroom_teacher && <div style={{ fontSize: '7.4pt' }}>Homeroom: <b>{report.homeroom_teacher}</b></div>}
+              <div style={{ marginTop: 2, fontSize: '7.4pt' }}><b>{yearGroup}</b></div>
+              {report.homeroom_teacher && <div style={{ fontSize: '7.4pt' }}>{t.homeroom}: <b>{report.homeroom_teacher}</b></div>}
             </div>
           </div>
           <div className="box" style={{ background: '#eef4fb', borderColor: '#cfe0f3', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div className="kicker" style={{ color: 'var(--navy)' }}>Homeroom Teacher Comment{bi ? ' · Nhận xét GVCN' : ''}</div>
-            <div className="fit txt" style={{ flex: 1, marginTop: 1 }}><Bi en={report.homeroom_note} vi={report.homeroom_note_vi} bi={bi} /></div>
+            <div className="kicker" style={{ color: 'var(--navy)' }}>{t.homeroomComment}</div>
+            <Text picked={pick(report.homeroom_note, report.homeroom_note_vi)} style={{ flex: 1, marginTop: 1 }} />
           </div>
         </section>
 
@@ -111,11 +117,11 @@ export default function ReportDocument({ report, sections, student, settings, hi
         {tiers.academic.length > 0 && (
           <section className="sec" style={{ flex: '1 1 0' }}>
             <div className="sec-h">
-              {tierTitle('academic', bi)}
+              <span>{t.tiers.academic}</span>
               <span style={{ display: 'flex', gap: 7, fontWeight: 600, letterSpacing: 0, textTransform: 'none', fontSize: '6.4pt' }}>
                 {levels.map((l) => (
                   <span key={l.value} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                    <span className="dot" style={{ background: l.color, width: 10, height: 10, fontSize: '5.6pt', boxShadow: '0 0 0 1px rgba(255,255,255,.5)' }}>{l.code}</span>{l.name}
+                    <span className="dot" style={{ background: l.color, width: 10, height: 10, fontSize: '5.6pt', boxShadow: '0 0 0 1px rgba(255,255,255,.5)' }}>{l.code}</span>{nameIn(l, vi)}
                   </span>
                 ))}
               </span>
@@ -124,22 +130,18 @@ export default function ReportDocument({ report, sections, student, settings, hi
               {tiers.academic.map((s) => {
                 const sub = subjectByKey(settings, s.subject_key)
                 const note = noteFor(s.subject_key)
+                const next = pick(s.next_focus, s.next_focus_vi)
                 return (
                   <div key={s.id} className="area-row">
                     <div className="area-name">
-                      <div className="area-title"><Icon name={sub.icon} size={11} /> {sub.name}</div>
+                      <div className="area-title"><Icon name={sub.icon} size={11} /> {nameIn(sub, vi)}</div>
                       {s.teacher_name && <div className="muted" style={{ fontSize: '6.4pt', marginTop: -2 }}>{s.teacher_name}</div>}
-                      <div style={{ marginTop: 1 }}><LevelPill settings={settings} value={s.level} /></div>
+                      <div style={{ marginTop: 1 }}><LevelPill settings={settings} value={s.level} vi={vi} t={t} /></div>
                     </div>
                     <div className="area-body">
-                      {(note?.description || '').trim() && (
-                        <div className="topics">
-                          <b className="runin green">Topics covered:</b>{note.description}
-                          {bi && note.description_vi && <div className="vi">{note.description_vi}</div>}
-                        </div>
-                      )}
-                      <div className="fit txt"><Bi en={s.comment} vi={s.comment_vi} bi={bi} /></div>
-                      {(s.next_focus || '').trim() && <div className="next"><b>Next focus:</b> {s.next_focus}</div>}
+                      {(note?.description || '').trim() && <Text className="topics" picked={pick(note.description, note.description_vi)} label={t.topicsCovered} tone="green" />}
+                      <Text picked={pick(s.comment, s.comment_vi)} />
+                      {next.text.trim() && <Text className="next" picked={next} label={t.nextFocus} />}
                     </div>
                   </div>
                 )
@@ -152,37 +154,35 @@ export default function ReportDocument({ report, sections, student, settings, hi
         <section style={{ display: 'grid', gridTemplateColumns: rows.length ? '1.08fr 1fr' : '1fr', gap: '2mm', flex: 'none' }}>
           {rows.length > 0 && (
             <div className="sec">
-              <div className="sec-h"><span>Progress Review Scores{bi && <span className="sub"> · Điểm đánh giá</span>}</span></div>
+              <div className="sec-h"><span>{t.scores}</span></div>
               <table className="scores">
                 <thead><tr>
-                  <th style={{ width: '25%' }}>Learning area</th>
+                  <th style={{ width: '25%' }}>{t.learningArea}</th>
                   {periods.map((p) => <th key={p.index} className={Number(p.index) === Number(report.period_index) ? 'cur' : ''}>{p.short}</th>)}
-                  <th className="sum">Summative</th>
+                  <th className="sum" style={{ lineHeight: 1.05 }}>{t.summative}<div style={{ fontSize: '5.2pt', fontWeight: 600, textTransform: 'none', letterSpacing: 0 }}>{t.endOfYearTest}</div></th>
                 </tr></thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.key}>
-                      <td style={{ fontWeight: 700, fontSize: '7.4pt', color: 'var(--navy)', whiteSpace: 'nowrap' }}>{r.name}</td>
-                      {r.cells.map((c, i) => <td key={i} className={Number(periods[i].index) === Number(report.period_index) ? 'cur' : ''}><ScoreCell cell={c} /></td>)}
-                      <td className="sum"><ScoreCell cell={r.summative} /></td>
+                      <td style={{ fontWeight: 700, fontSize: '7.4pt', color: 'var(--navy)', whiteSpace: 'nowrap' }}>{nameIn(subjectByKey(settings, r.key), vi)}</td>
+                      {r.cells.map((c, i) => <td key={i} className={Number(periods[i].index) === Number(report.period_index) ? 'cur' : ''}><ScoreCell cell={c} t={t} /></td>)}
+                      <td className="sum"><ScoreCell cell={r.summative} t={t} /></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <div className="muted" style={{ fontSize: '5.8pt', padding: '1.5px 7px 2px', borderTop: '1px solid var(--line)', background: 'var(--soft)' }}>
-                Updated each quarter. TBD: still to come · N/A: not enrolled or not reviewed that quarter.
-              </div>
+              <div className="muted" style={{ fontSize: '5.8pt', padding: '1.5px 7px 2px', borderTop: '1px solid var(--line)', background: 'var(--soft)' }}>{t.scoresKey}</div>
             </div>
           )}
           <div className="sec">
-            <div className="sec-h"><span>How I Learn{bi && <span className="sub"> · Kỹ năng học tập</span>}</span></div>
+            <div className="sec-h"><span>{t.howILearn}</span></div>
             <div className="skills">
               {(settings.skillGroups || []).map((g) => (
                 <div key={g.key}>
-                  <div className="kicker" style={{ padding: '1px 0', fontSize: '5.9pt' }}>{g.name}</div>
+                  <div className="kicker" style={{ padding: '1px 0', fontSize: '5.9pt' }}>{nameIn(g, vi)}</div>
                   {g.items.map((it) => (
                     <div key={it.key} className="skill-row">
-                      <span><Icon name={it.icon} size={8} style={{ color: 'var(--navy)' }} />{it.name}</span>
+                      <span><Icon name={it.icon} size={8} style={{ color: 'var(--navy)' }} />{nameIn(it, vi)}</span>
                       <Dot settings={settings} value={report.skills?.[it.key]} />
                     </div>
                   ))}
@@ -196,12 +196,8 @@ export default function ReportDocument({ report, sections, student, settings, hi
         {cardTiers.map((tier) => (
           <section key={tier} className="sec" style={{ height: tier === 'specialist' ? '45.5mm' : '37mm', flex: 'none' }}>
             <div className="sec-h">
-              {tierTitle(tier, bi)}
-              <span className="sub" style={{ fontSize: '6.4pt' }}>
-                {tier === 'specialist'
-                  ? `Individual comments on ${nick}'s progress`
-                  : `Course descriptions: topics the ${report.year_group} group covered this quarter`}
-              </span>
+              <span>{t.tiers[tier]}</span>
+              <span className="sub" style={{ fontSize: '6.4pt' }}>{tier === 'specialist' ? t.specialistNote(nick) : t.vocationalNote(yearGroup)}</span>
             </div>
             <div className="cards" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
               {tiers[tier].map((s) => {
@@ -210,13 +206,15 @@ export default function ReportDocument({ report, sections, student, settings, hi
                 return (
                   <div key={s.id} className="card-a">
                     <div className="card-head">
-                      <span className="t"><Icon name={sub.icon} size={10} /> {sub.name}</span>
-                      <LevelPill settings={settings} value={s.level} />
+                      <span className="t"><Icon name={sub.icon} size={10} /> {nameIn(sub, vi)}</span>
                     </div>
-                    {s.teacher_name && <div className="teacher">{s.teacher_name}</div>}
+                    <div className="card-sub">
+                      <span className="teacher">{s.teacher_name}</span>
+                      <LevelPill settings={settings} value={s.level} vi={vi} t={t} />
+                    </div>
                     {tier === 'vocational'
-                      ? <div className="fit txt"><Bi en={note?.description} vi={note?.description_vi} bi={bi} label="Topics covered:" tone="green" /></div>
-                      : <div className="fit txt"><Bi en={s.comment} vi={s.comment_vi} bi={bi} label="Comment:" tone="blue" /></div>}
+                      ? <Text picked={pick(note?.description, note?.description_vi)} label={t.topicsCovered} tone="green" />
+                      : <Text picked={pick(s.comment, s.comment_vi)} label={t.comment} tone="blue" />}
                   </div>
                 )
               })}
@@ -227,21 +225,20 @@ export default function ReportDocument({ report, sections, student, settings, hi
         {/* ---- experiences, student voice, signatures ---- */}
         <section style={{ display: 'grid', gridTemplateColumns: '1.15fr 1.3fr 0.7fr', gap: '3mm', height: '20.5mm', flex: 'none' }}>
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div className="kicker">Experiences &amp; growth{bi ? ' · Trải nghiệm' : ''}</div>
-            <ul className="bullets fit" style={{ flex: 1, marginTop: 1 }}>
-              {experiences.map((e, i) => <li key={i}>{e}</li>)}
-              {!experiences.length && <li className="muted">—</li>}
+            <div className="kicker">{t.experiences}</div>
+            <ul className="bullets fit" style={{ flex: 1, marginTop: 1 }} data-untranslated={experiences.missing ? '' : undefined}>
+              {experiences.text ? experiences.text.split('\n').map((e, i) => <li key={i}>{e}</li>) : <li className="muted">—</li>}
             </ul>
           </div>
           <div className="box" style={{ background: '#fffbeb', borderColor: '#fde68a', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div className="kicker" style={{ color: '#92400e' }}>In {nick}'s words</div>
-            <div className="quote fit" style={{ flex: 1, marginTop: 1 }}>{report.student_voice ? `"${report.student_voice}"` : '—'}</div>
+            <div className="kicker" style={{ color: '#92400e' }}>{t.inWords(nick)}</div>
+            <div className="quote fit" style={{ flex: 1, marginTop: 1 }} data-untranslated={voice.missing ? '' : undefined}>{voice.text ? `"${voice.text}"` : '—'}</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', gap: 2 }}>
             {(report.signatures || []).map((sg, i) => (
               <div key={i}>
                 <div style={{ fontFamily: "'Segoe Script', 'Brush Script MT', cursive", fontSize: '8.5pt', color: 'var(--navy)', minHeight: 12, lineHeight: 1.2 }}>{sg.name}</div>
-                <div className="sig-line"><b style={{ color: 'var(--ink)' }}>{sg.role}</b></div>
+                <div className="sig-line"><b style={{ color: 'var(--ink)' }}>{roleLabel(sg.role, lang)}</b></div>
               </div>
             ))}
           </div>

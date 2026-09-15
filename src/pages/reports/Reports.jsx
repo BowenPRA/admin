@@ -157,7 +157,8 @@ function ReportsList({ settings }) {
           <div className="flex flex-wrap justify-end gap-2">
             {gaps.length > 0 && <button className="btn-secondary text-xs" disabled={busy === yg} onClick={() => addMissing(yg, gaps)} title="These reports were created before the area was added to this year group"><Plus size={14} /> Add {[...new Set(gaps.map((g) => subjectByKey(settings, g.key).name))].join(', ')} to {new Set(gaps.map((g) => g.r.id)).size} report{new Set(gaps.map((g) => g.r.id)).size === 1 ? '' : 's'}</button>}
             {isHead && <button className="btn-secondary text-xs" disabled={busy === yg} onClick={() => updateRefs(yg, list)} title="Average this year group's review scores into every report's class reference"><RefreshCw size={14} /> Update class references</button>}
-            <Link className="btn-secondary text-xs" to={`/print/reports?year=${encodeURIComponent(settings.schoolYear)}&period=${encodeURIComponent(period)}&group=${encodeURIComponent(yg)}`} target="_blank"><Printer size={14} /> Print all</Link>
+            <Link className="btn-secondary text-xs" to={`/print/reports?year=${encodeURIComponent(settings.schoolYear)}&period=${encodeURIComponent(period)}&group=${encodeURIComponent(yg)}`} target="_blank"><Printer size={14} /> Print all{list.some((r) => r.lang === 'bi') ? ' (English)' : ''}</Link>
+            {list.some((r) => r.lang === 'bi') && <Link className="btn-secondary text-xs" to={`/print/reports?year=${encodeURIComponent(settings.schoolYear)}&period=${encodeURIComponent(period)}&group=${encodeURIComponent(yg)}&lang=vi`} target="_blank" title="Only the reports set to English and Vietnamese"><Printer size={14} /> Tiếng Việt ({list.filter((r) => r.lang === 'bi').length})</Link>}
           </div>
         )}>
           <div className="overflow-x-auto">
