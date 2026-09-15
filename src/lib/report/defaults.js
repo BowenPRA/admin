@@ -19,13 +19,14 @@ export const LEVELS = [
 
 // The three tiers of learning areas. A subject's `kind` is its tier, and the
 // tier decides what teachers write and how it prints:
-//   academic    level, progress review score, comment and next focus
+//   academic    level, progress review score, comment and next focus, plus an
+//               optional "topics covered" line shared by the year group
 //   specialist  level and a comment
 //   vocational  level, plus one "topics covered" description shared by the
 //               whole year group (no comment on the individual student)
 export const TIERS = [
   { key: 'academic', name: 'Academic Learning', name_vi: 'Học thuật', short: 'Academic',
-    hint: 'Level, progress review score, comment and next focus for each student.' },
+    hint: 'Level, progress review score, comment and next focus for each student. Topics covered is optional and shared by the year group.' },
   { key: 'specialist', name: 'Specialist Learning', name_vi: 'Môn chuyên biệt', short: 'Specialist',
     hint: 'Level and a comment for each student.' },
   { key: 'vocational', name: 'Vocational Learning', name_vi: 'Hướng nghiệp', short: 'Vocational',
@@ -52,10 +53,11 @@ export const SUBJECTS = [
 // only together with that layout.
 export const TEXT_LIMITS = {
   homeroom_note: 380,
-  academic_comment: 540,
+  academic_topics: 115,
+  academic_comment: 480,
   next_focus: 100,
-  specialist_comment: 340,
-  vocational_topics: 240,
+  specialist_comment: 320,
+  vocational_topics: 230,
   student_voice: 180,
   experience: 50,
 }
@@ -63,8 +65,8 @@ export const TEXT_LIMITS = {
 // A bilingual report prints English and Vietnamese in the same box in smaller
 // type, so each language gets a shorter limit (next focus, student voice and
 // experiences print in English only).
-const BILINGUAL = ['homeroom_note', 'academic_comment', 'specialist_comment', 'vocational_topics']
-export const textLimit = (key, bi) => (bi && BILINGUAL.includes(key) ? Math.floor((TEXT_LIMITS[key] * 0.57) / 10) * 10 : TEXT_LIMITS[key])
+const BILINGUAL_SHARE = { homeroom_note: 0.57, academic_topics: 0.57, academic_comment: 0.57, specialist_comment: 0.57, vocational_topics: 0.5 }
+export const textLimit = (key, bi) => (bi && BILINGUAL_SHARE[key] ? Math.floor((TEXT_LIMITS[key] * BILINGUAL_SHARE[key]) / 10) * 10 : TEXT_LIMITS[key])
 
 export const SKILL_GROUPS = [
   { key: 'foundational', name: 'Foundational Learning Skills', name_vi: 'Kỹ năng học tập cơ bản', items: [

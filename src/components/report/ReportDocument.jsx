@@ -15,10 +15,11 @@ function Dot({ settings, value }) {
   return l ? <span className="dot" style={{ background: l.color }}>{l.code}</span> : <span className="dot empty">–</span>
 }
 
-function Bi({ en, vi, bi }) {
+/** English (and Vietnamese on bilingual reports), with an optional run-in label such as "Comment:". */
+function Bi({ en, vi, bi, label, tone }) {
   return (
     <>
-      <div>{en || <span className="muted">—</span>}</div>
+      <div>{label && <b className={`runin ${tone || ''}`}>{label}</b>}{en || <span className="muted">—</span>}</div>
       {bi && vi && <div className="vi">{vi}</div>}
     </>
   )
@@ -122,14 +123,21 @@ export default function ReportDocument({ report, sections, student, settings, hi
             <div className="area-rows" style={{ gridTemplateRows: `repeat(${tiers.academic.length}, minmax(0, 1fr))` }}>
               {tiers.academic.map((s) => {
                 const sub = subjectByKey(settings, s.subject_key)
+                const note = noteFor(s.subject_key)
                 return (
                   <div key={s.id} className="area-row">
                     <div className="area-name">
-                      <div className="area-title"><Icon name={sub.icon} size={12} /> {sub.name}</div>
-                      {s.teacher_name && <div className="muted" style={{ fontSize: '6.6pt', marginTop: -2 }}>{s.teacher_name}</div>}
+                      <div className="area-title"><Icon name={sub.icon} size={11} /> {sub.name}</div>
+                      {s.teacher_name && <div className="muted" style={{ fontSize: '6.4pt', marginTop: -2 }}>{s.teacher_name}</div>}
                       <div style={{ marginTop: 1 }}><LevelPill settings={settings} value={s.level} /></div>
                     </div>
                     <div className="area-body">
+                      {(note?.description || '').trim() && (
+                        <div className="topics">
+                          <b className="runin green">Topics covered:</b>{note.description}
+                          {bi && note.description_vi && <div className="vi">{note.description_vi}</div>}
+                        </div>
+                      )}
                       <div className="fit txt"><Bi en={s.comment} vi={s.comment_vi} bi={bi} /></div>
                       {(s.next_focus || '').trim() && <div className="next"><b>Next focus:</b> {s.next_focus}</div>}
                     </div>
@@ -189,7 +197,11 @@ export default function ReportDocument({ report, sections, student, settings, hi
           <section key={tier} className="sec" style={{ height: tier === 'specialist' ? '45.5mm' : '37mm', flex: 'none' }}>
             <div className="sec-h">
               {tierTitle(tier, bi)}
-              {tier === 'vocational' && <span className="sub" style={{ fontSize: '6.4pt' }}>Topics covered by the {report.year_group} group this quarter</span>}
+              <span className="sub" style={{ fontSize: '6.4pt' }}>
+                {tier === 'specialist'
+                  ? `Individual comments on ${nick}'s progress`
+                  : `Course descriptions: topics the ${report.year_group} group covered this quarter`}
+              </span>
             </div>
             <div className="cards" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
               {tiers[tier].map((s) => {
@@ -203,8 +215,8 @@ export default function ReportDocument({ report, sections, student, settings, hi
                     </div>
                     {s.teacher_name && <div className="teacher">{s.teacher_name}</div>}
                     {tier === 'vocational'
-                      ? <div className="fit txt"><Bi en={note?.description} vi={note?.description_vi} bi={bi} /></div>
-                      : <div className="fit txt"><Bi en={s.comment} vi={s.comment_vi} bi={bi} /></div>}
+                      ? <div className="fit txt"><Bi en={note?.description} vi={note?.description_vi} bi={bi} label="Topics covered:" tone="green" /></div>
+                      : <div className="fit txt"><Bi en={s.comment} vi={s.comment_vi} bi={bi} label="Comment:" tone="blue" /></div>}
                   </div>
                 )
               })}

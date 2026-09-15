@@ -207,17 +207,21 @@ export async function seedYear7() {
     await db.sections.saveMany(updatedSections)
   }
 
-  // 5. Topics covered this quarter for the vocational areas (shared by the year group)
+  // 5. Topics covered this quarter (shared by the year group): a line above
+  //    each academic comment, and the whole card for vocational areas
   const COURSE_NOTES = {
+    math: 'Algebraic equations; fractions and decimals; ratio and proportion; area and perimeter; data handling.',
+    science: 'Scientific method and fair tests; states of matter; forces and motion; ecosystems and food chains.',
+    english: 'Narrative writing; reading comprehension strategies; grammar and sentence structure; oral presentations.',
     executive_function: 'Using a weekly planner; breaking projects into steps with checkpoints; setting and reviewing personal learning goals; managing time during independent work; reflecting on what helps us focus.',
     technology: 'Digital citizenship and staying safe online; file organisation in shared drives; building slide presentations; introduction to block-based coding; checking whether online sources are reliable.',
     wellbeing: 'Naming and managing emotions; calming strategies for stressful moments; building friendships and resolving conflict; healthy sleep and screen habits; weekly wellbeing circles.',
   }
   const existingNotes = await db.courseNotes.list({ school_year: settings.schoolYear, period_label: period.label, year_group: 'Year 7' })
   for (const [key, description] of Object.entries(COURSE_NOTES)) {
-    if (!existingNotes.find((n) => n.subject_key === key)) {
-      await db.courseNotes.save({ id: genId(), school_year: settings.schoolYear, period_label: period.label, year_group: 'Year 7', subject_key: key, description, description_vi: '', teacher_name: teacherFor(key) })
-    }
+    const note = existingNotes.find((n) => n.subject_key === key)
+    if (!note) await db.courseNotes.save({ id: genId(), school_year: settings.schoolYear, period_label: period.label, year_group: 'Year 7', subject_key: key, description, description_vi: '', teacher_name: teacherFor(key) })
+    else if (note.description !== description) await db.courseNotes.save({ ...note, description })
   }
 
   const total = allReports.length + updatedReports.length

@@ -107,10 +107,14 @@ body {
 
 /* academic rows */
 .rpt .area-rows { flex: 1; min-height: 0; display: grid; }
-.rpt .area-row { display: grid; grid-template-columns: 38mm 1fr; min-height: 0; border-top: 1px solid var(--line); }
+.rpt .area-row { display: grid; grid-template-columns: 26mm 1fr; min-height: 0; border-top: 1px solid var(--line); }
 .rpt .area-row:first-child { border-top: none; }
-.rpt .area-name { padding: 4px 6px; background: #fafbfd; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
-.rpt .area-title { display: flex; align-items: center; gap: 4px; font-weight: 800; font-size: 8.5pt; color: var(--navy); }
+.rpt .area-name { padding: 4px 5px; background: #fafbfd; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rpt .area-title { display: flex; align-items: center; gap: 3px; font-weight: 800; font-size: 8.2pt; color: var(--navy); white-space: nowrap; }
+.rpt .topics { flex: none; font-size: 7pt; line-height: 1.28; color: #4b5563; margin-bottom: 2px; padding-bottom: 2px; border-bottom: 1px dashed var(--line); }
+.rpt .runin { font-weight: 700; margin-right: 3px; }
+.rpt .runin.green { color: var(--green); }
+.rpt .runin.blue { color: var(--blue); }
 .rpt .area-body { padding: 4px 8px; display: flex; flex-direction: column; min-height: 0; }
 .rpt .area-body .fit { flex: 1; }
 .rpt .next { flex: none; font-size: 7.4pt; line-height: 1.3; margin-top: 2px; padding-top: 2px; border-top: 1px dashed var(--line); }

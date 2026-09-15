@@ -278,6 +278,7 @@ function SubjectCard({ tier, section: s, settings, levels, bi, editable, onPatch
     onPatch(patch)
   }
   const commentMax = textLimit(tier === 'academic' ? 'academic_comment' : 'specialist_comment', bi)
+  const topicsKey = tier === 'academic' ? 'academic_topics' : 'vocational_topics'
 
   return (
     <div id={`sec-${s.subject_key}`} className="scroll-mt-28">
@@ -314,15 +315,19 @@ function SubjectCard({ tier, section: s, settings, levels, bi, editable, onPatch
           </div>
 
           <div className="space-y-3">
-            {tier === 'vocational' ? (
+            {tier !== 'specialist' && (
               <div className="space-y-2 rounded-lg border border-dashed border-slate-300 p-3">
-                <Field label="Topics covered this quarter" right={<Count text={note?.description} max={textLimit('vocational_topics', bi)} />}>
-                  <TextArea rows={3} value={note?.description || ''} onChange={(v) => onNote({ description: v, teacher_name: s.teacher_name || note?.teacher_name || '' })} placeholder={`What the ${yearGroup} group explored in ${sub.name} this quarter…`} />
+                <Field label={tier === 'academic' ? 'Topics covered this quarter (optional)' : 'Topics covered this quarter'} right={<Count text={note?.description} max={textLimit(topicsKey, bi)} />}>
+                  <TextArea rows={tier === 'academic' ? 2 : 3} value={note?.description || ''} onChange={(v) => onNote({ description: v, teacher_name: s.teacher_name || note?.teacher_name || '' })} placeholder={`What the ${yearGroup} group explored in ${sub.name} this quarter…`} />
                 </Field>
-                {bi && <Field label="Vietnamese" right={<Count text={note?.description_vi} max={textLimit('vocational_topics', bi)} />}><TextArea rows={3} value={note?.description_vi || ''} onChange={(v) => onNote({ description_vi: v })} /></Field>}
-                <p className="flex items-center gap-1 text-xs text-slate-500"><Users size={13} /> Shared by every {yearGroup} report this quarter, so it only needs writing once. There is no individual comment for {sub.name}.</p>
+                {bi && <Field label="Vietnamese" right={<Count text={note?.description_vi} max={textLimit(topicsKey, bi)} />}><TextArea rows={2} value={note?.description_vi || ''} onChange={(v) => onNote({ description_vi: v })} /></Field>}
+                <p className="flex items-center gap-1 text-xs text-slate-500">
+                  <Users size={13} /> Shared by every {yearGroup} report this quarter, so it only needs writing once.
+                  {tier === 'vocational' ? ` It prints as the course description; there is no individual comment for ${sub.name}.` : ' It prints above the comment.'}
+                </p>
               </div>
-            ) : (<>
+            )}
+            {tier !== 'vocational' && (<>
               <Field label="Teacher comment" right={<Count text={s.comment} max={commentMax} />}>
                 <TextArea rows={tier === 'academic' ? 5 : 4} value={s.comment} onChange={(v) => onPatch({ comment: v })} placeholder="Strengths, progress and evidence from this quarter…" />
               </Field>
