@@ -17,6 +17,7 @@ export default function PrintReport() {
   const [err, setErr] = useState('')
   const [bi, setBi] = useState(null)
   const [compact, setCompact] = useState(false)
+  const [overflow, setOverflow] = useState(0)
 
   useEffect(() => { loadReportBundle(id).then(setBundle).catch((e) => setErr(e.message)) }, [id])
   useEffect(() => { if (bundle) document.title = `${bundle.student?.full_name} – ${bundle.report.period_label} ${bundle.report.school_year}` }, [bundle])
@@ -30,13 +31,14 @@ export default function PrintReport() {
       <div className="no-print sticky top-0 z-10 flex items-center gap-2 border-b border-slate-300 bg-white/95 px-4 py-2 backdrop-blur">
         <Link to={`/reports/${id}`} className="btn-ghost"><ArrowLeft size={16} /> Back to editor</Link>
         <span className="flex-1 truncate text-sm font-semibold text-slate-700">{bundle.student?.full_name} · {report.period_label} {report.school_year}</span>
+        {overflow > 0 && <span className="text-xs font-semibold text-red-600">{overflow} box{overflow === 1 ? ' is' : 'es are'} too full (outlined in red){compact ? '' : ' · try Compact'}</span>}
         <button className="btn-secondary" onClick={() => setBi(!(bi ?? bundle.report.lang === 'bi'))}><Languages size={16} /> {report.lang === 'bi' ? 'Bilingual' : 'English only'}</button>
         <button className={compact ? 'btn-primary' : 'btn-secondary'} onClick={() => setCompact((v) => !v)} title="Smaller text if a page overflows"><Minimize2 size={16} /> Compact</button>
         <button className="btn-primary" onClick={() => window.print()}><Printer size={16} /> Print / Save PDF</button>
       </div>
       <div className="py-6 print:py-0">
         <div className="mx-auto shadow-xl print:shadow-none" style={{ width: '210mm' }}>
-          <ReportDocument {...bundle} report={report} settings={settings} compact={compact} />
+          <ReportDocument {...bundle} report={report} settings={settings} compact={compact} onOverflow={(n) => setOverflow((cur) => (cur === n ? cur : n))} />
         </div>
       </div>
     </div>

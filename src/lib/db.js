@@ -7,7 +7,7 @@
 
 import { supabase, hasSupabase } from './supabaseClient.js'
 import { DEFAULT_FEES, DEFAULT_CALENDAR } from './fees.js'
-import { DEFAULT_REPORT_SETTINGS } from './report/defaults.js'
+import { normalizeReportSettings } from './report/defaults.js'
 
 const TABLES = {
   families: 'adm_families',
@@ -213,10 +213,9 @@ export const db = {
   },
   setCalendar: (v) => A.setSetting('calendar', v),
   // Progress-report configuration: one JSON document; missing keys fall back
-  // to the defaults so new options appear without migration.
+  // to the defaults and older saved versions are upgraded on read.
   async getReportSettings() {
-    const v = (await A.getSetting('reports')) || {}
-    return { ...DEFAULT_REPORT_SETTINGS, ...v, org: { ...DEFAULT_REPORT_SETTINGS.org, ...(v.org || {}) } }
+    return normalizeReportSettings(await A.getSetting('reports'))
   },
   setReportSettings: (v) => A.setSetting('reports', v),
 

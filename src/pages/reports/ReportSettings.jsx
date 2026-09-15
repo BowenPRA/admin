@@ -4,7 +4,7 @@ import { Plus, Trash2, ArrowUp, ArrowDown, Save, RotateCcw, ArrowLeft } from 'lu
 import { useData } from '../../lib/DataContext'
 import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
-import { DEFAULT_REPORT_SETTINGS } from '../../lib/report/defaults'
+import { DEFAULT_REPORT_SETTINGS, TIERS } from '../../lib/report/defaults'
 import { LEVELS as YEAR_GROUPS } from '../../lib/fees'
 import { ICONS } from '../../components/report/icons'
 import { Card, Field, TextInput, TextArea, Select, Checkbox, Empty, Spinner } from '../../components/ui'
@@ -90,24 +90,34 @@ function SettingsForm({ initial }) {
         </div>
       </Card>
 
-      <Card title="Learning areas" subtitle="Academic areas appear in the main table (with review scores); vocational areas appear as cards. The key gives teachers their permissions, so avoid renaming keys once reports exist.">
+      <Card title="Learning areas" subtitle="The tier decides how an area prints: academic (level, review score, comment), specialist (level, comment) or vocational (level, plus topics covered shared by the year group). The key gives teachers their permissions, so avoid renaming keys once reports exist.">
         <div className="space-y-3">
           {s.subjects.map((sub, i) => (
-            <div key={i} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_120px_120px_auto]">
+            <div key={i} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_130px_120px_auto]">
               <Field label="Name"><TextInput value={sub.name} onChange={(v) => set(`subjects.${i}.name`, v)} /></Field>
               <Field label="Vietnamese"><TextInput value={sub.name_vi} onChange={(v) => set(`subjects.${i}.name_vi`, v)} /></Field>
               <Field label="Key"><TextInput value={sub.key} onChange={(v) => set(`subjects.${i}.key`, slug(v))} /></Field>
-              <Field label="Kind"><Select value={sub.kind} onChange={(v) => set(`subjects.${i}.kind`, v)} options={[{ value: 'academic', label: 'Academic' }, { value: 'vocational', label: 'Vocational' }]} /></Field>
+              <Field label="Tier"><Select value={sub.kind} onChange={(v) => set(`subjects.${i}.kind`, v)} options={TIERS.map((t) => ({ value: t.key, label: t.short }))} /></Field>
               <Field label="Icon"><Select value={sub.icon} onChange={(v) => set(`subjects.${i}.icon`, v)} options={iconOpts} /></Field>
               <div className="flex items-end gap-1 pb-1">
                 <button className="btn-ghost px-2" onClick={() => move('subjects', i, -1)}><ArrowUp size={14} /></button>
                 <button className="btn-ghost px-2" onClick={() => move('subjects', i, 1)}><ArrowDown size={14} /></button>
                 <button className="btn-ghost px-2 text-red-500" onClick={() => del('subjects', i)}><Trash2 size={14} /></button>
               </div>
-              <div className="flex items-end pb-2 sm:col-span-6"><Checkbox checked={sub.scored !== false} onChange={(v) => set(`subjects.${i}.scored`, v)} label="Has a progress review score" /></div>
+              <div className="sm:col-span-6">
+                <div className="label">Only for year groups <span className="font-normal normal-case text-slate-400">{(sub.yearGroups || []).length ? '' : '(none ticked: every year group in its template)'}</span></div>
+                <div className="flex flex-wrap gap-1">
+                  {YEAR_GROUPS.map((g) => {
+                    const on = (sub.yearGroups || []).includes(g)
+                    return <button key={g} type="button" aria-pressed={on} onClick={() => set(`subjects.${i}.yearGroups`, on ? sub.yearGroups.filter((x) => x !== g) : [...(sub.yearGroups || []), g])}
+                      className={`chip ${on ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-sky-100'}`}>{g}</button>
+                  })}
+                </div>
+              </div>
+              {sub.kind === 'academic' && <div className="sm:col-span-6"><Checkbox checked={sub.scored !== false} onChange={(v) => set(`subjects.${i}.scored`, v)} label="Has a progress review score (shown in the Q1–Q4 and summative table)" /></div>}
             </div>
           ))}
-          <button className="btn-secondary text-xs" onClick={() => add('subjects', { key: `subject_${s.subjects.length + 1}`, kind: 'vocational', name: 'New area', name_vi: '', icon: 'star', scored: false })}><Plus size={14} /> Add learning area</button>
+          <button className="btn-secondary text-xs" onClick={() => add('subjects', { key: `subject_${s.subjects.length + 1}`, kind: 'specialist', name: 'New area', name_vi: '', icon: 'star', scored: false })}><Plus size={14} /> Add learning area</button>
         </div>
       </Card>
 
@@ -115,7 +125,7 @@ function SettingsForm({ initial }) {
         <div className="space-y-4">
           {Object.keys(s.templates || {}).map((k) => {
             const t = s.templates[k]
-            const toggleIn = (field, key) => (on) => set(`templates.${k}.${field}`, on ? s.subjects.map((x) => x.key).filter((x) => x === key || (t[field] || []).includes(x)) : (t[field] || []).filter((x) => x !== key))
+            const toggleArea = (key) => (on) => set(`templates.${k}.areas`, on ? s.subjects.map((x) => x.key).filter((x) => x === key || (t.areas || []).includes(x)) : (t.areas || []).filter((x) => x !== key))
             return (
               <div key={k} className="rounded-xl border border-slate-200 p-3">
                 <div className="grid gap-2 sm:grid-cols-3">
@@ -125,13 +135,24 @@ function SettingsForm({ initial }) {
                 </div>
                 <div className="mt-3 grid gap-4 sm:grid-cols-3">
                   <div><div className="label">Year groups</div><div className="grid grid-cols-2 gap-1">{YEAR_GROUPS.map((g) => <Checkbox key={g} checked={(t.yearGroups || []).includes(g)} onChange={(on) => set(`templates.${k}.yearGroups`, on ? [...t.yearGroups, g] : t.yearGroups.filter((x) => x !== g))} label={g} />)}</div></div>
-                  <div><div className="label">Academic areas (table)</div><div className="grid gap-1">{s.subjects.map((sub) => <Checkbox key={sub.key} checked={(t.academic || []).includes(sub.key)} onChange={toggleIn('academic', sub.key)} label={sub.name} />)}</div></div>
-                  <div><div className="label">Vocational areas (cards)</div><div className="grid gap-1">{s.subjects.map((sub) => <Checkbox key={sub.key} checked={(t.vocational || []).includes(sub.key)} onChange={toggleIn('vocational', sub.key)} label={sub.name} />)}</div></div>
+                  <div className="sm:col-span-2">
+                    <div className="label">Learning areas</div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {TIERS.map((tier) => (
+                        <div key={tier.key}>
+                          <div className="mb-1 text-xs font-semibold text-slate-500">{tier.short}</div>
+                          <div className="grid gap-1">
+                            {s.subjects.filter((sub) => sub.kind === tier.key).map((sub) => <Checkbox key={sub.key} checked={(t.areas || []).includes(sub.key)} onChange={toggleArea(sub.key)} label={`${sub.name}${(sub.yearGroups || []).length ? ` (${sub.yearGroups.join(', ')})` : ''}`} />)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             )
           })}
-          <button className="btn-secondary text-xs" onClick={() => { const name = prompt('Template name (e.g. Primary)'); if (!name) return; const key = slug(name); setS((cur) => ({ ...cur, templates: { ...cur.templates, [key]: { key, name, program: `${name} Program`, yearGroups: [], academic: [], vocational: [] } } })) }}><Plus size={14} /> Add template</button>
+          <button className="btn-secondary text-xs" onClick={() => { const name = prompt('Template name (e.g. Primary)'); if (!name) return; const key = slug(name); setS((cur) => ({ ...cur, templates: { ...cur.templates, [key]: { key, name, program: `${name} Program`, yearGroups: [], areas: [] } } })) }}><Plus size={14} /> Add template</button>
         </div>
       </Card>
 

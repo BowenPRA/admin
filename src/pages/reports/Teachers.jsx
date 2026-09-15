@@ -251,7 +251,7 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
               <tbody>
                 {settings.subjects.map((s) => (
                   <tr key={s.key} className="border-t border-slate-100">
-                    <td className="whitespace-nowrap py-1.5 pl-3 pr-3 font-semibold text-slate-700">{s.name} <span className="font-normal text-slate-400">{s.kind === 'academic' ? '' : '· voc.'}</span></td>
+                    <td className="whitespace-nowrap py-1.5 pl-3 pr-3 font-semibold text-slate-700">{s.name} <span className="font-normal text-slate-400">{s.kind === 'specialist' ? '· spec.' : s.kind === 'vocational' ? '· voc.' : ''}</span></td>
                     {groups.map((g) => {
                       const k = `${s.key}:${g}`
                       return (

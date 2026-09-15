@@ -2,7 +2,7 @@ import { db, genId } from './db'
 import { ROSTER } from '../data/roster'
 import { TEACHER_SCHEDULE } from '../data/staff'
 import { normalizeCode } from './studentIds'
-import { buildReport, buildSections } from './report/utils'
+import { buildReport, buildSections, buildSection, missingAreas } from './report/utils'
 
 const SCORES = {
   'Amada':  { math: { raw: '40/50', pct: 80, level: 3 }, english: { raw: '43/50', pct: 86, level: 3 }, science: { raw: '38/50', pct: 76, level: 2 } },
@@ -18,18 +18,18 @@ const SCORES = {
   'Tess':   { math: { raw: '30/50', pct: 60, level: 2 }, english: { raw: '34/50', pct: 68, level: 2 }, science: { raw: '32/50', pct: 64, level: 2 } },
 }
 
-const VOCATIONAL_LEVELS = {
-  'Amada':  { art_of_science: 3, history: 2, executive_function: 2, technology: 3, wellbeing: 3 },
-  'Lily':   { art_of_science: 3, history: 3, executive_function: 3, technology: 4, wellbeing: 4 },
-  'Oliver': { art_of_science: 2, history: 2, executive_function: 2, technology: 2, wellbeing: 2 },
-  'Goku':   { art_of_science: 3, history: 2, executive_function: 2, technology: 3, wellbeing: 2 },
-  'Su':     { art_of_science: 2, history: 2, executive_function: 2, technology: 2, wellbeing: 3 },
-  'Ana':    { art_of_science: 2, history: 2, executive_function: 1, technology: 2, wellbeing: 2 },
-  'Hunter': { art_of_science: 3, history: 3, executive_function: 3, technology: 3, wellbeing: 3 },
-  'Erica':  { art_of_science: 2, history: 2, executive_function: 2, technology: 2, wellbeing: 3 },
-  'Carrot': { art_of_science: 2, history: 2, executive_function: 2, technology: 2, wellbeing: 2 },
-  'Nấm':   { art_of_science: 3, history: 2, executive_function: 2, technology: 3, wellbeing: 3 },
-  'Tess':   { art_of_science: 2, history: 2, executive_function: 1, technology: 2, wellbeing: 2 },
+const OTHER_LEVELS = {
+  'Amada':  { art_of_science: 3, history: 2, movement: 3, executive_function: 2, technology: 3, wellbeing: 3 },
+  'Lily':   { art_of_science: 3, history: 3, movement: 4, executive_function: 3, technology: 4, wellbeing: 4 },
+  'Oliver': { art_of_science: 2, history: 2, movement: 3, executive_function: 2, technology: 2, wellbeing: 2 },
+  'Goku':   { art_of_science: 3, history: 2, movement: 3, executive_function: 2, technology: 3, wellbeing: 2 },
+  'Su':     { art_of_science: 2, history: 2, movement: 2, executive_function: 2, technology: 2, wellbeing: 3 },
+  'Ana':    { art_of_science: 2, history: 2, movement: 2, executive_function: 1, technology: 2, wellbeing: 2 },
+  'Hunter': { art_of_science: 3, history: 3, movement: 3, executive_function: 3, technology: 3, wellbeing: 3 },
+  'Erica':  { art_of_science: 2, history: 2, movement: 2, executive_function: 2, technology: 2, wellbeing: 3 },
+  'Carrot': { art_of_science: 2, history: 2, movement: 3, executive_function: 2, technology: 2, wellbeing: 2 },
+  'Nấm':   { art_of_science: 3, history: 2, movement: 2, executive_function: 2, technology: 3, wellbeing: 3 },
+  'Tess':   { art_of_science: 2, history: 2, movement: 2, executive_function: 1, technology: 2, wellbeing: 2 },
 }
 
 function teacherFor(subjectKey) {
@@ -44,14 +44,12 @@ const FULL_COMMENTS = {
     science: { comment: 'Amada approaches scientific inquiry with curiosity and is building a strong foundation in experimental design. She records observations carefully and is learning to draw conclusions from data. While she sometimes needs prompting to connect concepts across topics, her effort and willingness to ask questions are commendable.', next_focus: 'Developing skills in forming and testing hypotheses independently.' },
     art_of_science: { comment: 'Amada brings creativity and precision to her scientific art projects, producing detailed and visually engaging work. She takes care to research her subjects thoroughly and has developed a strong eye for colour and composition in her illustrations.' },
     history: { comment: 'Amada is developing her ability to analyse historical sources and form opinions supported by evidence. She participates well in discussions about Vietnamese and world history and is learning to compare perspectives across time periods.' },
-    executive_function: { comment: 'Amada is building organisational skills and learning to manage her time across multiple tasks effectively. She has made good progress with her planner and is beginning to break larger assignments into manageable steps independently.' },
-    technology: { comment: 'Amada shows confidence with digital tools and applies her skills creatively in project-based learning. She has been particularly engaged with presentation software and is developing her understanding of responsible digital citizenship.' },
-    wellbeing: { comment: 'Amada is a positive presence who supports her peers and demonstrates strong self-awareness. She contributes thoughtfully to our wellbeing circles and is developing strategies to manage her emotions during challenging moments.' },
+    movement: { comment: 'Amada joins every Movement session with energy and a willingness to try new activities. She is building coordination and balance in our circuits and cooperative games, and she encourages teammates warmly. She is learning to pace herself so she can keep her effort steady to the end of a session.' },
     report: {
       glance: 'Amada has settled in well this quarter and approaches her learning with enthusiasm and determination. She is a kind and supportive member of our learning community who contributes positively to class discussions.',
       homeroom_note: 'Amada has had a wonderful start to the year. She brings a positive attitude to every session and is always willing to help her classmates. Her organisational skills have improved significantly, and she is becoming more independent in managing her learning. Amada\'s creativity shines through in group projects, and she is a valued member of our community.',
       skills: { ready: 3, instructions: 3, creativity: 3, grasps: 3, persists: 3, emotions: 3, relationships: 3, identity: 3, motivation: 3, adaptability: 2 },
-      experiences: ['Participated in the community garden project', 'Led a group presentation on Vietnamese cultural heritage', 'Contributed to the Quarter 1 science fair'],
+      experiences: ['Participated in the community garden project', 'Led a presentation on Vietnamese heritage', 'Contributed to the Quarter 1 science fair'],
       student_voice: 'I really enjoyed the science experiments this quarter, especially when we got to work together in teams.',
     },
   },
@@ -61,14 +59,12 @@ const FULL_COMMENTS = {
     science: { comment: 'Lily is an outstanding science learner who approaches every investigation with genuine curiosity and rigour. She designs thorough experiments, analyses data critically, and draws well-supported conclusions. Lily frequently makes insightful connections between topics and asks thoughtful questions that deepen the learning for everyone.', next_focus: 'Pursuing independent research projects and presenting scientific findings to wider audiences.' },
     art_of_science: { comment: 'Lily combines scientific accuracy with artistic creativity, producing work that is both informative and visually striking. Her detailed diagrams and scientific illustrations demonstrate a deep understanding of the concepts she is representing.' },
     history: { comment: 'Lily engages thoughtfully with historical topics and contributes well-reasoned arguments in class discussions. She shows a genuine interest in understanding different perspectives and connects historical events to present-day issues with maturity.' },
-    executive_function: { comment: 'Lily demonstrates strong organisational skills and manages her time effectively across all learning areas. She sets clear goals for herself, uses her planner consistently, and is a role model for self-directed learning in the classroom.' },
-    technology: { comment: 'Lily is a confident and creative user of technology who often helps peers and explores new tools independently. She has taken a lead role in collaborative digital projects and shows excellent judgement in evaluating online sources.' },
-    wellbeing: { comment: 'Lily is emotionally mature and a compassionate leader who actively supports the wellbeing of her peers. She facilitates group discussions with empathy and is always the first to check in on classmates who may be having a difficult day.' },
+    movement: { comment: 'Lily moves with control and confidence and shows real body awareness in balance and agility tasks. She listens carefully to feedback, refines her technique quickly and often demonstrates skills for the group. Lily plays fairly, includes others in team games and is a positive influence on the class.' },
     report: {
       glance: 'Lily has had an outstanding quarter, excelling across all her learning areas while remaining a supportive and humble member of our community. Her dedication and curiosity are truly inspiring.',
-      homeroom_note: 'Lily continues to impress with her dedication, curiosity, and kindness. She approaches every challenge with a positive mindset and consistently produces work of the highest standard. Beyond her academic achievements, Lily is a natural leader who lifts those around her. She volunteers to help classmates, asks thoughtful questions, and brings joy to our learning environment every day.',
+      homeroom_note: 'Lily continues to impress with her dedication, curiosity, and kindness. She meets every challenge with a positive mindset and consistently produces work of a high standard. Beyond her academic achievements, Lily is a natural leader who lifts those around her. She volunteers to help classmates, asks thoughtful questions, and brings joy to our learning environment.',
       skills: { ready: 4, instructions: 4, creativity: 4, grasps: 4, persists: 4, emotions: 4, relationships: 4, identity: 3, motivation: 4, adaptability: 3 },
-      experiences: ['Represented the learning community in the inter-school mathematics competition', 'Led the design team for the Quarter 1 science fair display', 'Mentored younger learners during buddy reading sessions'],
+      experiences: ['Competed in the inter-school maths competition', 'Led the design team for the science fair', 'Mentored younger learners in buddy reading'],
       student_voice: 'I loved the science fair project because I got to research something I was really passionate about and share it with everyone.',
     },
   },
@@ -104,11 +100,15 @@ export async function seedYear7() {
 
   const y7Students = students.filter((s) => s.class_group === 'Year 7' || y7Roster.some((r) => normalizeCode(r.student_code) === normalizeCode(s.student_code)))
 
-  // 2. Create teachers
+  // 2. Create teachers, and give existing ones any classes added to the schedule since (e.g. Movement for Caleb)
   const existing = await db.teachers.list()
   for (const t of TEACHER_SCHEDULE) {
-    if (!existing.find((e) => e.email === t.email)) {
+    const row = existing.find((e) => e.email === t.email)
+    if (!row) {
       await db.teachers.save({ ...t, id: genId(), active: true })
+    } else {
+      const add = t.subjects.filter((k) => !(row.subjects || []).includes(k))
+      if (add.length) await db.teachers.save({ ...row, subjects: [...(row.subjects || []), ...add] })
     }
   }
 
@@ -144,9 +144,10 @@ export async function seedYear7() {
     if (existingReport) {
       report = existingReport
       secs = await db.sections.list({ report_id: report.id })
+      for (const key of missingAreas(settings, { ...report, year_group: 'Year 7' }, secs)) secs.push(buildSection(report.id, key, settings, { yearGroup: 'Year 7', teachers: TEACHER_SCHEDULE }))
     } else {
       report = buildReport(student, period, template, settings, 'Mr. Bowen')
-      secs = buildSections(report.id, template, settings)
+      secs = buildSections(report.id, template, settings, { yearGroup: 'Year 7', teachers: TEACHER_SCHEDULE })
     }
 
     report.year_group = 'Year 7'
@@ -161,11 +162,13 @@ export async function seedYear7() {
         sec.level = s.level
         sec.teacher_name = teacherFor(sec.subject_key)
       }
-      const vocLevels = VOCATIONAL_LEVELS[nick]
+      const vocLevels = OTHER_LEVELS[nick]
       if (vocLevels && vocLevels[sec.subject_key] != null) {
         sec.level = vocLevels[sec.subject_key]
         sec.teacher_name = teacherFor(sec.subject_key)
       }
+      // Vocational areas have no individual comment (older seeds wrote one)
+      if (['executive_function', 'technology', 'wellbeing'].includes(sec.subject_key)) { sec.comment = ''; sec.comment_vi = '' }
       const full = FULL_COMMENTS[nick]
       if (full && full[sec.subject_key]) {
         sec.comment = full[sec.subject_key].comment
@@ -204,11 +207,11 @@ export async function seedYear7() {
     await db.sections.saveMany(updatedSections)
   }
 
-  // 5. Create course notes (topics covered this quarter)
+  // 5. Topics covered this quarter for the vocational areas (shared by the year group)
   const COURSE_NOTES = {
-    math: 'Algebraic expressions and equations; operations with fractions and decimals; ratio and proportion; introduction to geometry and area; data handling and basic statistics.',
-    science: 'Scientific method and experimental design; properties of matter and states of matter; forces and motion; introduction to ecosystems and food chains; laboratory safety and equipment.',
-    english: 'Narrative writing and short stories; reading comprehension strategies; grammar and sentence structure; oral presentation skills; vocabulary development through literature circles.',
+    executive_function: 'Using a weekly planner; breaking projects into steps with checkpoints; setting and reviewing personal learning goals; managing time during independent work; reflecting on what helps us focus.',
+    technology: 'Digital citizenship and staying safe online; file organisation in shared drives; building slide presentations; introduction to block-based coding; checking whether online sources are reliable.',
+    wellbeing: 'Naming and managing emotions; calming strategies for stressful moments; building friendships and resolving conflict; healthy sleep and screen habits; weekly wellbeing circles.',
   }
   const existingNotes = await db.courseNotes.list({ school_year: settings.schoolYear, period_label: period.label, year_group: 'Year 7' })
   for (const [key, description] of Object.entries(COURSE_NOTES)) {

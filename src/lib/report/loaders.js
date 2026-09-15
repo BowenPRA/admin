@@ -22,7 +22,10 @@ export async function loadReportBundle(id) {
   ])
   sections.sort(bySort)
   const history = yearReports.map((r) => ({ report: r, sections: r.id === id ? sections : histSections.filter((s) => s.report_id === r.id).sort(bySort) }))
-  return { report, sections, student: student || { full_name: report.student_name }, history, cohortAvg: cohortAverages(cohortSections), courseNotes }
+  return {
+    report, sections, student: student || { full_name: report.student_name }, history, courseNotes,
+    cohortAvg: cohortAverages(cohortSections), summativeAvg: cohortAverages(cohortSections, 'summative_pct'),
+  }
 }
 
 /** The student's sections from the most recent earlier period this school year (for "previous level"). */

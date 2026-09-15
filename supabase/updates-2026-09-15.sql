@@ -116,7 +116,7 @@ insert into adm_teachers (email, name, title, role, subjects, homeroom_groups, a
   ('david@pra.edu.vn',   'David',  'Mr.', 'teacher', array['english:Year 7', 'math:Year 5'], array['Upper Secondary'], true),
   ('solo@pra.edu.vn',    'Solo',   'Ms.', 'teacher', array['english:Year 1', 'math:Year 1', 'science:Year 1'], array['Year 1'], true),
   ('caleb@pra.edu.vn',   'Caleb',  'Mr.', 'teacher', array['english:Year 2', 'english:Year 3', 'math:Year 2', 'math:Year 3', 'science:Year 2', 'science:Year 3',
-                                                           'technology:Year 2', 'technology:Year 3', 'technology:Year 4', 'technology:Year 5'], array['Year 2', 'Year 3'], true),
+                                                           'technology:Year 2', 'technology:Year 3', 'technology:Year 4', 'technology:Year 5', 'movement:Year 7'], array['Year 2', 'Year 3'], true),
   ('kiu@pra.edu.vn',     'Kiu',    'Ms.', 'teacher', array['english:Year 5', 'science:Year 5', 'history:Year 7', 'executive_function:Year 7', 'wellbeing:Year 7', 'wellbeing:Upper Secondary'], array['Year 5'], true),
   ('thanh.n@pra.edu.vn', 'Thanh',  'Ms.', 'teacher', array['english:Kindergarten', 'math:Kindergarten', 'science:Kindergarten'], array['Kindergarten'], true),
   ('duyen.n@pra.edu.vn', 'Duyen',  'Ms.', 'teacher', array['technology:Year 1'], array[]::text[], true),
@@ -130,7 +130,7 @@ with schedule(email, role, subjects, homeroom) as (values
   ('david@pra.edu.vn',   'teacher', array['english:Year 7', 'math:Year 5'], array['Upper Secondary']),
   ('solo@pra.edu.vn',    'teacher', array['english:Year 1', 'math:Year 1', 'science:Year 1'], array['Year 1']),
   ('caleb@pra.edu.vn',   'teacher', array['english:Year 2', 'english:Year 3', 'math:Year 2', 'math:Year 3', 'science:Year 2', 'science:Year 3',
-                                          'technology:Year 2', 'technology:Year 3', 'technology:Year 4', 'technology:Year 5'], array['Year 2', 'Year 3']),
+                                          'technology:Year 2', 'technology:Year 3', 'technology:Year 4', 'technology:Year 5', 'movement:Year 7'], array['Year 2', 'Year 3']),
   ('kiu@pra.edu.vn',     'teacher', array['english:Year 5', 'science:Year 5', 'history:Year 7', 'executive_function:Year 7', 'wellbeing:Year 7', 'wellbeing:Upper Secondary'], array['Year 5']),
   ('thanh.n@pra.edu.vn', 'teacher', array['english:Kindergarten', 'math:Kindergarten', 'science:Kindergarten'], array['Kindergarten']),
   ('duyen.n@pra.edu.vn', 'teacher', array['technology:Year 1'], array[]::text[])

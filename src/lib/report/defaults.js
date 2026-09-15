@@ -17,16 +17,54 @@ export const LEVELS = [
     desc_vi: 'Học sinh vượt qua các tiêu chuẩn mong đợi, áp dụng các khái niệm phức tạp một cách sáng tạo và cần cơ hội mở rộng.' },
 ]
 
+// The three tiers of learning areas. A subject's `kind` is its tier, and the
+// tier decides what teachers write and how it prints:
+//   academic    level, progress review score, comment and next focus
+//   specialist  level and a comment
+//   vocational  level, plus one "topics covered" description shared by the
+//               whole year group (no comment on the individual student)
+export const TIERS = [
+  { key: 'academic', name: 'Academic Learning', name_vi: 'Học thuật', short: 'Academic',
+    hint: 'Level, progress review score, comment and next focus for each student.' },
+  { key: 'specialist', name: 'Specialist Learning', name_vi: 'Môn chuyên biệt', short: 'Specialist',
+    hint: 'Level and a comment for each student.' },
+  { key: 'vocational', name: 'Vocational Learning', name_vi: 'Hướng nghiệp', short: 'Vocational',
+    hint: 'Level for each student. Instead of a comment, one description of the topics covered is shared by the whole year group.' },
+]
+
+// `yearGroups` limits an area to some year groups (empty = every year group
+// its template covers).
 export const SUBJECTS = [
   { key: 'math', kind: 'academic', name: 'Maths', name_vi: 'Toán học', icon: 'calculator', scored: true },
   { key: 'science', kind: 'academic', name: 'Science', name_vi: 'Khoa học', icon: 'flask', scored: true },
   { key: 'english', kind: 'academic', name: 'English', name_vi: 'Tiếng Anh', icon: 'book', scored: true },
-  { key: 'art_of_science', kind: 'vocational', name: 'Art of Science', name_vi: 'Nghệ thuật Khoa học', icon: 'palette', scored: false },
-  { key: 'history', kind: 'vocational', name: 'History', name_vi: 'Lịch sử', icon: 'landmark', scored: false },
+  { key: 'art_of_science', kind: 'specialist', name: 'Art of Science', name_vi: 'Nghệ thuật Khoa học', icon: 'palette', scored: false },
+  { key: 'history', kind: 'specialist', name: 'History', name_vi: 'Lịch sử', icon: 'landmark', scored: false },
+  { key: 'movement', kind: 'specialist', name: 'Movement', name_vi: 'Vận động', icon: 'movement', scored: false, yearGroups: ['Year 7'] },
   { key: 'executive_function', kind: 'vocational', name: 'Executive Function', name_vi: 'Kỹ năng điều hành', icon: 'brain', scored: false },
   { key: 'technology', kind: 'vocational', name: 'Technology', name_vi: 'Công nghệ', icon: 'monitor', scored: false },
   { key: 'wellbeing', kind: 'vocational', name: 'Wellbeing', name_vi: 'Sức khỏe tinh thần', icon: 'heart', scored: false },
 ]
+
+// Character limits for the printed boxes. The report is one A4 page; each limit
+// is sized so realistic English at the limit fits its box in ReportDocument
+// (checked with 3 academic, 3 specialist and 3 vocational areas). Change them
+// only together with that layout.
+export const TEXT_LIMITS = {
+  homeroom_note: 380,
+  academic_comment: 540,
+  next_focus: 100,
+  specialist_comment: 340,
+  vocational_topics: 240,
+  student_voice: 180,
+  experience: 50,
+}
+
+// A bilingual report prints English and Vietnamese in the same box in smaller
+// type, so each language gets a shorter limit (next focus, student voice and
+// experiences print in English only).
+const BILINGUAL = ['homeroom_note', 'academic_comment', 'specialist_comment', 'vocational_topics']
+export const textLimit = (key, bi) => (bi && BILINGUAL.includes(key) ? Math.floor((TEXT_LIMITS[key] * 0.57) / 10) * 10 : TEXT_LIMITS[key])
 
 export const SKILL_GROUPS = [
   { key: 'foundational', name: 'Foundational Learning Skills', name_vi: 'Kỹ năng học tập cơ bản', items: [
@@ -45,12 +83,13 @@ export const SKILL_GROUPS = [
   ] },
 ]
 
+// `areas` lists the learning areas a template contains; each prints under its
+// tier. (Templates saved before tiers had `academic` / `vocational` lists.)
 export const TEMPLATES = {
   lower_secondary: {
     key: 'lower_secondary', name: 'Lower Secondary', program: 'Lower Secondary Program',
     yearGroups: ['Year 7', 'Year 8', 'Year 9'],
-    academic: ['math', 'science', 'english'],
-    vocational: ['art_of_science', 'history', 'executive_function', 'technology', 'wellbeing'],
+    areas: ['math', 'science', 'english', 'art_of_science', 'history', 'movement', 'executive_function', 'technology', 'wellbeing'],
   },
 }
 
@@ -61,7 +100,10 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
+const SETTINGS_VERSION = 2
+
 export const DEFAULT_REPORT_SETTINGS = {
+  version: SETTINGS_VERSION,
   org: {
     name: 'Palm River Academy',
     tagline: 'Learning for Life. Growing Together.',
@@ -80,4 +122,38 @@ export const DEFAULT_REPORT_SETTINGS = {
     { role: 'Homeroom Teacher', name: '' },
     { role: 'Head Teacher', name: 'Mr. Seth' },
   ],
+}
+
+/**
+ * Stored settings merged over the defaults. Settings saved before version 2
+ * (two kinds, no Movement) are upgraded once: Art of Science and History move
+ * to the specialist tier, Movement is added for Year 7, and template area lists
+ * are combined. Saving in Report settings then stores the upgraded version.
+ */
+export function normalizeReportSettings(stored) {
+  const v = stored || {}
+  const s = { ...DEFAULT_REPORT_SETTINGS, ...v, org: { ...DEFAULT_REPORT_SETTINGS.org, ...(v.org || {}) } }
+  const tierKeys = TIERS.map((t) => t.key)
+  let subjects = (s.subjects || []).map((sub) => ({ ...sub }))
+  let templates = Object.fromEntries(Object.entries(s.templates || {}).map(([k, t]) => [k, { ...t }]))
+
+  if ((Number(v.version) || 1) < SETTINGS_VERSION && v.subjects) {
+    for (const sub of subjects) if (['art_of_science', 'history'].includes(sub.key) && sub.kind === 'vocational') sub.kind = 'specialist'
+    if (!subjects.some((sub) => sub.key === 'movement')) {
+      const at = subjects.findIndex((sub) => sub.key === 'history')
+      subjects.splice(at < 0 ? subjects.length : at + 1, 0, SUBJECTS.find((sub) => sub.key === 'movement'))
+    }
+    const ls = templates.lower_secondary
+    if (ls) {
+      const areas = ls.areas || [...(ls.academic || []), ...(ls.vocational || [])]
+      if (!areas.includes('movement')) areas.splice(areas.includes('history') ? areas.indexOf('history') + 1 : areas.length, 0, 'movement')
+      templates.lower_secondary = { ...ls, areas }
+    }
+  }
+  for (const sub of subjects) if (!tierKeys.includes(sub.kind)) sub.kind = 'vocational'
+  for (const [k, t] of Object.entries(templates)) {
+    if (!t.areas) templates[k] = { ...t, areas: [...(t.academic || []), ...(t.specialist || []), ...(t.vocational || [])] }
+    delete templates[k].academic; delete templates[k].specialist; delete templates[k].vocational
+  }
+  return { ...s, subjects, templates, version: SETTINGS_VERSION }
 }

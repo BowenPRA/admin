@@ -80,6 +80,8 @@ create table if not exists adm_report_sections (
   score_raw text,
   score_pct numeric,
   class_avg numeric,
+  summative_raw text,
+  summative_pct numeric,
   teacher_name text,
   updated_by text,
   created_at timestamptz default now(),

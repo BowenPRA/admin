@@ -14,6 +14,8 @@ export default function PrintBatch() {
   const { reportSettings: settings } = useData()
   const [bundles, setBundles] = useState(null)
   const [compact, setCompact] = useState(false)
+  const [overflow, setOverflow] = useState({})
+  const tooFull = Object.values(overflow).filter(Boolean).length
   const year = params.get('year'), period = params.get('period'), group = params.get('group')
 
   useEffect(() => {
@@ -36,13 +38,14 @@ export default function PrintBatch() {
       <div className="no-print sticky top-0 z-10 flex items-center gap-2 border-b border-slate-300 bg-white/95 px-4 py-2 backdrop-blur">
         <Link to="/reports" className="btn-ghost"><ArrowLeft size={16} /> Back</Link>
         <span className="flex-1 text-sm font-semibold text-slate-700">{bundles.length} report{bundles.length === 1 ? '' : 's'} · {group || 'All year groups'} · {period} {year}</span>
+        {tooFull > 0 && <span className="text-xs font-semibold text-red-600">{tooFull} report{tooFull === 1 ? ' has' : 's have'} a box that is too full (outlined in red)</span>}
         <button className={compact ? 'btn-primary' : 'btn-secondary'} onClick={() => setCompact((v) => !v)}><Minimize2 size={16} /> Compact</button>
         <button className="btn-primary" onClick={() => window.print()}><Printer size={16} /> Print all</button>
       </div>
       <div className="space-y-6 py-6 print:space-y-0 print:py-0">
         {bundles.map((b) => (
           <div key={b.report.id} className="mx-auto shadow-xl print:shadow-none" style={{ width: '210mm' }}>
-            <ReportDocument {...b} settings={settings} compact={compact} />
+            <ReportDocument {...b} settings={settings} compact={compact} onOverflow={(n) => setOverflow((cur) => (cur[b.report.id] === n ? cur : { ...cur, [b.report.id]: n }))} />
           </div>
         ))}
       </div>

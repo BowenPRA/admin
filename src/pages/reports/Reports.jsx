@@ -5,7 +5,7 @@ import { useData } from '../../lib/DataContext'
 import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
 import { loadPreviousSections } from '../../lib/report/loaders'
-import { buildReport, buildSections, completion, cohortAverages, templateForYearGroup, fmtDate, subjectByKey, currentPeriod } from '../../lib/report/utils'
+import { buildReport, buildSections, buildSection, completion, sectionDone, missingAreas, cohortAverages, templateForYearGroup, fmtDate, subjectByKey, currentPeriod } from '../../lib/report/utils'
 import { photoSrc } from '../../lib/report/photo'
 import { Card, Field, Select, Checkbox, Modal, Empty, Spinner, ReportStatusChip, TextInput } from '../../components/ui'
 import { seedYear7 } from '../../lib/seedYear7'
@@ -32,7 +32,7 @@ async function fetchPeriod(settings, period) {
 }
 
 function ReportsList({ settings }) {
-  const { students } = useData()
+  const { students, teachers } = useData()
   const { me, isHead, canSubject, canHomeroom, myYearGroups } = useAuth()
   const [period, setPeriod] = useState(() => currentPeriod(settings)?.label || '')
   const [group, setGroup] = useState('')
@@ -72,9 +72,9 @@ function ReportsList({ settings }) {
     const out = []
     for (const r of reports || []) {
       if (r.status === 'published') continue
-      const mine = sections.filter((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group) && (!s.level || !(s.comment || '').trim()))
-      const overview = canHomeroom(r) && (!(r.glance || '').trim() || !(r.homeroom_note || '').trim())
-      if (mine.length || overview) out.push({ report: r, parts: [...mine.map((s) => subjectByKey(settings, s.subject_key).name), overview ? 'overview / homeroom note' : null].filter(Boolean) })
+      const mine = sections.filter((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group) && !sectionDone(settings, s))
+      const overview = canHomeroom(r) && !(r.homeroom_note || '').trim()
+      if (mine.length || overview) out.push({ report: r, parts: [...mine.map((s) => subjectByKey(settings, s.subject_key).name), overview ? 'homeroom comment' : null].filter(Boolean) })
     }
     return out
   }, [reports, sections, settings, me]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -93,6 +93,13 @@ function ReportsList({ settings }) {
     if (!changed.length) { alert('Nothing to update: no review scores entered yet, or the references already match.'); return }
     setBusy(yg)
     try { await db.sections.saveMany(changed); load(); alert(`Class references for ${yg}: ${Object.entries(avgs).map(([k, v]) => `${subjectByKey(settings, k).name} ${v}%`).join(', ')}`) }
+    catch (e) { alert(e.message) } finally { setBusy('') }
+  }
+  // Reports created before an area was added to their year group (e.g. Movement for Year 7).
+  const missingFor = (list) => list.flatMap((r) => missingAreas(settings, r, sections.filter((s) => s.report_id === r.id)).map((key) => ({ r, key })))
+  const addMissing = async (yg, gaps) => {
+    setBusy(yg)
+    try { await db.sections.saveMany(gaps.map(({ r, key }) => buildSection(r.id, key, settings, { yearGroup: r.year_group, teachers }))); load() }
     catch (e) { alert(e.message) } finally { setBusy('') }
   }
 
@@ -145,9 +152,10 @@ function ReportsList({ settings }) {
 
       {!reports ? <Spinner /> : !byGroup.length ? (
         <Empty text={`No ${period} reports yet. `}>{isHead && <button className="font-semibold text-pra-blue" onClick={() => setCreating(true)}>Create them →</button>}</Empty>
-      ) : byGroup.map(([yg, list]) => (
+      ) : byGroup.map(([yg, list]) => { const gaps = isHead ? missingFor(list.filter((r) => r.status !== 'published')) : []; return (
         <Card key={yg} title={`${yg} · ${list.length} report${list.length === 1 ? '' : 's'}`} actions={(
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            {gaps.length > 0 && <button className="btn-secondary text-xs" disabled={busy === yg} onClick={() => addMissing(yg, gaps)} title="These reports were created before the area was added to this year group"><Plus size={14} /> Add {[...new Set(gaps.map((g) => subjectByKey(settings, g.key).name))].join(', ')} to {new Set(gaps.map((g) => g.r.id)).size} report{new Set(gaps.map((g) => g.r.id)).size === 1 ? '' : 's'}</button>}
             {isHead && <button className="btn-secondary text-xs" disabled={busy === yg} onClick={() => updateRefs(yg, list)} title="Average this year group's review scores into every report's class reference"><RefreshCw size={14} /> Update class references</button>}
             <Link className="btn-secondary text-xs" to={`/print/reports?year=${encodeURIComponent(settings.schoolYear)}&period=${encodeURIComponent(period)}&group=${encodeURIComponent(yg)}`} target="_blank"><Printer size={14} /> Print all</Link>
           </div>
@@ -158,7 +166,7 @@ function ReportsList({ settings }) {
             <tbody>
               {list.map((r) => {
                 const student = students.find((s) => s.id === r.student_id)
-                const c = completion(r, sections.filter((s) => s.report_id === r.id))
+                const c = completion(r, sections.filter((s) => s.report_id === r.id), settings)
                 const photo = photoSrc(student?.photo)
                 const age = studentAge(student?.dob)
                 return (
@@ -173,10 +181,10 @@ function ReportsList({ settings }) {
                       {isHead ? (student?.level || r.year_group) : (
                         <div className="flex flex-wrap gap-1 py-1">
                           {sections.filter((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group)).map((s) => {
-                            const done = !!s.level && !!(s.comment || '').trim()
+                            const done = sectionDone(settings, s)
                             return <span key={s.id} className={`chip ${done ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{done ? '✓ ' : ''}{subjectByKey(settings, s.subject_key).name}</span>
                           })}
-                          {canHomeroom(r) && <span className={`chip ${(r.glance || '').trim() && (r.homeroom_note || '').trim() ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>Homeroom</span>}
+                          {canHomeroom(r) && <span className={`chip ${(r.homeroom_note || '').trim() ?'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>Homeroom</span>}
                           {!sections.some((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group)) && !canHomeroom(r) && <span className="text-slate-400">read-only</span>}
                         </div>
                       )}
@@ -197,7 +205,7 @@ function ReportsList({ settings }) {
           </table>
           </div>
         </Card>
-      ))}
+      ) })}
 
       <Modal open={creating} onClose={() => setCreating(false)} title="Create progress reports">
         {creating && <CreateForm onClose={() => setCreating(false)} settings={settings} students={students} existing={reports || []} defaultPeriod={period} onDone={() => { setCreating(false); load() }} />}
@@ -209,6 +217,7 @@ function ReportsList({ settings }) {
 // Mounted fresh each time the modal opens, so its state starts from the defaults.
 function CreateForm({ onClose, settings, students, existing, defaultPeriod, onDone }) {
   const { displayName } = useAuth()
+  const { teachers } = useData()
   const templates = Object.values(settings.templates || {})
   const [tpl, setTpl] = useState(templates[0]?.key || '')
   const [periodLabel, setPeriodLabel] = useState(defaultPeriod)
@@ -233,7 +242,7 @@ function CreateForm({ onClose, settings, students, existing, defaultPeriod, onDo
         const t = single ? (templateForYearGroup(settings, s.level) || template) : template
         const r = buildReport(s, period, t, settings, homeroom)
         const prev = await loadPreviousSections(s.id, settings.schoolYear, period.index)
-        reports.push(r); sections.push(...buildSections(r.id, t, settings, prev))
+        reports.push(r); sections.push(...buildSections(r.id, t, settings, { yearGroup: s.level, prevSections: prev, teachers }))
       }
       await db.reports.saveMany(reports)
       await db.sections.saveMany(sections)
