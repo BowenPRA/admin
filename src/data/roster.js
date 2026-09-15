@@ -2,7 +2,7 @@
 // Students > Load 2026-2027 roster adds the ones that are missing (matched by student code or name).
 export const ROSTER = [
   {
-    "student_code": "PAL0115",
+    "student_code": "S0115",
     "level": "Nursery",
     "full_name": "Gia Nghi Weber",
     "nickname": "Sophia",
@@ -59,7 +59,7 @@ export const ROSTER = [
     "photo": ""
   },
   {
-    "student_code": "PAL0134",
+    "student_code": "S0134",
     "level": "Nursery",
     "full_name": "Trần An Nhiên (Evelyn Smets)",
     "nickname": "Eve",
@@ -78,7 +78,7 @@ export const ROSTER = [
     "photo": ""
   },
   {
-    "student_code": "PAL0125",
+    "student_code": "S0125",
     "level": "Kindergarten",
     "full_name": "Nguyễn Gia Linh",
     "nickname": "Gia Linh",
@@ -97,7 +97,7 @@ export const ROSTER = [
     "photo": "photos/gia_linh.jpg"
   },
   {
-    "student_code": "PAL0126",
+    "student_code": "S0126",
     "level": "Kindergarten",
     "full_name": "Nguyễn Quang Minh",
     "nickname": "Quang Minh",
@@ -116,7 +116,7 @@ export const ROSTER = [
     "photo": "photos/quang_minh.jpg"
   },
   {
-    "student_code": "PAL0110",
+    "student_code": "S0110",
     "level": "Kindergarten",
     "full_name": "Louis Yves Huu Croquevielle Nguyễn",
     "nickname": "Louis",
@@ -135,7 +135,7 @@ export const ROSTER = [
     "photo": "photos/louis_c.jpg"
   },
   {
-    "student_code": "PAL0052",
+    "student_code": "S0052",
     "level": "Year 1",
     "full_name": "Sunny Vui Barker",
     "nickname": "Sunny",
@@ -154,7 +154,7 @@ export const ROSTER = [
     "photo": "photos/sunny.jpg"
   },
   {
-    "student_code": "PAL0072",
+    "student_code": "S0072",
     "level": "Year 1",
     "full_name": "Hoàng Anh Quân",
     "nickname": "Gin",
@@ -173,7 +173,7 @@ export const ROSTER = [
     "photo": "photos/gin.jpg"
   },
   {
-    "student_code": "PAL0077",
+    "student_code": "S0077",
     "level": "Year 1",
     "full_name": "Lamberti Helios Serge Jean - Rene",
     "nickname": "Helios",
@@ -192,7 +192,7 @@ export const ROSTER = [
     "photo": "photos/helios.jpg"
   },
   {
-    "student_code": "PAL0070",
+    "student_code": "S0070",
     "level": "Year 1",
     "full_name": "Bùi Nguyễn Nhã Vy",
     "nickname": "Bống",
@@ -211,7 +211,7 @@ export const ROSTER = [
     "photo": "photos/bống.jpg"
   },
   {
-    "student_code": "PAL0090",
+    "student_code": "S0090",
     "level": "Year 1",
     "full_name": "Nguyễn Trình Xuân Ca",
     "nickname": "Mía",
@@ -230,7 +230,7 @@ export const ROSTER = [
     "photo": "photos/mía.jpg"
   },
   {
-    "student_code": "PAL0122",
+    "student_code": "S0122",
     "level": "Year 1",
     "full_name": "Nguyễn Tấn Lộc",
     "nickname": "Mít",
@@ -249,7 +249,7 @@ export const ROSTER = [
     "photo": "photos/mít.jpg"
   },
   {
-    "student_code": "PAL0123",
+    "student_code": "S0123",
     "level": "Year 1",
     "full_name": "Lê Nguyễn Khôi Nguyên",
     "nickname": "Coffee",
@@ -268,7 +268,7 @@ export const ROSTER = [
     "photo": "photos/coffee.jpg"
   },
   {
-    "student_code": "PAL0137",
+    "student_code": "S0137",
     "level": "Year 1",
     "full_name": "Anaya Bisht",
     "nickname": "Anaya",
@@ -287,7 +287,7 @@ export const ROSTER = [
     "photo": "photos/anaya.jpg"
   },
   {
-    "student_code": "PAL0130",
+    "student_code": "S0130",
     "level": "Year 2",
     "full_name": "Matvei Bulgakov",
     "nickname": "Matvei",
@@ -306,7 +306,7 @@ export const ROSTER = [
     "photo": ""
   },
   {
-    "student_code": "PAL0067",
+    "student_code": "S0067",
     "level": "Year 3",
     "full_name": "Lê Gia Hưng",
     "nickname": "Bob",
@@ -325,7 +325,7 @@ export const ROSTER = [
     "photo": "photos/bob.jpg"
   },
   {
-    "student_code": "PAL0035",
+    "student_code": "S0035",
     "level": "Year 3",
     "full_name": "Lai Linnie",
     "nickname": "Chom chom",
@@ -344,7 +344,7 @@ export const ROSTER = [
     "photo": "photos/chom_chom.jpg"
   },
   {
-    "student_code": "PAL0135",
+    "student_code": "S0135",
     "level": "Year 3",
     "full_name": "Levendi Ceacon",
     "nickname": "Levendi",
@@ -363,7 +363,7 @@ export const ROSTER = [
     "photo": ""
   },
   {
-    "student_code": "PAL0026",
+    "student_code": "S0026",
     "level": "Year 5",
     "full_name": "Đặng Thanh Thảo",
     "nickname": "Bơ",
@@ -382,7 +382,7 @@ export const ROSTER = [
     "photo": "photos/bơ.jpg"
   },
   {
-    "student_code": "PAL0066",
+    "student_code": "S0066",
     "level": "Year 5",
     "full_name": "Lê An Nam",
     "nickname": "Bo",
@@ -401,7 +401,7 @@ export const ROSTER = [
     "photo": "photos/bo.jpg"
   },
   {
-    "student_code": "PAL0060",
+    "student_code": "S0060",
     "level": "Year 5",
     "full_name": "Weber Selena Gia Hân",
     "nickname": "Selena",
@@ -439,7 +439,7 @@ export const ROSTER = [
     "photo": "photos/gene.jpg"
   },
   {
-    "student_code": "PAL0131",
+    "student_code": "S0131",
     "level": "Year 5",
     "full_name": "Margot Baker",
     "nickname": "Margot",
@@ -458,7 +458,7 @@ export const ROSTER = [
     "photo": "photos/margot.jpg"
   },
   {
-    "student_code": "PAL0136",
+    "student_code": "S0136",
     "level": "Year 7",
     "full_name": "Oliver Mian",
     "nickname": "Oliver",
@@ -477,7 +477,7 @@ export const ROSTER = [
     "photo": "photos/oliver.jpg"
   },
   {
-    "student_code": "PAL0024",
+    "student_code": "S0024",
     "level": "Year 7",
     "full_name": "Hoàng Vĩnh Khoa",
     "nickname": "Goku",
@@ -496,7 +496,7 @@ export const ROSTER = [
     "photo": "photos/goku.jpg"
   },
   {
-    "student_code": "PAL0051",
+    "student_code": "S0051",
     "level": "Year 7",
     "full_name": "Barocco Mỹ Linh",
     "nickname": "Lily",
@@ -515,7 +515,7 @@ export const ROSTER = [
     "photo": "photos/lily.jpg"
   },
   {
-    "student_code": "PAL0007",
+    "student_code": "S0007",
     "level": "Year 7",
     "full_name": "Amada Isabella Alice Batchelor",
     "nickname": "Amada",
@@ -534,7 +534,7 @@ export const ROSTER = [
     "photo": "photos/amada.jpg"
   },
   {
-    "student_code": "PAL0108",
+    "student_code": "S0108",
     "level": "Year 7",
     "full_name": "Đặng Thanh Ngân",
     "nickname": "Su",
@@ -553,7 +553,7 @@ export const ROSTER = [
     "photo": "photos/su.jpg"
   },
   {
-    "student_code": "PAL0054",
+    "student_code": "S0054",
     "level": "Year 7",
     "full_name": "Đinh Lê Ana",
     "nickname": "Ana",
@@ -591,7 +591,7 @@ export const ROSTER = [
     "photo": "photos/hunter.jpg"
   },
   {
-    "student_code": "PAL0018",
+    "student_code": "S0018",
     "level": "Year 7",
     "full_name": "Mazzola May Erica",
     "nickname": "Erica",
@@ -610,7 +610,7 @@ export const ROSTER = [
     "photo": "photos/erica.jpg"
   },
   {
-    "student_code": "PAL0011",
+    "student_code": "S0011",
     "level": "Year 7",
     "full_name": "Ngô Tuệ Mẫn",
     "nickname": "Carrot",
@@ -629,7 +629,7 @@ export const ROSTER = [
     "photo": "photos/carrot.jpg"
   },
   {
-    "student_code": "PAL0006",
+    "student_code": "S0006",
     "level": "Year 7",
     "full_name": "Nguyễn Trần Linh Chi",
     "nickname": "Nấm",
@@ -648,7 +648,7 @@ export const ROSTER = [
     "photo": "photos/nấm.jpg"
   },
   {
-    "student_code": "PAL0138",
+    "student_code": "S0138",
     "level": "Year 7",
     "full_name": "Tess Nunns",
     "nickname": "Tess",
@@ -667,7 +667,7 @@ export const ROSTER = [
     "photo": ""
   },
   {
-    "student_code": "PAL0091",
+    "student_code": "S0091",
     "level": "Upper Secondary",
     "full_name": "Louis Minh Huy Gowman",
     "nickname": "Louis",
@@ -686,7 +686,7 @@ export const ROSTER = [
     "photo": "photos/louis_g.jpg"
   },
   {
-    "student_code": "PAL0017",
+    "student_code": "S0017",
     "level": "Year 9",
     "full_name": "Đinh Hồ Ngọc Khôi",
     "nickname": "Khoi",
@@ -705,7 +705,7 @@ export const ROSTER = [
     "photo": "photos/khoi.jpg"
   },
   {
-    "student_code": "PAL0050",
+    "student_code": "S0050",
     "level": "Year 9",
     "full_name": "Barocco Angelo Hoang",
     "nickname": "Angelo",
@@ -724,7 +724,7 @@ export const ROSTER = [
     "photo": "photos/angelo.jpg"
   },
   {
-    "student_code": "PAL0019",
+    "student_code": "S0019",
     "level": "Year 9",
     "full_name": "Nguyễn Quán Long",
     "nickname": "Chris",
@@ -743,7 +743,7 @@ export const ROSTER = [
     "photo": "photos/chris.jpg"
   },
   {
-    "student_code": "PAL0001",
+    "student_code": "S0001",
     "level": "Year 9",
     "full_name": "Trần Bảo Khang",
     "nickname": "Jackson",
@@ -762,7 +762,7 @@ export const ROSTER = [
     "photo": "photos/jackson.jpg"
   },
   {
-    "student_code": "PAL0012",
+    "student_code": "S0012",
     "level": "Year 9",
     "full_name": "Huỳnh Kim Long",
     "nickname": "Kim Long",
@@ -781,7 +781,7 @@ export const ROSTER = [
     "photo": "photos/kim_long.jpg"
   },
   {
-    "student_code": "PAL0097",
+    "student_code": "S0097",
     "level": "Upper Secondary",
     "full_name": "Ruggeri Sky Thien",
     "nickname": "Sky",
@@ -800,7 +800,7 @@ export const ROSTER = [
     "photo": "photos/sky.jpg"
   },
   {
-    "student_code": "PAL0118",
+    "student_code": "S0118",
     "level": "Upper Secondary",
     "full_name": "Martha Elizabeth Harvey",
     "nickname": "Martha",
@@ -819,7 +819,7 @@ export const ROSTER = [
     "photo": "photos/martha.jpg"
   },
   {
-    "student_code": "PAL0121",
+    "student_code": "S0121",
     "level": "Upper Secondary",
     "full_name": "Trịnh Thị Hương Quỳnh",
     "nickname": "Huong",

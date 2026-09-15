@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
-import { PlusCircle, Download, Trash2 } from 'lucide-react'
+import { PlusCircle, Download, Trash2, FilePen } from 'lucide-react'
+import InvoiceDocument from '../components/InvoiceDocument'
+import { useToast } from '../lib/toast'
+import { gmailConfigured, draftLink, getToken, prepareGmail } from '../lib/gmail'
+import { draftInvoice, logDraft, lastDraft, invoiceRecipients } from '../lib/invoiceDraft'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
@@ -13,14 +18,17 @@ const STATUSES = ['all', 'draft', 'sent', 'partial', 'paid', 'void']
 export default function Invoices() {
   const { t, lang } = useT()
   const navigate = useNavigate()
-  const { students, families } = useData()
+  const { students, families, fees } = useData()
+  const toast = useToast()
+  const pdfRef = useRef(null)
+  const [rendering, setRendering] = useState(null) // { inv, progress } while making drafts
   const [invoices, setInvoices] = useState(null)
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('all')
   const [selected, setSelected] = useState(() => new Set())
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => { db.invoices.list().then(setInvoices).catch(() => setInvoices([])) }, [])
+  useEffect(() => { db.invoices.list().then(setInvoices).catch(() => setInvoices([])); prepareGmail() }, [])
 
   const removeOne = async (i) => {
     if (!confirm(`${i.number} · ${i.student_names}\n\n${t('confirmDeleteInvoice')}`)) return
@@ -46,6 +54,34 @@ export default function Invoices() {
       .sort((a, b) => (b.number || '').localeCompare(a.number || ''))
   }, [invoices, q, status])
 
+  // Selected invoices → one Gmail draft each, PDF attached. Each invoice is
+  // rendered off-screen in turn and turned into a PDF.
+  const draftSelected = async () => {
+    const list = rows.filter((r) => selected.has(r.id) && r.status !== 'void')
+    if (!list.length) return
+    if (!gmailConfigured) { toast.info(t('gmailNotConfigured')); return }
+    let made = 0
+    const failed = []
+    setBusy(true)
+    try {
+      await getToken()
+      for (const inv of list) {
+        flushSync(() => setRendering({ inv, progress: `${made + failed.length + 1}/${list.length}` }))
+        try {
+          const d = await draftInvoice({ inv, fees, node: pdfRef.current, to: invoiceRecipients(inv, families, students) })
+          const saved = await logDraft(inv, d)
+          setInvoices((xs) => xs.map((x) => (x.id === saved.id ? saved : x)))
+          made++
+        } catch (e) {
+          failed.push(`${inv.number}: ${e.message}`)
+          if (/sign-in|Google|401|403/.test(e.message)) break // no point trying the rest without access
+        }
+      }
+    } catch (e) { failed.push(e.message) } finally { setRendering(null); setBusy(false) }
+    if (made) toast(<span>{t('draftsMade', { n: made })} · <a className="font-semibold text-pra-blue underline" href={draftLink()} target="_blank" rel="noreferrer">{t('openInGmail')}</a></span>)
+    if (failed.length) toast.error(failed.join('\n'))
+  }
+
   const doExport = async () => {
     const payments = await db.payments.list()
     exportWorkbook({ invoices: invoices || [], payments, students, families })
@@ -59,6 +95,7 @@ export default function Invoices() {
         <h1 className="text-2xl font-black text-slate-800">{t('invoices')}</h1>
         <div className="flex-1" />
         <input className="input max-w-xs" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} />
+        {selected.size > 0 && <button className="btn-green" onClick={draftSelected} disabled={busy} title={gmailConfigured ? '' : t('gmailNotConfigured')}><FilePen size={16} /> {rendering ? `${t('makingDraft')} ${rendering.progress}` : `${t('gmailDrafts')} (${selected.size})`}</button>}
         {selected.size > 0 && <button className="btn-danger" onClick={removeSelected} disabled={busy}><Trash2 size={16} /> {t('deleteSelected')} ({selected.size})</button>}
         <button className="btn-secondary" onClick={doExport}><Download size={16} /> {t('export')}</button>
         <button className="btn-green" onClick={() => navigate('/invoices/new')}><PlusCircle size={16} /> {t('newInvoice')}</button>
@@ -81,7 +118,7 @@ export default function Invoices() {
                   return (
                     <tr key={i.id} className={`border-t border-slate-100 hover:bg-slate-50 cursor-pointer ${selected.has(i.id) ? 'bg-sky-50' : ''}`} onClick={() => navigate(`/invoices/${i.id}`)}>
                       <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.has(i.id)} onChange={() => toggle(i.id)} /></td>
-                      <td className="py-2"><Link className="font-semibold text-pra-blue" to={`/invoices/${i.id}`} onClick={(e) => e.stopPropagation()}>{i.number}</Link> <span className="text-[10px] uppercase text-slate-400">{i.lang}</span>{i.sent_at && <span className="ml-1 text-[10px] text-green-700" title={i.sent_to}>✉</span>}</td>
+                      <td className="py-2"><Link className="font-semibold text-pra-blue" to={`/invoices/${i.id}`} onClick={(e) => e.stopPropagation()}>{i.number}</Link> <span className="text-[10px] uppercase text-slate-400">{i.lang}</span>{i.sent_at && <span className="ml-1 text-[10px] text-green-700" title={i.sent_to}>✉</span>}{!i.sent_at && lastDraft(i) && <FilePen size={11} className="ml-1 inline text-slate-400" aria-label={t('draftSavedAt')} />}</td>
                       <td>{i.student_names}</td>
                       <td className="text-slate-500">{i.family_name}</td>
                       <td>{i.period_label}</td>
@@ -100,6 +137,13 @@ export default function Invoices() {
           </div>
         )}
       </Card>
+
+      {/* Off-screen full-size invoice that each draft's PDF is rendered from. */}
+      {rendering && fees && (
+        <div aria-hidden style={{ position: 'absolute', left: -10000, top: 0, width: '210mm', pointerEvents: 'none' }}>
+          <div ref={pdfRef}><InvoiceDocument doc={rendering.inv.doc} fees={fees} number={rendering.inv.number} issueDate={fmtDate(rendering.inv.issue_date, rendering.inv.lang)} /></div>
+        </div>
+      )}
     </div>
   )
 }

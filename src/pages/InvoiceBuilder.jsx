@@ -5,8 +5,9 @@ import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { LEVELS, PROGRAMS, periodInfo, mealRateFor, bandFor } from '../lib/fees'
-import { buildDocument, defaultStudentOptions, docTotals, PERIOD_OPTIONS, PLAN_OPTIONS, studentDisplayName } from '../lib/pricing'
+import { buildDocument, defaultStudentOptions, docTotals, PERIOD_OPTIONS, PLAN_OPTIONS, studentDisplayName, quarterDays, billedDays } from '../lib/pricing'
 import { fmt, todayISO } from '../lib/money'
+import { gmailConfigured, getToken, prepareGmail } from '../lib/gmail'
 import { Card, Field, TextInput, NumberInput, MoneyInput, Select, Checkbox, Spinner } from '../components/ui'
 
 const PLAN_PERIOD_DEFAULT = { earlyBird: 'year', standard: 'year', quarterly: 'q1', split: 'sem1', weekly: 'custom', trial: 'custom', staff: 'q1', none: 'q1' }
@@ -45,6 +46,11 @@ export default function InvoiceBuilder() {
   const [editId, setEditId] = useState(null)
   const [loadedFrom, setLoadedFrom] = useState(null)
   const [showInactive, setShowInactive] = useState(false)
+  // Remembered per browser: also make a Gmail draft with the PDF after creating.
+  const [makeDraft, setMakeDraftState] = useState(() => { try { return localStorage.getItem('pra-admin-auto-draft') === '1' } catch { return false } })
+  const setMakeDraft = (v) => { setMakeDraftState(v); try { localStorage.setItem('pra-admin-auto-draft', v ? '1' : '0') } catch { /* ignore */ } }
+
+  useEffect(() => { prepareGmail() }, [])
 
   // ?edit=<id> re-opens an existing invoice's options; ?copy=<id> duplicates.
   useEffect(() => {
@@ -122,11 +128,23 @@ export default function InvoiceBuilder() {
     const next = inputs.billQuarters.includes(qid) ? inputs.billQuarters.filter((x) => x !== qid) : [...inputs.billQuarters, qid].sort()
     if (!next.length) return
     // billing one quarter: meals/transport for that quarter; several: sum them
-    const days = next.reduce((s, x) => s + periodInfo(x, calendar).days, 0)
     const months = next.reduce((s, x) => s + periodInfo(x, calendar).months, 0)
     const periodId = next.length === 1 ? next[0] : (next.join('') === 'q1q2' ? 'sem1' : next.join('') === 'q3q4' ? 'sem2' : next.length === 4 ? 'year' : inputs.periodId)
-    set({ billQuarters: next, periodId, students: inputs.students.map((e) => ({ ...e, opts: { ...e.opts, mealDays: days, transportMonths: months } })) })
+    set({ billQuarters: next, periodId, students: inputs.students.map((e) => ({ ...e, opts: { ...e.opts, mealDays: billedDays(next, e.opts, calendar), transportMonths: months } })) })
   }
+  // Prorate one quarter for a student (days = null turns it off). Meal days
+  // follow the prorated days for the quarters billed now.
+  const prorateStudent = (e, qid, days) => {
+    const prorate = { ...(e.opts.prorate || {}) }
+    if (days === null) delete prorate[qid]; else prorate[qid] = days
+    const opts = { ...e.opts, prorate }
+    return { ...e, opts: { ...opts, mealDays: inputs.plan === 'quarterly' ? billedDays(inputs.billQuarters, opts, calendar) : opts.mealDays } }
+  }
+  const setProrate = (id, qid, days) => set({ students: inputs.students.map((e) => (e.student.id === id ? prorateStudent(e, qid, days) : e)) })
+  const prorateForAll = (from) => set({
+    students: inputs.students.map((e) => (e.student.id === from.student.id ? e
+      : ['q1', 'q2', 'q3', 'q4'].reduce((acc, k) => prorateStudent(acc, k, from.opts.prorate?.[k] ?? null), e)))
+  })
 
   const doc = useMemo(() => (fees && calendar ? buildDocument(inputs, fees, calendar) : null), [inputs, fees, calendar])
   const totals = doc ? docTotals(doc) : null
@@ -135,6 +153,8 @@ export default function InvoiceBuilder() {
     if (!inputs.students.length) return
     setBusy(true)
     try {
+      // Ask Google for access now, while this click still counts, so the draft can be made on the next page.
+      if (makeDraft && gmailConfigured) await getToken().catch(() => {})
       const names = inputs.students.map((e) => e.student.nickname || e.student.full_name).join(', ')
       const famIds = [...new Set(inputs.students.map((e) => e.student.family_id).filter(Boolean))]
       const famName = famIds.map((id) => famById[id]?.name).filter(Boolean).join(' / ')
@@ -153,7 +173,7 @@ export default function InvoiceBuilder() {
         inputs, doc, notes: existing?.notes || '',
       }
       const saved = await db.invoices.save(row)
-      navigate(`/invoices/${saved.id}`)
+      navigate(`/invoices/${saved.id}${makeDraft ? '?draft=1' : ''}`)
     } finally { setBusy(false) }
   }
 
@@ -342,6 +362,34 @@ export default function InvoiceBuilder() {
                       </div>
                     )}
                   </div>
+                  {quarterlyLike && (
+                    <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-3">
+                      <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span className="text-sm font-semibold text-slate-700">{t('proratedQuarters')}</span>
+                        <span className="text-xs text-slate-500">{t('proratedHint')}</span>
+                        {inputs.students.length > 1 && Object.keys(opts.prorate || {}).length > 0 && (
+                          <button type="button" className="ml-auto text-xs font-semibold text-pra-blue hover:underline" onClick={() => prorateForAll({ student: s, opts })}>{t('sameForAll')}</button>
+                        )}
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {calendar.quarters.map((qq) => {
+                          const full = quarterDays(calendar, qq.id)
+                          const on = opts.prorate?.[qq.id] !== undefined
+                          return (
+                            <div key={qq.id} className={`rounded-lg px-2.5 py-2 ${on ? 'bg-amber-50 ring-1 ring-amber-200' : 'bg-slate-50'}`}>
+                              <Checkbox checked={on} onChange={(v) => setProrate(s.id, qq.id, v ? full : null)} label={`${uiLang === 'vi' ? qq.vi : qq.en} · ${t('prorated')}`} className="text-xs font-semibold" />
+                              {on && (
+                                <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-600">
+                                  <NumberInput value={opts.prorate[qq.id]} onChange={(v) => setProrate(s.id, qq.id, v === '' ? '' : Math.min(full, Math.max(0, v)))} min={0} max={full} className="input !w-16 !py-1 text-right text-xs" aria-label={t('prorateDays')} />
+                                  <span>{t('ofDays', { n: full })}</span>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <div className="mt-3 grid gap-3 sm:grid-cols-3">
                     <div className="rounded-lg bg-slate-50 p-3">
                       <Checkbox checked={opts.meals} onChange={(v) => setOpts(s.id, { meals: v, mealRate: mealRateFor(s.level, s.program, fees) })} label={t('meals')} className="font-semibold" />
@@ -422,7 +470,11 @@ export default function InvoiceBuilder() {
               <div className="text-xs text-slate-500">{inputs.students.length} {t('students').toLowerCase()} · {inputs.lang.toUpperCase()}</div>
             </div>
           )}
-          <button className="btn-green mt-4 w-full justify-center" disabled={!inputs.students.length || busy} onClick={create}>
+          <div className="mt-4 rounded-lg bg-slate-50 p-2.5">
+            <Checkbox checked={makeDraft} onChange={setMakeDraft} label={t('alsoMakeDraft')} className="text-xs font-semibold" />
+            <p className="mt-1 pl-6 text-[11px] leading-snug text-slate-500">{gmailConfigured ? t('alsoMakeDraftHint') : t('gmailNotConfiguredShort')}</p>
+          </div>
+          <button className="btn-green mt-3 w-full justify-center" disabled={!inputs.students.length || busy} onClick={create}>
             {busy ? t('saving') : (editId ? t('save') : t('createInvoice'))} <ChevronRight size={16} />
           </button>
         </Card>

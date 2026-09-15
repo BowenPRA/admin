@@ -116,6 +116,33 @@ export function defaultStudentOptions(student, fees, calendar, ctx) {
   }
 }
 
+const QUARTERS = ['q1', 'q2', 'q3', 'q4']
+
+/** School days in a quarter from the calendar (45 in 2026-2027). */
+export function quarterDays(calendar, qid) {
+  return Number(calendar?.quarters?.find((q) => q.id === qid)?.days) || 45
+}
+
+/**
+ * Prorated quarters for a student: opts.prorate = { q1: 30 } means Quarter 1 is
+ * charged for 30 of its school days. Returns [{ qid, days, full }].
+ */
+export function proratedQuarters(opts, calendar) {
+  return QUARTERS.filter((k) => opts?.prorate?.[k] !== undefined && opts.prorate[k] !== '' && opts.prorate[k] !== null)
+    .map((k) => ({ qid: k, days: Math.max(0, Number(opts.prorate[k]) || 0), full: quarterDays(calendar, k) }))
+}
+
+/** Meal days for the billed quarters, using prorated days where set. */
+export function billedDays(billQuarters, opts, calendar) {
+  return (billQuarters || []).reduce((s, k) => {
+    const p = proratedQuarters(opts, calendar).find((x) => x.qid === k)
+    return s + (p ? p.days : quarterDays(calendar, k))
+  }, 0)
+}
+
+// Prorated amounts are rounded to the nearest 1,000 VND.
+const round1000 = (v) => Math.round(v / 1000) * 1000
+
 function dueLabel(lang, iso) {
   return L(lang, `Due ${fmtDate(iso, 'en')}`, `Hạn ${fmtDate(iso, 'vi')}`)
 }
@@ -236,6 +263,12 @@ export function buildDocument(inputs, fees, calendar) {
           let qa = quarterAmounts(student, fees)
           if (item.id === 'acellus') qa = [annual / 4, annual / 4, annual / 4, annual / 4]
           if (override !== null) { const s = qa.reduce((a, b) => a + b, 0); qa = qa.map((x) => Math.round(override * x / s)) }
+          // Joined or left mid-quarter: charge only the school days attended.
+          const pro = item.id === 'main' ? proratedQuarters(opts, calendar) : []
+          if (pro.length) {
+            qa = qa.map((x, i) => { const p = pro.find((r) => r.qid === QUARTERS[i]); return p ? round1000(x * Math.min(p.days, p.full) / p.full) : x })
+            cells.curriculum += '\n' + pro.map((p) => L(lang, `(Quarter ${p.qid.slice(1)}: ${p.days} of ${p.full} days)`, `(Quý ${p.qid.slice(1)}: ${p.days}/${p.full} ngày)`)).join('\n')
+          }
           const disc = qa.map(applyDisc)
           const vals = showDiscountCol ? qa : disc
           ;['q1', 'q2', 'q3', 'q4'].forEach((k, i) => { cells[k] = vals[i] })

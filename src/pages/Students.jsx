@@ -1,323 +1,403 @@
 import { useMemo, useState } from 'react'
-import { Pencil, Trash2, UserPlus, Users, Camera, ClipboardList, ChevronUp, ChevronDown } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { useAuth } from '../lib/AuthContext'
+import { useToast } from '../lib/toast'
 import { LEVELS, PROGRAMS } from '../lib/fees'
 import { ROSTER } from '../data/roster'
-import { resizeImage, photoSrc } from '../lib/report/photo'
+import { photoSrc } from '../lib/report/photo'
 import { proposeFamilies, familyNameFor, looksVietnamese, emailsOf } from '../lib/families'
-import { Card, Field, TextInput, Select, Checkbox, Modal, Empty, Spinner } from '../components/ui'
+import { normalizeCode, needsCodeUpdate, nextStudentCode } from '../lib/studentIds'
+import { Card, Checkbox, Empty, Spinner, Avatar, Segmented, SearchInput, PageHeader, Menu } from '../components/ui'
+import StudentModal from '../components/students/StudentModal'
+import FamilyModal from '../components/students/FamilyModal'
+import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact } from '../lib/studentRecords'
 
-// New students added by hand from now on pay a full-price Quarter 4 (q4_full);
-// the roster loader turns it off for the students already enrolled.
-const blankStudent = () => ({ full_name: '', nickname: '', level: 'Year 1', program: 'regular', family_id: '', legacy: false, is_new: true, q4_full: true, active: true, dob: '', nationality: '', notes: '',
-  student_code: '', gender: '', class_group: '', parents_email: '', parent_phone: '', address: '', allergies: '', start_date: '', enrollment_status: '', photo: '' })
-const blankFamily = () => ({ name: '', email: '', phone: '', language: 'en', notes: '' })
+const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
+const levelIndex = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
+// Sorts S0007 before S0120, and BLE / missing IDs after the S numbers.
+const codeKey = (c) => { const m = normalizeCode(c).match(/^([A-Z]+)(\d+)$/); return m ? `${m[1] === 'S' ? 0 : 1}${m[1]}${m[2].padStart(6, '0')}` : `9${c || ''}` }
 
-function SortTh({ col, cur, dir, onClick, children }) {
-  const active = cur === col
+function SortTh({ col, sort, onSort, children, className = '' }) {
+  const active = sort.col === col
   return (
-    <th className="py-2 cursor-pointer select-none whitespace-nowrap" onClick={() => onClick(col)}>
-      <span className="inline-flex items-center gap-0.5">
+    <th className={`th ${className}`} aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" className="group inline-flex items-center gap-0.5 uppercase hover:text-slate-800" onClick={() => onSort(col)}>
         {children}
-        {active ? (dir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />) : <ChevronUp size={13} className="opacity-0 group-hover:opacity-30" />}
-      </span>
+        {active ? (sort.dir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />) : <ChevronUp size={13} className="opacity-0 group-hover:opacity-40" />}
+      </button>
     </th>
-  )
-}
-
-export function StudentForm({ value, onChange, families, t, lang }) {
-  const set = (k) => (v) => onChange({ ...value, [k]: v })
-  const photo = async (file) => { try { onChange({ ...value, photo: await resizeImage(file) }) } catch (e) { alert(e.message) } }
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <div className="flex items-start gap-4 sm:col-span-2">
-        <label className="group relative cursor-pointer" title={t('photo')}>
-          {value.photo ? <img src={value.photo} alt="" className="h-20 w-20 rounded-full object-cover ring-2 ring-slate-200" /> : <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Camera /></div>}
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files[0] && photo(e.target.files[0])} />
-        </label>
-        <div className="grid flex-1 gap-3 sm:grid-cols-3">
-          <Field label={t('fullName')} className="sm:col-span-2"><TextInput value={value.full_name} onChange={set('full_name')} autoFocus /></Field>
-          <Field label={t('studentCode')}><TextInput value={value.student_code || ''} onChange={set('student_code')} placeholder="PAL0139" /></Field>
-        </div>
-      </div>
-      <Field label={t('nickname')}><TextInput value={value.nickname} onChange={set('nickname')} /></Field>
-      <Field label={t('family')}>
-        <Select value={value.family_id || ''} onChange={set('family_id')} options={[{ value: '', label: `— ${t('noFamily')} —` }, ...families.map((f) => ({ value: f.id, label: f.name }))]} />
-      </Field>
-      <Field label={t('level')}><Select value={value.level} onChange={set('level')} options={LEVELS.map((l) => ({ value: l, label: l }))} /></Field>
-      <Field label={t('program')}><Select value={value.program} onChange={set('program')} options={PROGRAMS.map((p) => ({ value: p.id, label: lang === 'vi' ? p.vi : p.en }))} /></Field>
-      <Field label={t('dob')}><TextInput value={value.dob || ''} onChange={set('dob')} type="date" /></Field>
-      <Field label={t('nationality')}><TextInput value={value.nationality || ''} onChange={set('nationality')} /></Field>
-      <Field label={t('gender')}><Select value={value.gender || ''} onChange={set('gender')} options={[{ value: '', label: '—' }, { value: 'female', label: 'Female' }, { value: 'male', label: 'Male' }]} /></Field>
-      <Field label={t('classGroup')}><TextInput value={value.class_group || ''} onChange={set('class_group')} /></Field>
-      <Field label={t('parentsEmail')}><TextInput value={value.parents_email || ''} onChange={set('parents_email')} /></Field>
-      <Field label={t('parentPhone')}><TextInput value={value.parent_phone || ''} onChange={set('parent_phone')} /></Field>
-      <Field label={t('address')}><TextInput value={value.address || ''} onChange={set('address')} /></Field>
-      <Field label={t('allergies')}><TextInput value={value.allergies || ''} onChange={set('allergies')} /></Field>
-      <div className="sm:col-span-2 flex flex-wrap gap-4">
-        <Checkbox checked={value.legacy} onChange={set('legacy')} label={t('legacy')} />
-        <Checkbox checked={value.is_new} onChange={set('is_new')} label={t('isNew')} />
-        <Checkbox checked={!!value.q4_full} onChange={set('q4_full')} label={t('q4Full')} />
-        <Checkbox checked={value.active !== false} onChange={set('active')} label={t('active')} />
-      </div>
-      <Field label={t('notes')} className="sm:col-span-2"><TextInput value={value.notes || ''} onChange={set('notes')} /></Field>
-    </div>
-  )
-}
-
-export function FamilyForm({ value, onChange, t }) {
-  const set = (k) => (v) => onChange({ ...value, [k]: v })
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <Field label={t('parentName')} className="sm:col-span-2"><TextInput value={value.name} onChange={set('name')} autoFocus /></Field>
-      <Field label={t('email')}><TextInput value={value.email || ''} onChange={set('email')} type="email" /></Field>
-      <Field label={t('phone')}><TextInput value={value.phone || ''} onChange={set('phone')} /></Field>
-      <Field label={t('preferredLang')}><Select value={value.language || 'en'} onChange={set('language')} options={[{ value: 'en', label: t('english') }, { value: 'vi', label: t('vietnamese') }]} /></Field>
-      <Field label={t('notes')}><TextInput value={value.notes || ''} onChange={set('notes')} /></Field>
-    </div>
   )
 }
 
 export default function Students() {
   const { t, lang } = useT()
+  const toast = useToast()
   const { loading, students, families, refresh } = useData()
-  const { isOffice, isHead } = useAuth()
-  const canEdit = isOffice || isHead
+  const { isOffice } = useAuth()
+  const canEdit = isOffice
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') === 'families' ? 'families' : 'students'
+  const setTab = (v) => setParams(v === 'families' ? { tab: v } : {}, { replace: true })
+
   const [q, setQ] = useState('')
-  const [showInactive, setShowInactive] = useState(false)
-  const [editing, setEditing] = useState(null) // student row
+  const [status, setStatus] = useState('active')
+  const [level, setLevel] = useState('')
+  const [program, setProgram] = useState('')
+  const [noFamily, setNoFamily] = useState(false)
+  const [missingContact, setMissingContact] = useState(false)
+  const [sort, setSort] = useState({ col: 'level', dir: 'asc' })
+  const [editing, setEditing] = useState(null)
   const [editingFam, setEditingFam] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [sortCol, setSortCol] = useState('level')
-  const [sortDir, setSortDir] = useState('asc')
-
-  const toggleSort = (col) => {
-    if (sortCol === col) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
-    else { setSortCol(col); setSortDir('asc') }
-  }
 
   const famById = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families])
+  const kidsByFamily = useMemo(() => {
+    const m = {}
+    students.forEach((s) => { if (s.family_id) (m[s.family_id] ||= []).push(s) })
+    return m
+  }, [students])
+  const programName = (id) => { const p = PROGRAMS.find((x) => x.id === id); return p ? (lang === 'vi' ? p.vi : p.en).replace(/ Program$| Pathway$/, '') : id }
 
+  const counts = useMemo(() => ({
+    active: students.filter((s) => s.active !== false).length,
+    past: students.filter((s) => s.active === false).length,
+  }), [students])
+  const toConvert = useMemo(() => students.filter(needsCodeUpdate), [students])
+  const withoutId = useMemo(() => students.filter((s) => s.active !== false && !s.student_code), [students])
+
+  const inStatus = (s) => status === 'all' || (status === 'active' ? s.active !== false : s.active === false)
   const rows = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    const filtered = students
-      .filter((s) => showInactive || s.active !== false)
-      .filter((s) => !needle || `${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''} ${s.level} ${s.student_code}`.toLowerCase().includes(needle))
-    const cmp = (a, b) => {
-      let va, vb
-      switch (sortCol) {
-        case 'name': va = a.full_name || ''; vb = b.full_name || ''; break
-        case 'nickname': va = a.nickname || ''; vb = b.nickname || ''; break
-        case 'level': return (LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level)) * (sortDir === 'asc' ? 1 : -1) || (a.full_name || '').localeCompare(b.full_name || '')
-        case 'program': va = a.program || ''; vb = b.program || ''; break
-        case 'age': { const da = a.dob ? new Date(a.dob) : null, db2 = b.dob ? new Date(b.dob) : null; return ((da || 0) - (db2 || 0)) * (sortDir === 'asc' ? -1 : 1) }
-        default: va = a.full_name || ''; vb = b.full_name || ''
-      }
-      return va.localeCompare(vb) * (sortDir === 'asc' ? 1 : -1)
-    }
-    return [...filtered].sort(cmp)
-  }, [students, q, showInactive, famById, sortCol, sortDir])
+    const needle = norm(q)
+    const list = students
+      .filter(inStatus)
+      .filter((s) => !level || s.level === level)
+      .filter((s) => !program || s.program === program)
+      .filter((s) => !noFamily || !s.family_id)
+      .filter((s) => !needle || norm(`${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''} ${s.level} ${s.student_code} ${normalizeCode(s.student_code)} ${s.class_group}`).includes(needle))
+    const dir = sort.dir === 'asc' ? 1 : -1
+    const byName = (a, b) => (a.full_name || '').localeCompare(b.full_name || '')
+    const cmp = {
+      code: (a, b) => codeKey(a.student_code).localeCompare(codeKey(b.student_code)),
+      name: byName,
+      level: (a, b) => levelIndex(a.level) - levelIndex(b.level) || byName(a, b),
+      age: (a, b) => (b.dob || '9999').localeCompare(a.dob || '9999'),
+      program: (a, b) => (a.program || '').localeCompare(b.program || '') || byName(a, b),
+      family: (a, b) => (famById[a.family_id]?.name || '~').localeCompare(famById[b.family_id]?.name || '~') || byName(a, b),
+    }[sort.col] || byName
+    return [...list].sort((a, b) => cmp(a, b) * dir)
+  }, [students, q, status, level, program, noFamily, famById, sort]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const saveStudent = async () => {
-    if (!editing.full_name.trim()) return
+  const famRows = useMemo(() => {
+    const needle = norm(q)
+    const isActive = (f) => (kidsByFamily[f.id] || []).some((s) => s.active !== false)
+    return families
+      .filter((f) => status === 'all' || (status === 'active' ? isActive(f) : !isActive(f)))
+      .filter((f) => !missingContact || familyMissingContact(f, kidsByFamily[f.id]))
+      .filter((f) => !needle || norm(`${f.name} ${f.email} ${f.phone} ${(kidsByFamily[f.id] || []).map((k) => `${k.full_name} ${k.nickname} ${k.student_code}`).join(' ')} ${contactsOf(f, kidsByFamily[f.id]).map((c) => c.name).join(' ')}`).includes(needle))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [families, kidsByFamily, q, status, missingContact])
+
+  const filtersOn = !!(q || level || program || noFamily || missingContact)
+  const clearFilters = () => { setQ(''); setLevel(''); setProgram(''); setNoFamily(false); setMissingContact(false) }
+  const onSort = (col) => setSort((s) => (s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' }))
+
+  const run = async (fn) => {
     setBusy(true)
-    try {
-      await db.students.save({ ...editing, family_id: editing.family_id || null, dob: editing.dob || null })
-      await refresh(); setEditing(null)
-    } finally { setBusy(false) }
+    try { await fn() } catch (e) { toast.error(e.message || String(e)) } finally { setBusy(false) }
   }
-  const saveFamily = async () => {
-    if (!editingFam.name.trim()) return
-    setBusy(true)
-    try { await db.families.save(editingFam); await refresh(); setEditingFam(null) } finally { setBusy(false) }
+
+  // ---- students ----
+  const saveStudent = async (s) => {
+    try {
+      let familyId = s.family_id || null
+      if (familyId === '__new') {
+        const fam = await db.families.save({ name: familyNameFor([s]), email: emailsOf(s).join(', '), phone: s.parent_phone || '', language: looksVietnamese([s]) ? 'vi' : 'en', notes: '', contacts: [] })
+        familyId = fam.id
+      }
+      await db.students.save({ ...s, family_id: familyId, dob: s.dob || null })
+      await refresh()
+      setEditing(null)
+      toast(t('studentSaved', { name: s.nickname || s.full_name }))
+    } catch (e) { toast.error(e.message) }
   }
   const removeStudent = async (s) => {
-    if (!confirm(t('confirmDelete'))) return
-    await db.students.remove(s.id); await refresh()
+    if (!confirm(t('confirmDeleteStudent', { name: s.full_name }))) return
+    await run(async () => { await db.students.remove(s.id); await refresh(); setEditing(null); toast(t('deletedName', { name: s.full_name })) })
   }
-  const removeFamily = async (f) => {
-    if (!confirm(t('confirmDelete'))) return
-    await db.families.remove(f.id); await refresh()
-  }
+  const assignFamily = (s, familyId) => run(async () => {
+    let fid = familyId || null
+    if (familyId === '__new') {
+      const fam = await db.families.save({ name: familyNameFor([s]), email: emailsOf(s).join(', '), phone: s.parent_phone || '', language: looksVietnamese([s]) ? 'vi' : 'en', notes: '', contacts: [] })
+      fid = fam.id
+    }
+    await db.students.save({ ...s, family_id: fid })
+    await refresh()
+  })
+  const convertCodes = () => run(async () => {
+    // Skips a student whose new ID another student already has (shown as a duplicate in the form).
+    const taken = new Set(students.map((s) => s.student_code))
+    const rows = toConvert.map((s) => ({ ...s, student_code: normalizeCode(s.student_code) })).filter((s) => !taken.has(s.student_code))
+    await db.students.saveMany(rows)
+    await refresh()
+    toast(t('idsConverted', { n: rows.length }))
+  })
+  const assignMissingIds = () => run(async () => {
+    const pool = [...students]
+    const rows = [...withoutId].sort((a, b) => levelIndex(a.level) - levelIndex(b.level) || a.full_name.localeCompare(b.full_name)).map((s) => {
+      const row = { ...s, student_code: nextStudentCode(pool) }
+      pool.push(row)
+      return row
+    })
+    await db.students.saveMany(rows)
+    await refresh()
+    toast(t('idsAssigned', { n: rows.length }))
+  })
   // Adds students from the built-in 2026-2027 roster that are not here yet
-  // (matched by student code, then by full name) and fills in blank details
-  // on the ones that are.
-  const loadRoster = async () => {
-    const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
-    const rows = []
+  // (matched by student ID, then by full name) and fills in blank details.
+  const loadRoster = () => {
+    const out = []
     let added = 0, updated = 0
     for (const r of ROSTER) {
-      const existing = students.find((s) => (r.student_code && s.student_code === r.student_code) || norm(s.full_name) === norm(r.full_name))
-      if (!existing) { rows.push({ ...blankStudent(), ...r, is_new: false, q4_full: false }); added++; continue }
+      const code = normalizeCode(r.student_code)
+      const existing = students.find((s) => (code && normalizeCode(s.student_code) === code) || norm(s.full_name) === norm(r.full_name))
+      if (!existing) { out.push({ ...blankStudent(), ...r, student_code: code, is_new: false, q4_full: false }); added++; continue }
       const patch = {}
-      for (const [k, v] of Object.entries(r)) if (v && !existing[k]) patch[k] = v
-      if (Object.keys(patch).length) { rows.push({ ...existing, ...patch }); updated++ }
+      for (const [k, v] of Object.entries(r)) if (v && !existing[k]) patch[k] = k === 'student_code' ? code : v
+      if (Object.keys(patch).length) { out.push({ ...existing, ...patch }); updated++ }
     }
-    if (!rows.length) { alert('Every student in the 2026-2027 roster is already here.'); return }
-    if (!confirm(`Add ${added} students and fill in details for ${updated} existing ones from the 2026-2027 roster?`)) return
-    setBusy(true)
-    try { await db.students.saveMany(rows); await refresh() } catch (e) { alert(e.message) } finally { setBusy(false) }
+    if (!out.length) { toast.info(t('rosterUpToDate')); return }
+    if (!confirm(t('rosterConfirm', { added, updated }))) return
+    run(async () => { await db.students.saveMany(out); await refresh(); toast(t('rosterDone', { added, updated })) })
   }
-
-  // Put a student into a family straight from the table. '__new' makes a
-  // family for that student first (named after them, language guessed from
-  // the name, parent email copied across).
-  const assignFamily = async (s, familyId) => {
-    setBusy(true)
-    try {
-      let fid = familyId || null
-      if (familyId === '__new') {
-        const fam = await db.families.save({ name: familyNameFor([s]), email: emailsOf(s).join(', '), phone: s.parent_phone || '', language: looksVietnamese([s]) ? 'vi' : 'en', notes: '' })
-        fid = fam.id
-      }
-      await db.students.save({ ...s, family_id: fid })
-      await refresh()
-    } catch (e) { alert(e.message) } finally { setBusy(false) }
-  }
-
-  // Group students who share a parent email / phone into families.
-  const buildFamilies = async () => {
+  const buildFamilies = () => {
     const { create, attach } = proposeFamilies(students, families)
-    if (!create.length && !attach.length) { alert(t('buildFamiliesNone')); return }
-    const lines = [
-      ...create.map((c) => `• ${c.name} (${c.language.toUpperCase()}): ${c.names.join(', ')}`),
-      ...attach.map((a) => `• → ${a.familyName}: ${a.names.join(', ')}`),
-    ]
+    if (!create.length && !attach.length) { toast.info(t('buildFamiliesNone')); return }
+    const lines = [...create.map((c) => `• ${c.name} (${c.language.toUpperCase()}): ${c.names.join(', ')}`), ...attach.map((a) => `• → ${a.familyName}: ${a.names.join(', ')}`)]
     if (!confirm(`${t('buildFamiliesConfirm')}\n\n${lines.join('\n')}`)) return
-    setBusy(true)
-    try {
+    run(async () => {
       const updates = []
       for (const c of create) {
-        const fam = await db.families.save({ name: c.name, email: c.email, phone: c.phone, language: c.language, notes: '' })
+        const fam = await db.families.save({ name: c.name, email: c.email, phone: c.phone, language: c.language, notes: '', contacts: [] })
         c.studentIds.forEach((id) => updates.push({ ...students.find((s) => s.id === id), family_id: fam.id }))
       }
       attach.forEach((a) => a.studentIds.forEach((id) => updates.push({ ...students.find((s) => s.id === id), family_id: a.familyId })))
       await db.students.saveMany(updates)
       await refresh()
-    } catch (e) { alert(e.message) } finally { setBusy(false) }
+      toast(t('familiesBuilt'))
+    })
+  }
+
+  // ---- families ----
+  const saveFamily = async (f) => {
+    try { await db.families.save(f); await refresh(); setEditingFam(null); toast(t('familySaved', { name: f.name })) } catch (e) { toast.error(e.message) }
+  }
+  const removeFamily = async (f) => {
+    if (!confirm(t('confirmDeleteFamily', { name: f.name }))) return
+    await run(async () => {
+      const kids = kidsByFamily[f.id] || []
+      if (kids.length) await db.students.saveMany(kids.map((k) => ({ ...k, family_id: null })))
+      await db.families.remove(f.id); await refresh(); setEditingFam(null); toast(t('deletedName', { name: f.name }))
+    })
   }
 
   if (loading) return <Spinner />
 
   const familyOptions = [
     { value: '', label: `— ${t('noFamily')} —` },
-    ...families.map((f) => ({ value: f.id, label: f.name })),
     { value: '__new', label: t('newFamilyOption') },
+    ...[...families].sort((a, b) => a.name.localeCompare(b.name)).map((f) => ({ value: f.id, label: f.name })),
   ]
+  const levelCounts = students.filter(inStatus).reduce((m, s) => { m[s.level] = (m[s.level] || 0) + 1; return m }, {})
+  const grouped = sort.col === 'level'
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-black text-slate-800">{t('students')}</h1>
-        <div className="flex-1" />
-        <input className="input max-w-xs" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} />
-        <Checkbox checked={showInactive} onChange={setShowInactive} label={t('inactive')} />
-        {canEdit && <button className="btn-secondary" onClick={loadRoster} disabled={busy}><ClipboardList size={16} /> {t('loadRoster')}</button>}
-        {canEdit && <button className="btn-secondary" onClick={buildFamilies} disabled={busy}><Users size={16} /> {t('buildFamilies')}</button>}
-        {canEdit && <button className="btn-secondary" onClick={() => setEditingFam(blankFamily())}><Users size={16} /> {t('addFamily')}</button>}
-        {canEdit && <button className="btn-primary" onClick={() => setEditing(blankStudent())}><UserPlus size={16} /> {t('addStudent')}</button>}
+    <div className="space-y-5">
+      <PageHeader title={tab === 'families' ? t('families') : t('students')}
+        subtitle={`${t('studentsCount', { n: counts.active })} ${t('enrolled').toLowerCase()} · ${t('familiesCount', { n: families.length })}`}>
+        {canEdit && (
+          <Menu label={t('more')} icon={MoreHorizontal} items={[
+            { label: t('loadRoster'), icon: ClipboardList, onClick: loadRoster, disabled: busy, hint: lang === 'vi' ? 'Thêm học sinh còn thiếu từ danh sách của văn phòng' : 'Add anyone missing from the office student list' },
+            { label: t('buildFamilies'), icon: Users, onClick: buildFamilies, disabled: busy, hint: lang === 'vi' ? 'Theo email / điện thoại phụ huynh chung' : 'Match siblings by shared parent email or phone' },
+            { label: t('addFamily'), icon: Users, onClick: () => setEditingFam(blankFamily()) },
+          ]} />
+        )}
+        {canEdit && <button className="btn-primary" onClick={() => setEditing(blankStudent(students))}><UserPlus size={16} /> {t('addStudent')}</button>}
+      </PageHeader>
+
+      {canEdit && toConvert.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          <IdCard size={18} className="flex-none text-sky-600" />
+          <span className="flex-1">{t('convertIdsText', { n: toConvert.length })}</span>
+          <button className="btn-primary !py-1.5" disabled={busy} onClick={convertCodes}>{t('convertIds')}</button>
+        </div>
+      )}
+      {canEdit && toConvert.length === 0 && withoutId.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <AlertTriangle size={18} className="flex-none text-amber-600" />
+          <span className="flex-1">{t('missingIdsText', { n: withoutId.length })} <span className="text-amber-700">{withoutId.slice(0, 4).map((s) => s.nickname || s.full_name).join(', ')}{withoutId.length > 4 ? '…' : ''}</span></span>
+          <button className="btn-secondary !py-1.5" disabled={busy} onClick={assignMissingIds}>{t('assignIds')}</button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Segmented value={tab} onChange={setTab} options={[{ value: 'students', label: t('students') }, { value: 'families', label: t('families') }]} />
+        <span className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
+        <Segmented value={status} onChange={setStatus} options={[
+          { value: 'active', label: `${t('enrolled')}${tab === 'students' ? ` · ${counts.active}` : ''}` },
+          { value: 'past', label: `${t('past')}${tab === 'students' ? ` · ${counts.past}` : ''}` },
+          { value: 'all', label: t('all') },
+        ]} />
       </div>
 
-      <Card>
-        <div className="flex items-center justify-between px-1 pb-2 text-xs text-slate-400">{rows.length} student{rows.length !== 1 ? 's' : ''}</div>
-        {rows.length === 0 ? <Empty text={t('noData')} /> : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="text-left text-xs uppercase text-slate-500">
-                <SortTh col="name" cur={sortCol} dir={sortDir} onClick={toggleSort}>{t('fullName')}</SortTh>
-                <SortTh col="nickname" cur={sortCol} dir={sortDir} onClick={toggleSort}>{t('nickname')}</SortTh>
-                <SortTh col="level" cur={sortCol} dir={sortDir} onClick={toggleSort}>{t('level')}</SortTh>
-                <SortTh col="age" cur={sortCol} dir={sortDir} onClick={toggleSort}>Age</SortTh>
-                <SortTh col="program" cur={sortCol} dir={sortDir} onClick={toggleSort}>{t('program')}</SortTh>
-                <th>{t('family')}</th><th></th><th></th>
-              </tr></thead>
-              <tbody>
-                {rows.map((s) => {
-                  const age = s.dob ? Math.floor((Date.now() - new Date(s.dob)) / 31557600000) : null
-                  return (
-                    <tr key={s.id} className={`border-t border-slate-100 hover:bg-slate-50 ${s.active === false ? 'opacity-50' : ''}`}>
-                      <td className="py-2 font-semibold"><span className="flex items-center gap-2">{photoSrc(s.photo) ? <img src={photoSrc(s.photo)} alt="" className="h-7 w-7 rounded-full object-cover flex-none" /> : null}{s.full_name}{s.student_code && <span className="font-mono text-[10px] font-normal text-slate-400">{s.student_code}</span>}</span></td>
-                      <td>{s.nickname}</td>
-                      <td>{s.level}</td>
-                      <td className="text-slate-500">{age != null ? age : '—'}</td>
-                      <td className="text-slate-500">{(PROGRAMS.find((p) => p.id === s.program) || {})[lang === 'vi' ? 'vi' : 'en'] || s.program}</td>
-                      <td className="min-w-[180px]">
-                        {canEdit ? (
-                          <select className={`input !py-1 text-xs ${s.family_id ? '' : 'text-amber-700 border-amber-300'}`} value={s.family_id || ''} disabled={busy} onChange={(e) => assignFamily(s, e.target.value)}>
-                            {familyOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                          </select>
-                        ) : (famById[s.family_id]?.name || <span className="text-slate-300">—</span>)}
-                      </td>
-                      <td className="text-xs whitespace-nowrap">{s.legacy && <span className="chip bg-purple-100 text-purple-800 mr-1">legacy</span>}{s.is_new && <span className="chip bg-green-100 text-green-800 mr-1">new</span>}{s.q4_full && <span className="chip bg-slate-100 text-slate-600" title={t('q4Full')}>Q4 full</span>}</td>
-                      <td className="whitespace-nowrap text-right">
-                        {canEdit && <button className="btn-ghost p-1.5" onClick={() => setEditing({ ...blankStudent(), ...s })}><Pencil size={15} /></button>}
-                        {canEdit && <button className="btn-ghost p-1.5 text-red-500" onClick={() => removeStudent(s)}><Trash2 size={15} /></button>}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+      <Card className="!p-0">
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3">
+          <SearchInput value={q} onChange={setQ} placeholder={tab === 'students' ? (lang === 'vi' ? 'Tên, mã, gia đình…' : 'Name, ID, family…') : t('search')} className="w-full sm:w-64" />
+          {tab === 'students' ? (<>
+            <select className="input w-auto" value={level} onChange={(e) => setLevel(e.target.value)} aria-label={t('yearGroup')}>
+              <option value="">{t('allYearGroups')}</option>
+              {LEVELS.map((l) => <option key={l} value={l}>{l}{levelCounts[l] ? ` (${levelCounts[l]})` : ''}</option>)}
+            </select>
+            <select className="input w-auto" value={program} onChange={(e) => setProgram(e.target.value)} aria-label={t('program')}>
+              <option value="">{t('allPrograms')}</option>
+              {PROGRAMS.map((p) => <option key={p.id} value={p.id}>{lang === 'vi' ? p.vi : p.en}</option>)}
+            </select>
+            {canEdit && <Checkbox checked={noFamily} onChange={setNoFamily} label={t('withoutFamily')} className="px-1" />}
+          </>) : (
+            <Checkbox checked={missingContact} onChange={setMissingContact} label={t('missingContact')} className="px-1" />
+          )}
+          {filtersOn && <button className="btn-ghost text-xs" onClick={clearFilters}>{t('clearFilters')}</button>}
+          <span className="ml-auto text-xs text-slate-400">{tab === 'students' ? t('studentsCount', { n: rows.length }) : t('familiesCount', { n: famRows.length })}</span>
+        </div>
+
+        {tab === 'students' ? (
+          rows.length === 0 ? <div className="p-4"><Empty text={students.length ? t('noMatches') : t('noData')} /></div> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50/60">
+                  <tr>
+                    <SortTh col="code" sort={sort} onSort={onSort} className="pl-4">ID</SortTh>
+                    <SortTh col="name" sort={sort} onSort={onSort}>{t('student')}</SortTh>
+                    <SortTh col="level" sort={sort} onSort={onSort}>{t('yearGroup')}</SortTh>
+                    <SortTh col="age" sort={sort} onSort={onSort} className="hidden md:table-cell">{t('age')}</SortTh>
+                    <SortTh col="program" sort={sort} onSort={onSort} className="hidden md:table-cell">{t('program')}</SortTh>
+                    <SortTh col="family" sort={sort} onSort={onSort} className="hidden lg:table-cell">{t('family')}</SortTh>
+                    <th className="th hidden sm:table-cell" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((s, i) => {
+                    const age = ageOf(s.dob)
+                    const header = grouped && (i === 0 || rows[i - 1].level !== s.level)
+                    const code = s.student_code
+                    return [
+                      header && (
+                        <tr key={`h-${s.level}`} className="bg-slate-50/80">
+                          <td colSpan={7} className="px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-pra-navy">{s.level || '—'} <span className="font-semibold text-slate-400">· {rows.filter((r) => r.level === s.level).length}</span></td>
+                        </tr>
+                      ),
+                      <tr key={s.id} onClick={() => setEditing({ ...blankStudent(), ...s })}
+                        className={`cursor-pointer border-t border-slate-100 transition-colors hover:bg-sky-50/50 ${s.active === false ? 'text-slate-400' : ''}`}>
+                        <td className="td pl-4">
+                          {code ? <span className={`code ${needsCodeUpdate(s) ? '!bg-sky-50 !text-sky-700' : ''}`} title={needsCodeUpdate(s) ? `→ ${normalizeCode(code)}` : undefined}>{code}</span>
+                            : <span className="text-xs text-amber-600">{t('noId')}</span>}
+                        </td>
+                        <td className="td">
+                          <div className="flex items-center gap-2.5">
+                            <Avatar src={photoSrc(s.photo)} name={s.full_name} size={32} className={s.active === false ? 'opacity-60' : ''} />
+                            <div className="min-w-0">
+                              <div className={`truncate font-semibold ${s.active === false ? '' : 'text-slate-800'}`}>{s.full_name}</div>
+                              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                {s.nickname && <span>“{s.nickname}”</span>}
+                                {s.allergies && <span className="rounded bg-red-50 px-1 text-[10px] font-semibold text-red-700" title={s.allergies}>{lang === 'vi' ? 'dị ứng' : 'allergy'}</span>}
+                                <span className="md:hidden">{age != null ? `${age}y` : ''}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="td whitespace-nowrap">{s.level}{s.class_group && s.class_group !== s.level && <div className="text-xs text-slate-400">{s.class_group}</div>}</td>
+                        <td className="td hidden text-slate-500 md:table-cell">{age ?? '—'}</td>
+                        <td className="td hidden whitespace-nowrap text-slate-600 md:table-cell">{programName(s.program)}</td>
+                        <td className="td hidden min-w-[190px] lg:table-cell" onClick={(e) => canEdit && e.stopPropagation()}>
+                          {canEdit ? (
+                            <select className={`input !py-1 text-xs ${s.family_id ? '' : '!border-amber-300 text-amber-700'}`} value={s.family_id || ''} disabled={busy} onChange={(e) => assignFamily(s, e.target.value)} aria-label={t('family')}>
+                              {familyOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
+                          ) : <span className="text-slate-600">{famById[s.family_id]?.name || '—'}</span>}
+                        </td>
+                        <td className="td hidden whitespace-nowrap pr-4 text-right text-xs sm:table-cell">
+                          {s.is_new && <span className="chip mr-1 bg-green-100 text-green-800">{lang === 'vi' ? 'mới' : 'new'}</span>}
+                          {s.legacy && <span className="chip mr-1 bg-purple-100 text-purple-800">legacy</span>}
+                          {s.q4_full && <span className="chip bg-slate-100 text-slate-600" title={t('q4Full')}>Q4</span>}
+                        </td>
+                      </tr>,
+                    ]
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          famRows.length === 0 ? <div className="p-4"><Empty text={families.length ? t('noMatches') : t('noData')} /></div> : (
+            <ul className="divide-y divide-slate-100">
+              {famRows.map((f) => {
+                const kids = [...(kidsByFamily[f.id] || [])].sort((a, b) => levelIndex(a.level) - levelIndex(b.level))
+                const contacts = contactsOf(f, kids)
+                const missing = familyMissingContact(f, kids)
+                return (
+                  <li key={f.id} className="grid gap-3 px-4 py-3 hover:bg-slate-50/60 md:grid-cols-[1.1fr_1.4fr_1.6fr_auto]">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 font-semibold text-slate-800">{f.name}<span className="code uppercase">{f.language || 'en'}</span></div>
+                      {missing && <div className="mt-0.5 flex items-center gap-1 text-xs text-amber-600"><AlertTriangle size={12} /> {t('missingContact')}</div>}
+                      {f.notes && <div className="mt-0.5 truncate text-xs text-slate-400" title={f.notes}>{f.notes}</div>}
+                    </div>
+                    <div className="flex flex-wrap content-start gap-1.5">
+                      {kids.length ? kids.map((k) => (
+                        <button key={k.id} type="button" onClick={() => setEditing({ ...blankStudent(), ...k })}
+                          className={`inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-0.5 pl-0.5 pr-2 text-xs hover:border-pra-blue ${k.active === false ? 'opacity-50' : ''}`}>
+                          <Avatar src={photoSrc(k.photo)} name={k.full_name} size={20} />
+                          <span className="font-semibold text-slate-700">{k.nickname || k.full_name.split(' ')[0]}</span>
+                          <span className="text-slate-400">{k.level?.replace('Year ', 'Y')}</span>
+                        </button>
+                      )) : <span className="text-xs text-slate-400">—</span>}
+                    </div>
+                    <div className="space-y-0.5 text-xs text-slate-600">
+                      {contacts.slice(0, 3).map((c, i) => (
+                        <div key={i} className="flex flex-wrap items-center gap-x-3">
+                          {(c.name || c.relation) && <span className="font-semibold text-slate-700">{c.name}{c.relation ? <span className="font-normal text-slate-400"> · {c.relation}</span> : ''}</span>}
+                          {c.email && <a href={`mailto:${c.email}`} className="inline-flex items-center gap-1 hover:text-pra-blue"><Mail size={11} />{c.email}</a>}
+                          {c.phone && <span className="inline-flex items-center gap-1"><Phone size={11} />{c.phone}</span>}
+                        </div>
+                      ))}
+                      {contacts.length > 3 && <div className="text-slate-400">+{contacts.length - 3}</div>}
+                    </div>
+                    {canEdit && (
+                      <div className="flex items-start gap-1 md:justify-end">
+                        <button className="btn-ghost px-2 text-xs text-pra-blue" onClick={() => setEditing({ ...blankStudent(students), family_id: f.id, parents_email: f.email || '', parent_phone: f.phone || '' })}><UserPlus size={15} /> <span className="hidden xl:inline">{t('addChild')}</span></button>
+                        <button className="btn-ghost px-2" onClick={() => setEditingFam({ ...blankFamily(), ...f })} aria-label={t('edit')}><Pencil size={15} /></button>
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )
         )}
       </Card>
 
-      {(() => {
-        const activeFams = families.filter((f) => students.some((s) => s.family_id === f.id && s.active !== false)).sort((a, b) => a.name.localeCompare(b.name))
-        const inactiveFams = families.filter((f) => !students.some((s) => s.family_id === f.id && s.active !== false)).sort((a, b) => a.name.localeCompare(b.name))
-        const FamilyTable = ({ fams, dim }) => (
-          <table className="w-full text-sm">
-            <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2">{t('parentName')}</th><th>{t('email')}</th><th>{t('phone')}</th><th>{t('students')}</th><th>{t('language')}</th><th></th></tr></thead>
-            <tbody>
-              {fams.map((f) => (
-                <tr key={f.id} className={`border-t border-slate-100 hover:bg-slate-50 ${dim ? 'opacity-50' : ''}`}>
-                  <td className="py-2 font-semibold">{f.name}</td>
-                  <td className="max-w-[200px] truncate text-slate-600" title={f.email}>{f.email}</td>
-                  <td className="text-slate-600">{f.phone}</td>
-                  <td className="text-slate-500">{students.filter((s) => s.family_id === f.id).map((s) => s.nickname || s.full_name).join(', ')}</td>
-                  <td className="uppercase text-xs">{f.language}</td>
-                  <td className="whitespace-nowrap text-right">
-                    {canEdit && <button className="btn-ghost p-1.5 text-pra-blue" title={t('addToFamily')} onClick={() => setEditing({ ...blankStudent(), family_id: f.id, parents_email: f.email || '' })}><UserPlus size={15} /></button>}
-                    {canEdit && <button className="btn-ghost p-1.5" onClick={() => setEditingFam({ ...blankFamily(), ...f })}><Pencil size={15} /></button>}
-                    {canEdit && <button className="btn-ghost p-1.5 text-red-500" onClick={() => removeFamily(f)}><Trash2 size={15} /></button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )
-        return (
-          <>
-            <Card title={`${t('families')} — Active (${activeFams.length})`}>
-              {activeFams.length === 0 ? <Empty text={t('noData')} /> : <FamilyTable fams={activeFams} />}
-            </Card>
-            {showInactive && inactiveFams.length > 0 && (
-              <Card title={`${t('families')} — Inactive (${inactiveFams.length})`}>
-                <FamilyTable fams={inactiveFams} dim />
-              </Card>
-            )}
-          </>
-        )
-      })()}
+      {!canEdit && <p className="flex items-center gap-1.5 text-xs text-slate-400"><BadgeCheck size={14} /> {t('viewOnly')}</p>}
 
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? t('edit') : t('addStudent')} wide>
-        {editing && <StudentForm value={editing} onChange={setEditing} families={families} t={t} lang={lang} />}
-        <div className="mt-5 flex justify-end gap-2">
-          <button className="btn-secondary" onClick={() => setEditing(null)}>{t('cancel')}</button>
-          <button className="btn-primary" onClick={saveStudent} disabled={busy}>{busy ? t('saving') : t('save')}</button>
-        </div>
-      </Modal>
-
-      <Modal open={!!editingFam} onClose={() => setEditingFam(null)} title={editingFam?.id ? t('edit') : t('addFamily')}>
-        {editingFam && <FamilyForm value={editingFam} onChange={setEditingFam} t={t} />}
-        <div className="mt-5 flex justify-end gap-2">
-          <button className="btn-secondary" onClick={() => setEditingFam(null)}>{t('cancel')}</button>
-          <button className="btn-primary" onClick={saveFamily} disabled={busy}>{busy ? t('saving') : t('save')}</button>
-        </div>
-      </Modal>
+      {editing && (
+        <StudentModal key={editing.id || 'new'} value={editing} onClose={() => setEditing(null)} onSave={saveStudent} onDelete={removeStudent}
+          students={students} families={families} canEdit={canEdit} t={t} lang={lang} />
+      )}
+      {editingFam && (
+        <FamilyModal key={editingFam.id || 'new-family'} value={editingFam} onClose={() => setEditingFam(null)} onSave={saveFamily} onDelete={removeFamily}
+          kids={kidsByFamily[editingFam.id] || []} t={t} />
+      )}
     </div>
   )
 }

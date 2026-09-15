@@ -1,14 +1,17 @@
-// Send email through the school's Gmail account from the browser.
+// Save invoice emails as drafts (with the PDF attached) in the academy's Gmail
+// account from the browser. Nothing is ever sent from the app.
 //
-// Uses Google Identity Services: the first send in a session pops up Google's
-// sign-in for admin@palmriveracademy.edu.vn and asks permission to send mail;
-// the token lives in memory only. Needs VITE_GOOGLE_CLIENT_ID (see README).
+// Uses Google Identity Services: the first use in a session pops up Google's
+// sign-in for admin@palmriveracademy.edu.vn and asks permission to manage
+// drafts and send mail; the token lives in memory only. Needs
+// VITE_GOOGLE_CLIENT_ID (see README).
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 export const SENDER = import.meta.env.VITE_GMAIL_SENDER || 'admin@palmriveracademy.edu.vn'
 export const gmailConfigured = Boolean(CLIENT_ID)
 
-const SCOPE = 'https://www.googleapis.com/auth/gmail.send'
+// gmail.compose covers creating drafts and sending.
+const SCOPE = 'https://www.googleapis.com/auth/gmail.compose'
 let token = null
 let tokenExp = 0
 
@@ -24,7 +27,12 @@ function loadGis() {
   })
 }
 
+/** Load Google sign-in ahead of time, so the permission popup opens straight from a click and is not blocked. */
+export function prepareGmail() { if (gmailConfigured) loadGis().catch(() => {}) }
+
+// Call first thing in a click handler: the sign-in popup needs the click.
 export async function getToken() {
+  if (!gmailConfigured) throw new Error('Gmail is not connected yet (VITE_GOOGLE_CLIENT_ID is missing). See README → Google setup.')
   if (token && Date.now() < tokenExp - 60_000) return token
   await loadGis()
   return new Promise((resolve, reject) => {
@@ -38,6 +46,7 @@ export async function getToken() {
         tokenExp = Date.now() + (Number(resp.expires_in) || 3600) * 1000
         resolve(token)
       },
+      error_callback: (e) => reject(new Error(e?.message || 'Google sign-in was closed')),
     })
     client.requestAccessToken({ prompt: token ? '' : 'consent' })
   })
@@ -53,14 +62,12 @@ function b64url(bytes) {
 }
 
 /**
- * Build and send a MIME message with one PDF attachment.
+ * MIME message with one PDF attachment, base64url-encoded for the Gmail API.
  * @param {{to:string, cc?:string, subject:string, text:string, html?:string, attachment:{filename:string, base64:string}}} m
  */
-export async function sendMail(m) {
-  const tok = await getToken()
+function buildRaw(m) {
   const boundary = `pra${Date.now().toString(36)}`
   const alt = `alt${Date.now().toString(36)}`
-  const enc = new TextEncoder()
   const lines = [
     `From: Palm River Academy <${SENDER}>`,
     `To: ${m.to}`,
@@ -82,8 +89,8 @@ export async function sendMail(m) {
     `--${alt}--`,
     '',
     `--${boundary}`,
-    `Content-Type: application/pdf; name="${m.attachment.filename}"`,
-    `Content-Disposition: attachment; filename="${m.attachment.filename}"`,
+    `Content-Type: application/pdf; name="${encHeader(m.attachment.filename)}"`,
+    `Content-Disposition: attachment; filename="${encHeader(m.attachment.filename)}"`,
     'Content-Transfer-Encoding: base64',
     '',
     m.attachment.base64.replace(/(.{76})/g, '$1\r\n'),
@@ -91,22 +98,40 @@ export async function sendMail(m) {
     `--${boundary}--`,
     '',
   ]
-  const raw = b64url(enc.encode(lines.join('\r\n')))
-  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+  return b64url(new TextEncoder().encode(lines.join('\r\n')))
+}
+
+async function gmailPost(path, body) {
+  const tok = await getToken()
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) {
     let msg = `${res.status}`
     try { msg = (await res.json()).error?.message || msg } catch { /* ignore */ }
-    if (res.status === 401) { token = null }
-    throw new Error(msg)
+    if (res.status === 401 || res.status === 403) token = null
+    throw new Error(`Gmail: ${msg}`)
   }
   return res.json()
 }
 
-/** Fallback when Gmail is not configured: open a Gmail compose window pre-filled. */
+// The app never sends email: it only saves drafts for the office to review and send from Gmail.
+
+/** Saves the message to the Drafts folder. Returns { id, messageId, link }. */
+export async function createDraft(m) {
+  const d = await gmailPost('drafts', { message: { raw: buildRaw(m) } })
+  return { id: d.id, messageId: d.message?.id, link: draftLink(d.message?.id) }
+}
+
+/** Opens a draft in Gmail, signed in as the sending account. */
+export function draftLink(messageId) {
+  const base = `https://mail.google.com/mail/?authuser=${encodeURIComponent(SENDER)}`
+  return messageId ? `${base}#drafts?compose=${messageId}` : `${base}#drafts`
+}
+
+/** Fallback when Gmail is not connected: open a Gmail compose window pre-filled (Gmail saves it as a draft). */
 export function openComposeWindow({ to, cc, subject, text }) {
   const u = new URL('https://mail.google.com/mail/')
   u.searchParams.set('view', 'cm')

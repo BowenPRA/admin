@@ -23,6 +23,7 @@ export default function ReportEditor() {
   const [err, setErr] = useState('')
   const [saveState, setSaveState] = useState('idle')
   const [preview, setPreview] = useState(false)
+  const [showHomeroom, setShowHomeroom] = useState(false)
 
   // `latest` mirrors the three pieces of state so rapid keystrokes always build
   // on the newest value; it is only touched inside event handlers.
@@ -109,7 +110,31 @@ export default function ReportEditor() {
           {published && !isHead && <div className="mt-1 text-xs font-semibold text-amber-700">This report is published. Only the head teacher can change it now.</div>}
         </div>
 
-        <Card title="Overview" locked={!homeroomOk} subtitle="Report details and the opening summary. Homeroom teacher or head.">
+        {!isHead && !published && (() => {
+          const mine = sections.filter((s) => subjectOk(s.subject_key))
+          return (
+            <div className={`flex flex-wrap items-center gap-2 rounded-xl border px-4 py-2.5 text-sm ${mine.length || homeroomOk ? 'border-sky-200 bg-sky-50 text-sky-900' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+              {mine.length || homeroomOk ? (<>
+                <span className="font-semibold">You can edit:</span>
+                {mine.map((s) => <a key={s.id} href={`#sec-${s.subject_key}`} onClick={(e) => { e.preventDefault(); document.getElementById(`sec-${s.subject_key}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }} className="chip bg-white text-sky-800 ring-1 ring-sky-200 hover:bg-sky-100">{subjectByKey(settings, s.subject_key).name}</a>)}
+                {homeroomOk && <span className="chip bg-white text-amber-800 ring-1 ring-amber-200">Homeroom parts</span>}
+                <span className="text-xs text-sky-700/80">Other sections are shown for reference.</span>
+              </>) : <span><Lock size={14} className="mr-1 inline" />You are not linked to any part of this {report.year_group} report, so it is read-only.</span>}
+            </div>
+          )
+        })()}
+
+        {!homeroomOk && (
+          <Card locked title="Homeroom parts" subtitle={`Written by ${report.homeroom_teacher || 'the homeroom teacher'}. Shown for reference.`}
+            actions={<button type="button" className="btn-ghost text-xs" onClick={() => setShowHomeroom((v) => !v)}>{showHomeroom ? <ChevronUp size={14} /> : <ChevronDown size={14} />} {showHomeroom ? 'Hide details' : 'Show details'}</button>}>
+            <div className="grid gap-3 text-sm sm:grid-cols-2">
+              <div><div className="label">This period at a glance</div><p className="text-slate-600">{report.glance || <span className="italic text-slate-400">Not written yet</span>}</p></div>
+              <div><div className="label">Homeroom teacher note</div><p className="line-clamp-4 text-slate-600">{report.homeroom_note || <span className="italic text-slate-400">Not written yet</span>}</p></div>
+            </div>
+          </Card>
+        )}
+
+        {(homeroomOk || showHomeroom) && <Card title="Overview" locked={!homeroomOk} subtitle="Report details and the opening summary. Homeroom teacher or head.">
           <div className="grid gap-3 sm:grid-cols-4">
             <Field label="Report date"><TextInput type="date" value={report.report_date || ''} onChange={(v) => patchReport({ report_date: v })} disabled={!homeroomOk} /></Field>
             <Field label="Homeroom teacher"><input className="input" list="teacher-names" value={report.homeroom_teacher || ''} onChange={(e) => patchReport({ homeroom_teacher: e.target.value })} disabled={!homeroomOk} /><datalist id="teacher-names">{teacherNames.map((n) => <option key={n} value={n} />)}</datalist></Field>
@@ -119,7 +144,7 @@ export default function ReportEditor() {
           <Field label="This period at a glance" className="mt-3" right={`${wordCount(report.glance)} words · about 40 fits`}>
             <TextArea rows={2} value={report.glance} onChange={(v) => patchReport({ glance: v })} disabled={!homeroomOk} placeholder={`How has ${student?.nickname || 'the student'} settled in and approached learning this period?`} />
           </Field>
-        </Card>
+        </Card>}
 
         <div>
           <h2 className="mb-2 text-lg font-bold">Academic learning</h2>
@@ -141,6 +166,7 @@ export default function ReportEditor() {
           </div>
         </div>
 
+        {(homeroomOk || showHomeroom) && (<>
         <Card title="How I learn" locked={!homeroomOk} subtitle="Learner skills. The note under a skill is optional and prints in small text.">
           <div className="space-y-4">
             {(settings.skillGroups || []).map((g) => (
@@ -180,6 +206,7 @@ export default function ReportEditor() {
             ))}
           </div>
         </Card>
+        </>)}
       </div>
 
       {preview && (
@@ -197,6 +224,24 @@ function SubjectCard({ section: s, settings, levels, bi, editable, onPatch, coho
   const sub = subjectByKey(settings, s.subject_key)
   const [showNote, setShowNote] = useState(false)
   const scored = sub.scored !== false && !compact
+  if (!editable) {
+    const lvl = levelInfo(settings, s.level)
+    return (
+      <section id={`sec-${s.subject_key}`} className="card flex items-start gap-3 bg-slate-50/70 !px-4 !py-3">
+        <Icon name={sub.icon} size={18} className="mt-0.5 flex-none text-slate-400" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-bold text-slate-700">{sub.name}</span>
+            {lvl ? <span className="chip text-white" style={{ background: lvl.color }}>{lvl.code} · {lvl.name}</span> : <span className="chip bg-slate-100 text-slate-500">Not yet assessed</span>}
+            {hasNum(s.score_pct) && <span className="text-xs text-slate-500">{s.score_pct}%</span>}
+            {s.teacher_name && <span className="text-xs text-slate-400">{s.teacher_name}</span>}
+            <Lock size={12} className="ml-auto text-slate-300" />
+          </div>
+          {(s.comment || '').trim() ? <p className="mt-1 line-clamp-2 text-xs text-slate-600">{s.comment}</p> : <p className="mt-1 text-xs italic text-slate-400">No comment yet</p>}
+        </div>
+      </section>
+    )
+  }
   const handleRawScore = (raw) => {
     const patch = { score_raw: raw }
     const m = raw.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/)
@@ -207,7 +252,8 @@ function SubjectCard({ section: s, settings, levels, bi, editable, onPatch, coho
     onPatch(patch)
   }
   return (
-    <Card locked={!editable} className="!p-4" title={<span className="flex items-center gap-2"><Icon name={sub.icon} size={18} className="text-pra-navy" /> {sub.name}</span>}
+    <div id={`sec-${s.subject_key}`} className="scroll-mt-28">
+    <Card className="!p-4" title={<span className="flex items-center gap-2"><Icon name={sub.icon} size={18} className="text-pra-navy" /> {sub.name}</span>}
       actions={editable && !s.teacher_name && signName ? <button className="btn-ghost text-xs" onClick={() => onPatch({ teacher_name: signName })}>Sign as {signName}</button> : null}>
       <div className="grid gap-4 lg:grid-cols-[auto_1fr]">
         <div className="space-y-3">
@@ -254,5 +300,6 @@ function SubjectCard({ section: s, settings, levels, bi, editable, onPatch, coho
         </div>
       </div>
     </Card>
+    </div>
   )
 }

@@ -20,11 +20,12 @@ const TABLES = {
   reports: 'adm_reports',
   sections: 'adm_report_sections',
   courseNotes: 'adm_course_notes',
+  attendance: 'adm_attendance',
 }
 
 // Rows that come straight from form inputs may hold '' where Postgres wants
 // null (date / numeric columns). Applied to the report tables and students.
-const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes])
+const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes, TABLES.attendance])
 const cleanRow = (table, row) => (CLEAN.has(table) ? Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v === '' ? null : v])) : row)
 const matches = (row, filter) => Object.entries(filter || {}).every(([k, v]) => (Array.isArray(v) ? v.includes(row[k]) : row[k] === v))
 
@@ -43,6 +44,10 @@ const localAdapter = {
     const d = lsRead()
     return (d[table] || []).filter((r) => matches(r, filter))
   },
+  async listRange(table, col, from, to) {
+    const d = lsRead()
+    return (d[table] || []).filter((r) => r[col] >= from && r[col] <= to)
+  },
   async get(table, id) {
     const d = lsRead()
     return (d[table] || []).find((r) => r.id === id) || null
@@ -59,6 +64,22 @@ const localAdapter = {
     return r
   },
   async upsertMany(table, rows) { const out = []; for (const r of rows) out.push(await this.upsert(table, r)); return out },
+  // Insert or replace by a natural key (e.g. one attendance mark per student per day).
+  async upsertBy(table, rows, keys) {
+    const d = lsRead()
+    const list = d[table] || []
+    const now = new Date().toISOString()
+    const out = rows.map((row) => {
+      const i = list.findIndex((x) => keys.every((k) => x[k] === row[k]))
+      const r = { ...(i >= 0 ? list[i] : {}), ...row, id: i >= 0 ? list[i].id : row.id || genId(), updated_at: now }
+      r.created_at = r.created_at || now
+      if (i >= 0) list[i] = r; else list.push(r)
+      return r
+    })
+    d[table] = list
+    lsWrite(d)
+    return out
+  },
   async remove(table, id) {
     const d = lsRead()
     d[table] = (d[table] || []).filter((r) => r.id !== id)
@@ -90,6 +111,16 @@ const supaAdapter = {
     throwIf(error)
     return data || []
   },
+  // Pages through the rows so long ranges are not cut off at Supabase's 1000-row limit.
+  async listRange(table, col, from, to) {
+    const out = []
+    for (let start = 0; ; start += 1000) {
+      const { data, error } = await supabase.from(table).select('*').gte(col, from).lte(col, to).order(col).range(start, start + 999)
+      throwIf(error)
+      out.push(...(data || []))
+      if (!data || data.length < 1000) return out
+    }
+  },
   async get(table, id) {
     const { data, error } = await supabase.from(table).select('*').eq('id', id).maybeSingle()
     throwIf(error)
@@ -107,6 +138,14 @@ const supaAdapter = {
     const now = new Date().toISOString()
     const rs = rows.map((row) => { const r = cleanRow(table, { ...row, id: row.id || genId(), updated_at: now }); delete r.created_at; return r })
     const { data, error } = await supabase.from(table).upsert(rs).select()
+    throwIf(error)
+    return data || []
+  },
+  async upsertBy(table, rows, keys) {
+    if (!rows.length) return []
+    const now = new Date().toISOString()
+    const rs = rows.map((row) => { const r = cleanRow(table, { ...row, updated_at: now }); delete r.created_at; delete r.id; return r })
+    const { data, error } = await supabase.from(table).upsert(rs, { onConflict: keys.join(',') }).select()
     throwIf(error)
     return data || []
   },
@@ -144,6 +183,13 @@ export const db = {
   reports: crud(TABLES.reports),
   sections: crud(TABLES.sections),
   courseNotes: crud(TABLES.courseNotes),
+  attendance: {
+    list: (filter) => A.list(TABLES.attendance, filter),
+    /** Marks for a date range (inclusive, 'YYYY-MM-DD'). */
+    between: (from, to) => A.listRange(TABLES.attendance, 'date', from, to),
+    mark: (rows) => A.upsertBy(TABLES.attendance, rows, ['student_id', 'date']),
+    remove: (id) => A.remove(TABLES.attendance, id),
+  },
   invoices: {
     list: () => A.list(TABLES.invoices),
     get: (id) => A.get(TABLES.invoices, id),
@@ -214,4 +260,9 @@ export const auth = {
     return data
   },
   async signOut() { if (hasSupabase) await supabase.auth.signOut() },
+  async changePassword(password) {
+    if (!hasSupabase) throw new Error('Passwords only apply when connected to Supabase.')
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+  },
 }

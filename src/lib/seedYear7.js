@@ -1,14 +1,8 @@
 import { db, genId } from './db'
 import { ROSTER } from '../data/roster'
-import { DEFAULT_REPORT_SETTINGS } from './report/defaults'
+import { TEACHER_SCHEDULE } from '../data/staff'
+import { normalizeCode } from './studentIds'
 import { buildReport, buildSections } from './report/utils'
-
-const TEACHERS = [
-  { name: 'Bowen', title: 'Mr.', email: 'sbowen209@gmail.com', role: 'teacher', subjects: ['math', 'science', 'technology'], homeroom_groups: ['Year 7'], active: true },
-  { name: 'David', title: 'Mr.', email: 'david@science.local', role: 'teacher', subjects: ['english'], homeroom_groups: [], active: true },
-  { name: 'Seth', title: 'Mr.', email: 'seth@science.local', role: 'head', subjects: ['art_of_science'], homeroom_groups: ['*'], active: true },
-  { name: 'Kiu', title: 'Ms.', email: 'kiu@science.local', role: 'teacher', subjects: ['history', 'executive_function', 'wellbeing'], homeroom_groups: [], active: true },
-]
 
 const SCORES = {
   'Amada':  { math: { raw: '40/50', pct: 80, level: 3 }, english: { raw: '43/50', pct: 86, level: 3 }, science: { raw: '38/50', pct: 76, level: 2 } },
@@ -39,7 +33,7 @@ const VOCATIONAL_LEVELS = {
 }
 
 function teacherFor(subjectKey) {
-  const t = TEACHERS.find((t) => t.subjects.includes(subjectKey))
+  const t = TEACHER_SCHEDULE.find((t) => t.subjects.includes(`${subjectKey}:Year 7`))
   return t ? `${t.title} ${t.name}` : ''
 }
 
@@ -89,7 +83,7 @@ export async function seedYear7() {
   let students = await db.students.list()
   const y7Roster = ROSTER.filter((r) => r.class_group === 'Year 7')
   const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
-  const missing = y7Roster.filter((r) => !students.find((s) => s.student_code === r.student_code || norm(s.full_name) === norm(r.full_name)))
+  const missing = y7Roster.filter((r) => !students.find((s) => normalizeCode(s.student_code) === normalizeCode(r.student_code) || norm(s.full_name) === norm(r.full_name)))
   if (missing.length) {
     const rows = missing.map((r) => ({ ...r, id: genId(), active: true }))
     await db.students.saveMany(rows)
@@ -98,7 +92,7 @@ export async function seedYear7() {
   // Sync key fields from roster to all existing student records
   const rosterUpdates = []
   for (const r of ROSTER) {
-    const existing = students.find((s) => s.student_code === r.student_code || norm(s.full_name) === norm(r.full_name))
+    const existing = students.find((s) => normalizeCode(s.student_code) === normalizeCode(r.student_code) || norm(s.full_name) === norm(r.full_name))
     if (!existing) continue
     let changed = false
     for (const k of ['photo', 'level', 'class_group']) {
@@ -108,19 +102,18 @@ export async function seedYear7() {
   }
   if (rosterUpdates.length) await db.students.saveMany(rosterUpdates)
 
-  const y7Students = students.filter((s) => s.class_group === 'Year 7' || y7Roster.some((r) => r.student_code === s.student_code))
+  const y7Students = students.filter((s) => s.class_group === 'Year 7' || y7Roster.some((r) => normalizeCode(r.student_code) === normalizeCode(s.student_code)))
 
   // 2. Create teachers
   const existing = await db.teachers.list()
-  for (const t of TEACHERS) {
+  for (const t of TEACHER_SCHEDULE) {
     if (!existing.find((e) => e.email === t.email)) {
-      await db.teachers.save({ ...t, id: genId() })
+      await db.teachers.save({ ...t, id: genId(), active: true })
     }
   }
 
   // 3. Check for existing Q1 reports
   const existingReports = await db.reports.list({ school_year: settings.schoolYear, period_label: period.label })
-  const existingIds = new Set(existingReports.map((r) => r.student_id))
 
   // 4. Build reports and sections
   const allReports = []

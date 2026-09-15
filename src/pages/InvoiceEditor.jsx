@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Printer, Save, Trash2, Plus, Copy, Settings2, Receipt, Ban, Send, Mail, Download } from 'lucide-react'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { Printer, Save, Trash2, Plus, Copy, Settings2, Receipt, Ban, Send, Mail, Download, FilePen } from 'lucide-react'
+import { useToast } from '../lib/toast'
+import { gmailConfigured, draftLink, getToken, prepareGmail } from '../lib/gmail'
+import { draftInvoice, logDraft, lastDraft, invoiceRecipients } from '../lib/invoiceDraft'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { docTotals, recomputeRow, columnTotal } from '../lib/pricing'
 import { fmt, todayISO, fmtDate } from '../lib/money'
-import { emailsOf } from '../lib/families'
 import { nodeToPdfBlob, downloadBlob } from '../lib/pdf'
 import InvoiceDocument from '../components/InvoiceDocument'
 import SendInvoiceModal from '../components/SendInvoiceModal'
@@ -34,31 +36,49 @@ export default function InvoiceEditor() {
   const [editHeads, setEditHeads] = useState(false)
   const [payModal, setPayModal] = useState(null)
   const [sendOpen, setSendOpen] = useState(false)
+  const [drafting, setDrafting] = useState(false)
+  const [params, setParams] = useSearchParams()
+  const toast = useToast()
   const [scale, setScale] = useState(0.6)
   const previewRef = useRef(null)
   const pdfRef = useRef(null)
 
-  // Where the invoice should go: the family's email, else the parents' emails
-  // on the students' records.
-  const defaultTo = useMemo(() => {
-    if (!inv) return ''
-    const fam = (families || []).find((f) => f.id === inv.family_id)
-    const fromFam = emailsOf({ parents_email: fam?.email || '' })
-    const fromKids = (students || []).filter((s) => (inv.student_ids || []).includes(s.id)).flatMap(emailsOf)
-    return [...new Set([...fromFam, ...fromKids])].join(', ')
-  }, [inv, families, students])
+  // Where the invoice should go: the family's contacts, else the parents'
+  // emails on the students' records.
+  const defaultTo = useMemo(() => (inv ? invoiceRecipients(inv, families, students) : ''), [inv, families, students])
+  const draft = lastDraft(inv)
+
+  const recordDraft = async (d) => { const saved = await logDraft(inv, d); setInv(saved); setDirty(false) }
+
+  // One click: PDF + email from the template, saved to admin@'s Gmail Drafts.
+  const quickDraft = async () => {
+    if (!gmailConfigured) { setSendOpen(true); return }
+    setDrafting(true)
+    try {
+      await getToken()
+      const d = await draftInvoice({ inv, fees, node: pdfRef.current, to: defaultTo })
+      await recordDraft(d)
+      toast(<span>{t('draftSaved')} · <a className="font-semibold text-pra-blue underline" href={d.link} target="_blank" rel="noreferrer">{t('openInGmail')}</a></span>)
+    } catch (e) { toast.error(e.message) } finally { setDrafting(false) }
+  }
+
+  // Arriving from "Create invoice" with the Gmail draft option ticked.
+  useEffect(() => { prepareGmail() }, [])
+  const autoDraft = params.get('draft') === '1'
+  const autoRan = useRef(false)
+  useEffect(() => {
+    if (!autoDraft || !inv || !fees || autoRan.current) return
+    autoRan.current = true
+    Promise.resolve().then(() => {
+      setParams({}, { replace: true })
+      if (gmailConfigured) quickDraft()
+      else toast.info(t('gmailNotConfigured'))
+    })
+  }, [autoDraft, inv, fees]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const downloadPdf = async () => {
     setBusy(true)
     try { downloadBlob(await nodeToPdfBlob(pdfRef.current), invoiceFilename(inv)) } catch (e) { alert(e.message) } finally { setBusy(false) }
-  }
-
-  // Called by the send modal once the email has gone (or the Gmail draft was opened).
-  const recordSent = async ({ to, cc, subject, manual }) => {
-    const entry = { at: new Date().toISOString(), to, cc, subject, manual: !!manual }
-    const next = { ...inv, total: docTotals(inv.doc).total, sent_at: entry.at, sent_to: to, send_log: [...(inv.send_log || []), entry], status: inv.status === 'draft' ? 'sent' : inv.status }
-    const saved = await db.invoices.save(next)
-    setInv(saved); setDirty(false)
   }
 
   useEffect(() => {
@@ -153,17 +173,25 @@ export default function InvoiceEditor() {
         <Link className="btn-secondary" to={`/invoices/new?edit=${id}`} title={t('rebuild')}><Settings2 size={16} /> {t('rebuild')}</Link>
         <Link className="btn-secondary" to={`/print/invoice/${id}`} target="_blank"><Printer size={16} /> {t('print')}</Link>
         <button className="btn-secondary" onClick={downloadPdf} disabled={busy}><Download size={16} /> {t('downloadPdf')}</button>
-        <button className="btn-green" onClick={() => setSendOpen(true)} disabled={busy || inv.status === 'void'}><Mail size={16} /> {t('sendInvoice')}</button>
+        <button className="btn-secondary" onClick={() => setSendOpen(true)} disabled={busy || inv.status === 'void'}><Mail size={16} /> {t('sendInvoice')}</button>
+        <button className="btn-green" onClick={quickDraft} disabled={busy || drafting || inv.status === 'void'} title={gmailConfigured ? `${t('gmailDraftHint')} ${defaultTo || '—'}` : t('gmailNotConfigured')}>
+          <FilePen size={16} /> {drafting ? t('makingDraft') : t('gmailDraft')}
+        </button>
         <button className="btn-primary" onClick={save} disabled={busy || !dirty}><Save size={16} /> {busy ? t('saving') : dirty ? t('save') : t('saved')}</button>
       </div>
-      {inv.sent_at && <div className="text-xs text-green-700">✉ {t('sentAt')}: {new Date(inv.sent_at).toLocaleString()} → {inv.sent_to}</div>}
+      {(inv.sent_at || draft) && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          {inv.sent_at && <span className="text-green-700">✉ {t('sentAt')}: {new Date(inv.sent_at).toLocaleString()} → {inv.sent_to}</span>}
+          {draft && <span className="text-slate-600"><FilePen size={12} className="mr-1 inline" />{t('draftSavedAt')}: {new Date(draft.at).toLocaleString()} → {draft.to} · <a className="font-semibold text-pra-blue hover:underline" href={draftLink(draft.message_id)} target="_blank" rel="noreferrer">{t('openInGmail')}</a></span>}
+        </div>
+      )}
 
       {/* Full-size copy of the document, kept off-screen, that the PDF is rendered from. */}
       <div aria-hidden style={{ position: 'absolute', left: -10000, top: 0, width: '210mm', pointerEvents: 'none' }}>
         <div ref={pdfRef}><InvoiceDocument doc={doc} fees={fees} number={inv.number} issueDate={fmtDate(inv.issue_date, inv.lang)} /></div>
       </div>
 
-      {sendOpen && <SendInvoiceModal open onClose={() => setSendOpen(false)} inv={inv} fees={fees} docNode={pdfRef} defaultTo={defaultTo} onSent={recordSent} />}
+      {sendOpen && <SendInvoiceModal onClose={() => setSendOpen(false)} inv={inv} fees={fees} docNode={pdfRef} defaultTo={defaultTo} onDrafted={recordDraft} />}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* ---------- Editor ---------- */}

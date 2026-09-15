@@ -65,13 +65,15 @@ for r in rows:
     code = clean(r[3]); start = r[4]; name = clean(r[5])
     if not re.match(r'^(PAL|BLE)\s?\d+', code) or not name: continue
     code = code.replace(' ', '')
+    program = 'global' if code.startswith('BLE') or 'Global' in (clean(r[18]) if len(r) > 18 else '') else None
+    if code.startswith('PAL'): code = 'S' + code[3:]  # PRA student IDs are S0001; BLE codes stay as they are
     nick = clean(r[6]); gender = clean(r[7]).lower(); dob = iso_date(r[8])
     allergies = clean(r[9]); allergies = '' if allergies.lower() in ('no', 'option 2') else allergies
     emails = [e.strip() for e in re.split(r'[,\n ]+', str(r[11] or '')) if '@' in e]
     address = clean(r[11]); phone = re.sub(r'\s*\n\s*', ' | ', str(r[12] or '')).strip()
     status = clean(r[16]) if len(r) > 16 else ''
     plan = clean(r[18]) if len(r) > 18 else ''
-    program = 'global' if code.startswith('BLE') or 'Global' in plan else 'vocational' if 'Vocational' in plan else 'regular'
+    program = program or ('vocational' if 'Vocational' in plan else 'regular')
     key = 'Louis Minh Huy Gowman' if name == 'Louis Minh Huy Gowman' else nick
     last = LAST_YEAR.get(key)
     year_group = promote(last) if last else (group if group in ORDER else '')

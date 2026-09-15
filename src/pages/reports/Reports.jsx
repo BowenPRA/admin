@@ -33,9 +33,11 @@ async function fetchPeriod(settings, period) {
 
 function ReportsList({ settings }) {
   const { students } = useData()
-  const { me, isHead, canSubject, canHomeroom } = useAuth()
+  const { me, isHead, canSubject, canHomeroom, myYearGroups } = useAuth()
   const [period, setPeriod] = useState(() => currentPeriod(settings)?.label || '')
   const [group, setGroup] = useState('')
+  const [mineOnly, setMineOnly] = useState(true)
+  const scoped = !isHead && mineOnly && !!myYearGroups
   const [reports, setReports] = useState(null)
   const [sections, setSections] = useState([])
   const [creating, setCreating] = useState(false)
@@ -52,10 +54,18 @@ function ReportsList({ settings }) {
 
   const byGroup = useMemo(() => {
     const m = new Map()
-    for (const r of reports || []) { if (group && r.year_group !== group) continue; if (!m.has(r.year_group)) m.set(r.year_group, []); m.get(r.year_group).push(r) }
+    for (const r of reports || []) {
+      if (group && r.year_group !== group) continue
+      if (scoped && !myYearGroups.includes(r.year_group)) continue
+      if (!m.has(r.year_group)) m.set(r.year_group, [])
+      m.get(r.year_group).push(r)
+    }
     for (const list of m.values()) list.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || ''))
     return [...m.entries()].sort((a, b) => Number(String(a[0]).replace(/\D/g, '')) - Number(String(b[0]).replace(/\D/g, '')))
-  }, [reports, group])
+  }, [reports, group, scoped, myYearGroups])
+
+  // The learning areas this teacher writes, e.g. "English (Year 7)".
+  const mySubjects = (me?.subjects || []).map((k) => { const [s, g] = k.split(':'); return `${subjectByKey(settings, s).name}${g ? ` (${g})` : ''}` })
 
   // What still needs this teacher's input in the selected period.
   const todo = useMemo(() => {
@@ -90,7 +100,16 @@ function ReportsList({ settings }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="mr-auto text-2xl font-black text-slate-800">Progress reports <span className="text-base font-normal text-slate-400">{settings.schoolYear}</span></h1>
+        <div className="mr-auto">
+          <h1 className="text-2xl font-black text-slate-800">Progress reports <span className="text-base font-normal text-slate-400">{settings.schoolYear}</span></h1>
+          {!isHead && (
+            <p className="text-sm text-slate-500">
+              {mySubjects.length || (me?.homeroom_groups || []).length
+                ? <>You write {[mySubjects.join(', '), (me?.homeroom_groups || []).length ? `homeroom parts for ${me.homeroom_groups.join(', ')}` : ''].filter(Boolean).join(' and ')}. Everything else is read-only.</>
+                : 'You are not linked to any classes yet, so reports are read-only. Ask the head teacher to add you on the Teachers page.'}
+            </p>
+          )}
+        </div>
         {isHead && <Link to="/reports/settings" className="btn-secondary"><Settings size={16} /> Report settings</Link>}
         {isHead && <button className="btn-secondary" disabled={seeding} onClick={async () => { setSeeding(true); try { const r = await seedYear7(); alert(r.msg); load() } catch (e) { alert(e.message) } finally { setSeeding(false) } }}><Database size={16} /> {seeding ? 'Seeding…' : 'Seed Year 7 demo'}</button>}
         {isHead && <button className="btn-green" onClick={() => setCreating(true)}><Plus size={16} /> Create reports</button>}
@@ -101,6 +120,12 @@ function ReportsList({ settings }) {
           <option value="">All year groups</option>
           {[...new Set((reports || []).map((r) => r.year_group))].sort().map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
+        {!isHead && myYearGroups && (
+          <div className="seg" role="group">
+            <button type="button" aria-pressed={mineOnly} onClick={() => setMineOnly(true)}>My classes</button>
+            <button type="button" aria-pressed={!mineOnly} onClick={() => setMineOnly(false)}>All reports</button>
+          </div>
+        )}
       </div>
 
       {todo.length > 0 && (
@@ -127,8 +152,9 @@ function ReportsList({ settings }) {
             <Link className="btn-secondary text-xs" to={`/print/reports?year=${encodeURIComponent(settings.schoolYear)}&period=${encodeURIComponent(period)}&group=${encodeURIComponent(yg)}`} target="_blank"><Printer size={14} /> Print all</Link>
           </div>
         )}>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2">Student</th><th>Grade</th><th>Age</th><th>Completion</th><th>Status</th><th>Updated</th><th></th></tr></thead>
+            <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2">Student</th><th>{isHead ? 'Year group' : 'Your part'}</th><th className="hidden sm:table-cell">Age</th><th>Completion</th><th>Status</th><th className="hidden md:table-cell">Updated</th><th></th></tr></thead>
             <tbody>
               {list.map((r) => {
                 const student = students.find((s) => s.id === r.student_id)
@@ -143,11 +169,22 @@ function ReportsList({ settings }) {
                         <span>{student?.full_name || r.student_name}{student?.nickname && <span className="ml-1 text-xs font-normal text-slate-400">"{student.nickname}"</span>}</span>
                       </Link>
                     </td>
-                    <td className="text-xs text-slate-500">{student?.level || r.year_group}</td>
-                    <td className="text-xs text-slate-500">{age != null ? age : '—'}</td>
+                    <td className="text-xs text-slate-500">
+                      {isHead ? (student?.level || r.year_group) : (
+                        <div className="flex flex-wrap gap-1 py-1">
+                          {sections.filter((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group)).map((s) => {
+                            const done = !!s.level && !!(s.comment || '').trim()
+                            return <span key={s.id} className={`chip ${done ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{done ? '✓ ' : ''}{subjectByKey(settings, s.subject_key).name}</span>
+                          })}
+                          {canHomeroom(r) && <span className={`chip ${(r.glance || '').trim() && (r.homeroom_note || '').trim() ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>Homeroom</span>}
+                          {!sections.some((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group)) && !canHomeroom(r) && <span className="text-slate-400">read-only</span>}
+                        </div>
+                      )}
+                    </td>
+                    <td className="hidden text-xs text-slate-500 sm:table-cell">{age != null ? age : '—'}</td>
                     <td><div className="flex items-center gap-2"><div className="h-2 w-28 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-pra-green" style={{ width: `${c.pct}%` }} /></div><span className="text-xs text-slate-500">{c.pct}%</span></div></td>
                     <td><ReportStatusChip status={r.status} /></td>
-                    <td className="text-xs text-slate-500">{fmtDate(r.updated_at)}</td>
+                    <td className="hidden text-xs text-slate-500 md:table-cell">{fmtDate(r.updated_at)}</td>
                     <td className="whitespace-nowrap text-right">
                       <Link to={`/reports/${r.id}`} className="btn-secondary text-xs">Open</Link>
                       <Link to={`/print/report/${r.id}`} target="_blank" className="btn-ghost text-xs" title="Print"><ExternalLink size={14} /></Link>
@@ -158,6 +195,7 @@ function ReportsList({ settings }) {
               })}
             </tbody>
           </table>
+          </div>
         </Card>
       ))}
 

@@ -28,27 +28,33 @@ function Guard({ children }) {
   return <DataProvider>{children}</DataProvider>
 }
 
+// Invoices, receipts and fee settings are for office accounts only.
+function Office({ children }) {
+  const { isOffice } = useAuth()
+  return isOffice ? children : <Navigate to="/" replace />
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/print/invoice/:id" element={<Guard><PrintInvoice /></Guard>} />
-        <Route path="/print/receipt/:id" element={<Guard><PrintReceipt /></Guard>} />
+        <Route path="/print/invoice/:id" element={<Guard><Office><PrintInvoice /></Office></Guard>} />
+        <Route path="/print/receipt/:id" element={<Guard><Office><PrintReceipt /></Office></Guard>} />
         <Route path="/print/report/:id" element={<Guard><PrintReport /></Guard>} />
         <Route path="/print/reports" element={<Guard><PrintBatch /></Guard>} />
         <Route element={<Guard><Layout /></Guard>}>
           <Route index element={<Home />} />
-          <Route path="/invoices" element={<Invoices />} />
-          <Route path="/invoices/new" element={<InvoiceBuilder />} />
-          <Route path="/invoices/:id" element={<InvoiceEditor />} />
+          <Route path="/invoices" element={<Office><Invoices /></Office>} />
+          <Route path="/invoices/new" element={<Office><InvoiceBuilder /></Office>} />
+          <Route path="/invoices/:id" element={<Office><InvoiceEditor /></Office>} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/reports/settings" element={<ReportSettings />} />
           <Route path="/reports/:id" element={<ReportEditor />} />
           <Route path="/teachers" element={<Teachers />} />
           <Route path="/students" element={<Students />} />
           <Route path="/attendance" element={<Attendance />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings" element={<Office><SettingsPage /></Office>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
