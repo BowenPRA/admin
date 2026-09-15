@@ -84,7 +84,8 @@ for r in rows:
         year_group = f'Year {min(12, 2026 - y - 4)}' if y else ''
     note = ''
     if isinstance(start, str) and 'Trial' in start: note = start.replace('\n', ' ')
-    level = year_group if year_group in ORDER[:11] else ('Upper Secondary' if year_group else '')
+    # Year 9 and above are in Upper Secondary from 2026-2027.
+    level = year_group if year_group in ORDER[:10] else ('Upper Secondary' if year_group else '')
     students.append({
         'student_code': code,
         'level': level,

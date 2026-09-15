@@ -13,11 +13,17 @@ export const LEVELS = [
   'Upper Secondary',
 ]
 
+// Year 9 students moved up to Upper Secondary in 2026-2027, so Year 9 is invoiced
+// like Upper Secondary: a pathway fee plus the online (Acellus) fee.
+export function isUpperSecondary(level) {
+  return level === 'Upper Secondary' || level === 'Year 9'
+}
+
 // Which tuition band a level belongs to.
 export function bandFor(level) {
   if (level === 'Nursery') return 'nursery'
   if (level === 'Kindergarten') return 'kindergarten'
-  if (level === 'Upper Secondary') return 'upper'
+  if (isUpperSecondary(level)) return 'upper'
   const n = Number(String(level).replace('Year ', ''))
   if (n >= 1 && n <= 6) return 'y1_6'
   if (n >= 7 && n <= 9) return 'y7_9'
@@ -46,7 +52,7 @@ export const DEFAULT_FEES = {
   upper: {
     hybrid: 150_000_000,
     independent: 80_000_000,
-    acellus: 110_000_000, // paid by PRA on the family's behalf, reimbursed in cash
+    acellus: 110_000_000, // online fee, every Upper Secondary student: paid by PRA on the family's behalf, reimbursed in cash
   },
   legacyEarlyBird: 150_000_000, // returning "legacy" students keep last year's price
   meals: {

@@ -92,7 +92,7 @@ function SettingsForm({ data }) {
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {M('Upper Secondary · Hybrid (year)', 'upper.hybrid')}
           {M('Upper Secondary · Independent (year)', 'upper.independent')}
-          {M('Acellus (year)', 'upper.acellus')}
+          {M('Online fee · Acellus (year)', 'upper.acellus')}
           {M('Legacy early bird (year)', 'legacyEarlyBird')}
           {M('Meals · early years / day', 'meals.earlyYears')}
           {M('Meals · primary & secondary / day', 'meals.primarySecondary')}

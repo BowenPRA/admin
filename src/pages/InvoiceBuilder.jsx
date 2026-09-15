@@ -104,6 +104,8 @@ export default function InvoiceBuilder() {
           opts: {
             ...e.opts,
             upper,
+            // becoming Upper Secondary switches the online fee on; otherwise keep the current choice
+            includeAcellus: upper && !e.opts.upper ? true : e.opts.includeAcellus,
             mealRate: mealRateFor(s.level, programId, fees),
             weeklyRate: upper ? fees.weekly.summerUpper : (bandFor(s.level) === 'y7_9' ? fees.weekly.vocationalY7_9 : bandFor(s.level) === 'nursery' ? fees.weekly.globalNursery : fees.weekly.vocationalY1_6),
           },
@@ -355,7 +357,7 @@ export default function InvoiceBuilder() {
                       </>
                     )}
                     {inputs.plan === 'staff' && <Field label={t('staffMonths')}><NumberInput value={opts.staffMonths} onChange={(v) => setOpts(s.id, { staffMonths: v })} min={0} /></Field>}
-                    {opts.upper && showTuitionOpts && (
+                    {opts.upper && showTuitionOpts && inputs.plan !== 'weekly' && (
                       <div className="flex flex-col gap-2 sm:col-span-3">
                         <Checkbox checked={opts.includePathway} onChange={(v) => setOpts(s.id, { includePathway: v })} label={t('includePathway')} />
                         <Checkbox checked={opts.includeAcellus} onChange={(v) => setOpts(s.id, { includeAcellus: v })} label={t('includeAcellus')} />

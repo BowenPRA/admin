@@ -230,3 +230,15 @@ create policy staff_read on adm_attendance for select to authenticated using (ad
 create policy take_insert on adm_attendance for insert to authenticated with check (adm_can_attendance(year_group));
 create policy take_update on adm_attendance for update to authenticated using (adm_can_attendance(year_group)) with check (adm_can_attendance(year_group));
 create policy office_delete on adm_attendance for delete to authenticated using (adm_is_staff() or adm_is_head());
+
+-- ================================================================
+-- 7. Year 9 students move up to Upper Secondary (2026-2027)
+-- ================================================================
+-- Enrolled students only; past students keep the year group they left in.
+
+update adm_attendance a set year_group = 'Upper Secondary', updated_at = now()
+from adm_students s
+where a.student_id = s.id and a.year_group = 'Year 9' and s.level = 'Year 9' and coalesce(s.active, true);
+
+update adm_students set level = 'Upper Secondary', updated_at = now()
+where level = 'Year 9' and coalesce(active, true);

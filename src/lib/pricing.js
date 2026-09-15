@@ -35,7 +35,7 @@ export function studentDisplayName(s) {
 }
 
 function curriculumLabel(s, lang) {
-  if (s.level === 'Upper Secondary') return 'Upper Secondary'
+  if (bandFor(s.level) === 'upper') return 'Upper Secondary'
   return `${s.level}\n(${programLabel(s.program || 'regular', lang)})`
 }
 
@@ -99,7 +99,7 @@ export function defaultStudentOptions(student, fees, calendar, ctx) {
   return {
     tuitionOverride: '', // blank = use schedule
     includePathway: true, // upper secondary: hybrid / independent fee
-    includeAcellus: false, // upper secondary: Acellus fee (PRA pays on behalf, cash reimbursement)
+    includeAcellus: upper, // upper secondary: online (Acellus) fee, on by default (PRA pays on behalf, cash reimbursement)
     extraDiscountPct: 0,
     meals: true,
     mealDays: period.days,
@@ -241,14 +241,16 @@ export function buildDocument(inputs, fees, calendar) {
     const rows = []
     entries.forEach(({ student, opts }) => {
       const items = []
-      if (opts.upper) {
+      // Weekly short programmes (Global / Vocational / Summer) are one flat row: no pathway or online fee split.
+      if (opts.upper && plan !== 'weekly') {
         if (opts.includePathway) items.push({ id: 'main', label: programLabel(student.program === 'independent' ? 'independent' : 'hybrid', lang) })
         if (opts.includeAcellus) items.push({ id: 'acellus', label: L(lang, 'Acellus Fee', 'Phí Acellus') })
-      } else items.push({ id: 'main', label: '' })
+      } else items.push({ id: 'main', label: opts.upper ? programLabel(student.program || 'regular', lang) : '' })
 
       items.forEach((item, idx) => {
         const isDisc = student.id === discountId && item.id === 'main'
-        const dPct = (isDisc ? sibPct : 0) + Number(opts.extraDiscountPct || 0)
+        // Discounts never touch the Acellus fee: PRA pays it in full on the family's behalf.
+        const dPct = item.id === 'main' ? (isDisc ? sibPct : 0) + Number(opts.extraDiscountPct || 0) : 0
         const cells = { name: idx === 0 ? studentDisplayName(student) + (isDisc && !showDiscountCol ? '' : '') : '', curriculum: curriculumLabel(student, lang), item: item.label }
         const override = item.id === 'main' && opts.tuitionOverride !== '' ? Number(opts.tuitionOverride) : null
         const annual = override ?? annualTuition(student, plan, fees, item.id)
@@ -302,7 +304,7 @@ export function buildDocument(inputs, fees, calendar) {
     })
 
     const notes = []
-    if (entries.some((e) => e.opts.upper && e.opts.includeAcellus)) {
+    if (plan !== 'weekly' && entries.some((e) => e.opts.upper && e.opts.includeAcellus)) {
       notes.push(L(lang,
         'Note: PRA will make the Acellus payment on your behalf. Please reimburse PRA by paying that amount in cash.',
         'Ghi chú: PRA sẽ nộp hộ khoản phí Acellus. Phụ huynh vui lòng thanh toán lại bằng tiền mặt cho PRA.'))

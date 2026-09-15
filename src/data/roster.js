@@ -687,7 +687,7 @@ export const ROSTER = [
   },
   {
     "student_code": "S0017",
-    "level": "Year 9",
+    "level": "Upper Secondary",
     "full_name": "Đinh Hồ Ngọc Khôi",
     "nickname": "Khoi",
     "gender": "male",
@@ -706,7 +706,7 @@ export const ROSTER = [
   },
   {
     "student_code": "S0050",
-    "level": "Year 9",
+    "level": "Upper Secondary",
     "full_name": "Barocco Angelo Hoang",
     "nickname": "Angelo",
     "gender": "male",
@@ -725,7 +725,7 @@ export const ROSTER = [
   },
   {
     "student_code": "S0019",
-    "level": "Year 9",
+    "level": "Upper Secondary",
     "full_name": "Nguyễn Quán Long",
     "nickname": "Chris",
     "gender": "male",
@@ -744,7 +744,7 @@ export const ROSTER = [
   },
   {
     "student_code": "S0001",
-    "level": "Year 9",
+    "level": "Upper Secondary",
     "full_name": "Trần Bảo Khang",
     "nickname": "Jackson",
     "gender": "male",
@@ -763,7 +763,7 @@ export const ROSTER = [
   },
   {
     "student_code": "S0012",
-    "level": "Year 9",
+    "level": "Upper Secondary",
     "full_name": "Huỳnh Kim Long",
     "nickname": "Kim Long",
     "gender": "male",
@@ -839,7 +839,7 @@ export const ROSTER = [
   },
   {
     "student_code": "BLE0084",
-    "level": "Year 9",
+    "level": "Upper Secondary",
     "full_name": "Erel Rosenberg Schatz",
     "nickname": "Erel",
     "gender": "male",

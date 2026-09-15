@@ -135,7 +135,7 @@ const STRINGS = {
   weeks: ['Weeks', 'Số tuần'],
   ratePerWeek: ['Rate / week', 'Đơn giá / tuần'],
   includePathway: ['Pathway fee (Hybrid / Independent)', 'Phí lộ trình (Hybrid / Independent)'],
-  includeAcellus: ['Acellus fee (paid on behalf, cash)', 'Phí Acellus (nộp hộ, tiền mặt)'],
+  includeAcellus: ['Online fee - Acellus (paid on behalf, cash)', 'Phí học trực tuyến - Acellus (nộp hộ, tiền mặt)'],
   staffMonths: ['Months of materials', 'Số tháng học liệu'],
   deductions: ['Already paid / deposits', 'Đã thanh toán / đặt cọc'],
   addDeduction: ['Add deduction', 'Thêm khấu trừ'],
