@@ -300,6 +300,11 @@ const STRINGS = {
   takenBy: ['Taken by {name}', 'Người điểm danh: {name}'],
   lowAttendance: ['Below 90%', 'Dưới 90%'],
   addNote: ['Note', 'Ghi chú'],
+  markedOf: ['{done} of {total} marked', 'Đã điểm danh {done}/{total}'],
+  allMarked: ['All {total} marked', 'Đã điểm danh đủ {total}'],
+  nextGroup: ['Next: {group}', 'Tiếp: {group}'],
+  previousDay: ['Previous school day', 'Ngày học trước'],
+  nextDay: ['Next school day', 'Ngày học sau'],
 }
 
 const LangContext = createContext({ lang: 'en', setLang: () => {}, t: (k) => k })

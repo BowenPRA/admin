@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, KeyRound, ChevronDown, Eye } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
@@ -16,6 +16,25 @@ export default function Layout() {
   const { isHead, isOffice, displayName, me, viewAs, setViewAs } = useAuth()
   const [menu, setMenu] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
+  const { pathname } = useLocation()
+  const navRef = useRef(null)
+
+  // On phones the nav scrolls sideways; keep the current page's icon in view.
+  // Re-checked when the nav narrows (e.g. once the logo has loaded) or role-only links and the account menu appear.
+  useEffect(() => {
+    const nav = navRef.current
+    if (!nav) return
+    const reveal = () => {
+      const active = nav.querySelector('[aria-current="page"]')
+      if (!active) return
+      const left = active.offsetLeft - nav.offsetLeft
+      if (left < nav.scrollLeft || left + active.offsetWidth > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = left - 8
+    }
+    reveal()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(reveal) : null
+    ro?.observe(nav)
+    return () => ro?.disconnect()
+  }, [pathname, isOffice, isHead, !!me]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!menu) return
@@ -37,9 +56,9 @@ export default function Layout() {
       <header className="no-print sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2">
           <NavLink to="/" className="mr-1 flex flex-none items-center gap-2">
-            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Palm River Academy" className="h-9" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Palm River Academy" width="2128" height="858" className="h-9 w-auto" />
           </NavLink>
-          <nav className="-mx-1 no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1">
+          <nav ref={navRef} className="-mx-1 no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1">
             {item('/', Home, t('home'), true)}
             {isOffice && item('/invoices', FileText, t('invoices'))}
             {item('/students', Users, t('students'))}
