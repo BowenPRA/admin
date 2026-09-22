@@ -1,12 +1,15 @@
 import * as XLSX from 'xlsx'
 import { rowTotal } from './pricing'
+import { statusOf } from './studentRecords'
+import { LEVELS } from './fees'
+import { downloadBlob } from './pdf'
 
 // One workbook, four sheets: Invoices, Line items, Payments, Students.
-export function exportWorkbook({ invoices, payments, students, families }) {
+function invoiceWorkbook({ invoices, payments, students, families }) {
   const famName = (id) => families.find((f) => f.id === id)?.name || ''
 
   const inv = invoices.map((i) => ({
-    Number: i.number, Status: i.status, Language: i.lang, 'School year': i.school_year, Period: i.period_label,
+    Number: i.number, Status: i.status, Language: i.lang, 'Academic year': i.school_year, Period: i.period_label,
     Students: i.student_names, Family: i.family_name || famName(i.family_id),
     'Issue date': i.issue_date, 'Due date': i.due_date,
     Total: Number(i.total) || 0, Paid: Number(i.paid) || 0, Balance: (Number(i.total) || 0) - (Number(i.paid) || 0),
@@ -32,12 +35,12 @@ export function exportWorkbook({ invoices, payments, students, families }) {
   const invByIdNum = Object.fromEntries(invoices.map((i) => [i.id, i.number]))
   const pay = payments.map((p) => ({
     Receipt: p.receipt_number, Invoice: invByIdNum[p.invoice_id] || p.invoice_id, Student: p.student_names, Amount: Number(p.amount) || 0,
-    'Paid on': p.paid_on, Method: p.method, Reference: p.reference || '', Note: p.note || '',
+    'Paid on': p.paid_on, Method: p.method, Reference: p.reference || '', Note: p.note || '', 'Proof files': p.proof?.length || 0,
   }))
 
   const stu = students.map((s) => ({
     'Full name': s.full_name, Nickname: s.nickname, Level: s.level, Program: s.program, Family: famName(s.family_id),
-    Legacy: s.legacy ? 'yes' : '', 'New student': s.is_new ? 'yes' : '', Active: s.active === false ? 'no' : 'yes', DOB: s.dob || '', Nationality: s.nationality || '', Notes: s.notes || '',
+    Legacy: s.legacy ? 'yes' : '', 'New student': s.is_new ? 'yes' : '', Status: statusOf(s), DOB: s.dob || '', Nationality: s.nationality || '', Notes: s.notes || '',
   }))
 
   const wb = XLSX.utils.book_new()
@@ -45,8 +48,33 @@ export function exportWorkbook({ invoices, payments, students, families }) {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lines), 'Line items')
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pay), 'Payments')
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stu), 'Students')
-  const d = new Date().toISOString().slice(0, 10)
-  XLSX.writeFile(wb, `PRA-invoices-${d}.xlsx`)
+  return wb
+}
+
+const today = () => new Date().toISOString().slice(0, 10)
+const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+const toBlob = (wb) => new Blob([XLSX.write(wb, { type: 'array', bookType: 'xlsx', compression: true })], { type: XLSX_TYPE })
+
+export function exportWorkbook(data) {
+  XLSX.writeFile(invoiceWorkbook(data), `PRA-invoices-${today()}.xlsx`)
+}
+/** The same workbook as a file, for the folder export. */
+export const invoiceWorkbookBlob = (data) => toBlob(invoiceWorkbook(data))
+
+// ---------------- Student list ----------------
+// The styled workbook (photos, linked tabs, locked sheets) is built in studentWorkbook.js.
+const levelOrder = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
+
+/** Students in office order: year group, then name. */
+export const officeOrder = (students) => [...students].sort((a, b) => levelOrder(a.level) - levelOrder(b.level) || (a.full_name || '').localeCompare(b.full_name || ''))
+
+/** The student list as a file. `label` names what is in it ("Enrolled", "Year 3", …). */
+export const studentListBlob = async (data) => (await import('./studentWorkbook')).studentWorkbookBlob(data)
+
+/** Downloads the student list. */
+export async function exportStudentList({ label = '', ...data }) {
+  const tag = label ? `-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}` : ''
+  downloadBlob(await studentListBlob({ ...data, label }), `PRA-students${tag}-${today()}.xlsx`)
 }
 
 // Import students from a spreadsheet with columns like the school's roster

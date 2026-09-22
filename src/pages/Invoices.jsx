@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PlusCircle, Download, Trash2, FilePen } from 'lucide-react'
-import InvoiceDocument from '../components/InvoiceDocument'
 import { useToast } from '../lib/toast'
 import { gmailConfigured, draftLink, getToken, prepareGmail } from '../lib/gmail'
 import { draftInvoice, logDraft, lastDraft, invoiceRecipients } from '../lib/invoiceDraft'
@@ -20,8 +18,7 @@ export default function Invoices() {
   const navigate = useNavigate()
   const { students, families, fees } = useData()
   const toast = useToast()
-  const pdfRef = useRef(null)
-  const [rendering, setRendering] = useState(null) // { inv, progress } while making drafts
+  const [rendering, setRendering] = useState(null) // { progress } while making drafts
   const [invoices, setInvoices] = useState(null)
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('all')
@@ -54,8 +51,7 @@ export default function Invoices() {
       .sort((a, b) => (b.number || '').localeCompare(a.number || ''))
   }, [invoices, q, status])
 
-  // Selected invoices → one Gmail draft each, PDF attached. Each invoice is
-  // rendered off-screen in turn and turned into a PDF.
+  // Selected invoices → one Gmail draft each, PDF attached.
   const draftSelected = async () => {
     const list = rows.filter((r) => selected.has(r.id) && r.status !== 'void')
     if (!list.length) return
@@ -66,9 +62,9 @@ export default function Invoices() {
     try {
       await getToken()
       for (const inv of list) {
-        flushSync(() => setRendering({ inv, progress: `${made + failed.length + 1}/${list.length}` }))
+        setRendering({ progress: `${made + failed.length + 1}/${list.length}` })
         try {
-          const d = await draftInvoice({ inv, fees, node: pdfRef.current, to: invoiceRecipients(inv, families, students) })
+          const d = await draftInvoice({ inv, fees, to: invoiceRecipients(inv, families, students) })
           const saved = await logDraft(inv, d)
           setInvoices((xs) => xs.map((x) => (x.id === saved.id ? saved : x)))
           made++
@@ -137,13 +133,6 @@ export default function Invoices() {
           </div>
         )}
       </Card>
-
-      {/* Off-screen full-size invoice that each draft's PDF is rendered from. */}
-      {rendering && fees && (
-        <div aria-hidden style={{ position: 'absolute', left: -10000, top: 0, width: '210mm', pointerEvents: 'none' }}>
-          <div ref={pdfRef}><InvoiceDocument doc={rendering.inv.doc} fees={fees} number={rendering.inv.number} issueDate={fmtDate(rendering.inv.issue_date, rendering.inv.lang)} /></div>
-        </div>
-      )}
     </div>
   )
 }

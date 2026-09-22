@@ -24,6 +24,8 @@ create table if not exists adm_students (
   program text default 'regular',
   legacy boolean default false,
   is_new boolean default false,
+  -- 'active' | 'pending' | 'inactive'. `active` mirrors it (status = 'active').
+  status text default 'pending' check (status in ('active', 'pending', 'inactive')),
   active boolean default true,
   dob date,
   nationality text,

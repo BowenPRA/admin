@@ -3,6 +3,22 @@ import { nextStudentCode } from './studentIds'
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 /**
+ * Where a student stands. 'pending' is on the way in: the office can invoice
+ * them, but they are not in the register, the reports or the enrolled counts
+ * until someone marks them active. Rows saved before this existed have no
+ * `status`, so it is read back off the older `active` boolean; db.js keeps the
+ * two in step from then on.
+ */
+export const STATUSES = ['active', 'pending', 'inactive']
+export const statusOf = (s) => (STATUSES.includes(s?.status) ? s.status : (s?.active === false ? 'inactive' : 'active'))
+export const isEnrolled = (s) => statusOf(s) === 'active'
+export const isPending = (s) => statusOf(s) === 'pending'
+export const isPast = (s) => statusOf(s) === 'inactive'
+/** Pending students are billed like enrolled ones — that is how they start. */
+export const isBillable = (s) => statusOf(s) !== 'inactive'
+export const withStatus = (s, status) => ({ ...s, status, active: status === 'active' })
+
+/**
  * Empty student. Pass the current students for a brand-new one: it then gets
  * the next free ID and today's start date. Without them it is only a base for
  * spreading an existing row over, so nothing is invented for that row.
@@ -10,7 +26,10 @@ const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${St
 export const blankStudent = (students) => ({
   full_name: '', nickname: '', level: 'Year 1', program: 'regular', family_id: '', legacy: false, is_new: true,
   // Students added by hand pay a full-price Quarter 4; the roster loader turns it off.
-  q4_full: true, active: true, dob: '', nationality: '', notes: '',
+  q4_full: true, dob: '', nationality: '', notes: '',
+  // Someone new starts pending: billable, but not on the register yet. Only for
+  // a brand-new student, so spreading this over an existing row leaves it alone.
+  ...(students ? { status: 'pending', active: false } : {}),
   student_code: students ? nextStudentCode(students) : '', gender: '', class_group: '', parents_email: '', parent_phone: '',
   address: '', allergies: '', start_date: students ? localToday() : '', enrollment_status: '', photo: '',
 })

@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, Printer, Trash2, RefreshCw, ExternalLink, Settings, ArrowRight, Database } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Plus, Printer, Trash2, RefreshCw, ExternalLink, Settings, ArrowRight, Database, Languages } from 'lucide-react'
 import { useData } from '../../lib/DataContext'
 import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
+import { LEVELS } from '../../lib/fees'
 import { loadPreviousSections } from '../../lib/report/loaders'
-import { buildReport, buildSections, buildSection, completion, sectionDone, missingAreas, cohortAverages, templateForYearGroup, fmtDate, subjectByKey, currentPeriod } from '../../lib/report/utils'
+import { buildReport, buildSections, buildSection, completion, sectionDone, missingAreas, cohortAverages, templateForYearGroup, fmtDate, subjectByKey, currentPeriod, scheduledHomeroom, hasReviewScores } from '../../lib/report/utils'
 import { photoSrc } from '../../lib/report/photo'
-import { Card, Field, Select, Checkbox, Modal, Empty, Spinner, ReportStatusChip, TextInput } from '../../components/ui'
-import { seedYear7 } from '../../lib/seedYear7'
+import { isEnrolled } from '../../lib/studentRecords'
+import { Card, Field, Select, Checkbox, Modal, Empty, Spinner, ReportStatusChip } from '../../components/ui'
+import TranslationModal from '../../components/report/TranslationModal'
+
+// Nursery, Kindergarten, Year 1 … Upper Secondary, then anything unknown.
+const groupIndex = (g) => { const i = LEVELS.indexOf(g); return i < 0 ? 99 : i }
+const byYearGroup = (a, b) => groupIndex(a) - groupIndex(b) || String(a).localeCompare(String(b))
+const TEMPLATE_KEY = 'pra-report-template'
 
 function studentAge(dob) {
   if (!dob) return null
@@ -35,7 +42,8 @@ function ReportsList({ settings }) {
   const { students, teachers } = useData()
   const { me, isHead, canSubject, canHomeroom, myYearGroups } = useAuth()
   const [period, setPeriod] = useState(() => currentPeriod(settings)?.label || '')
-  const [group, setGroup] = useState('')
+  const [params] = useSearchParams()
+  const [group, setGroup] = useState(() => params.get('group') || '') // the home page links straight to a class
   const [mineOnly, setMineOnly] = useState(true)
   const scoped = !isHead && mineOnly && !!myYearGroups
   const [reports, setReports] = useState(null)
@@ -44,6 +52,9 @@ function ReportsList({ settings }) {
   const [busy, setBusy] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const [seeding, setSeeding] = useState(false)
+  const [translating, setTranslating] = useState(false)
+  // Translation files write every teacher's parts, so only head teachers and super admins get them.
+  const canTranslate = ['super_admin', 'head'].includes(me?.access)
 
   const load = useCallback(() => setReloadKey((k) => k + 1), [])
   useEffect(() => {
@@ -61,7 +72,7 @@ function ReportsList({ settings }) {
       m.get(r.year_group).push(r)
     }
     for (const list of m.values()) list.sort((a, b) => (a.student_name || '').localeCompare(b.student_name || ''))
-    return [...m.entries()].sort((a, b) => Number(String(a[0]).replace(/\D/g, '')) - Number(String(b[0]).replace(/\D/g, '')))
+    return [...m.entries()].sort((a, b) => byYearGroup(a[0], b[0]))
   }, [reports, group, scoped, myYearGroups])
 
   // The learning areas this teacher writes, e.g. "English (Year 7)".
@@ -81,19 +92,25 @@ function ReportsList({ settings }) {
 
   const remove = async (r) => {
     if (!confirm(`Delete the ${r.period_label} report for ${r.student_name}? This cannot be undone.`)) return
-    await db.reports.remove(r.id)
-    for (const s of sections.filter((x) => x.report_id === r.id)) await db.sections.remove(s.id).catch(() => {})
+    try {
+      await db.reports.remove(r.id)
+      for (const s of sections.filter((x) => x.report_id === r.id)) await db.sections.remove(s.id).catch(() => {})
+    } catch (e) { alert(e.message) }
     load()
   }
   const updateRefs = async (yg, list) => {
-    const ids = list.map((r) => r.id)
-    const cohort = sections.filter((s) => ids.includes(s.report_id))
-    const avgs = cohortAverages(cohort)
-    const changed = cohort.filter((s) => avgs[s.subject_key] != null && Number(s.class_avg) !== avgs[s.subject_key]).map((s) => ({ ...s, class_avg: avgs[s.subject_key] }))
-    if (!changed.length) { alert('Nothing to update: no review scores entered yet, or the references already match.'); return }
     setBusy(yg)
-    try { await db.sections.saveMany(changed); load(); alert(`Class references for ${yg}: ${Object.entries(avgs).map(([k, v]) => `${subjectByKey(settings, k).name} ${v}%`).join(', ')}`) }
-    catch (e) { alert(e.message) } finally { setBusy('') }
+    try {
+      // Work from what is saved now, not from when this page opened, and change only the class reference:
+      // teachers may have been writing comments in the meantime.
+      const ids = list.map((r) => r.id)
+      const cohort = (await fetchPeriod(settings, period)).ss.filter((s) => ids.includes(s.report_id))
+      const avgs = cohortAverages(cohort)
+      const changed = cohort.filter((s) => avgs[s.subject_key] != null && Number(s.class_avg) !== avgs[s.subject_key])
+      if (!changed.length) { alert('Nothing to update: no review scores entered yet, or the references already match.'); return }
+      for (const s of changed) await db.sections.patch(s.id, { class_avg: avgs[s.subject_key] })
+      load(); alert(`Class references for ${yg}: ${Object.entries(avgs).map(([k, v]) => `${subjectByKey(settings, k).name} ${v}%`).join(', ')}`)
+    } catch (e) { alert(e.message) } finally { setBusy('') }
   }
   // Reports created before an area was added to their year group (e.g. Movement for Year 7).
   const missingFor = (list) => list.flatMap((r) => missingAreas(settings, r, sections.filter((s) => s.report_id === r.id)).map((key) => ({ r, key })))
@@ -118,14 +135,15 @@ function ReportsList({ settings }) {
           )}
         </div>
         {isHead && <Link to="/reports/settings" className="btn-secondary"><Settings size={16} /> Report settings</Link>}
-        {isHead && <button className="btn-secondary" disabled={seeding} onClick={async () => { setSeeding(true); try { const r = await seedYear7(); alert(r.msg); load() } catch (e) { alert(e.message) } finally { setSeeding(false) } }}><Database size={16} /> {seeding ? 'Seeding…' : 'Seed Year 7 demo'}</button>}
+        {canTranslate && <button className="btn-secondary" onClick={() => setTranslating(true)} title="Download the reports for translation in the Claude desktop app, then upload the Vietnamese"><Languages size={16} /> Translate with Claude</button>}
+        {import.meta.env.DEV && isHead && <button className="btn-secondary" disabled={seeding} title="Development only" onClick={async () => { if (!confirm('Fill Year 7 with demo scores, levels and comments for Quarter 1? Existing Year 7 Quarter 1 reports are changed.')) return; setSeeding(true); try { const { seedYear7 } = await import('../../lib/seedYear7'); const r = await seedYear7(); alert(r.msg); load() } catch (e) { alert(e.message) } finally { setSeeding(false) } }}><Database size={16} /> {seeding ? 'Seeding…' : 'Seed Year 7 demo'}</button>}
         {isHead && <button className="btn-green" onClick={() => setCreating(true)}><Plus size={16} /> Create reports</button>}
       </div>
       <div className="flex flex-wrap gap-2">
-        <select className="input max-w-[200px]" value={period} onChange={(e) => setPeriod(e.target.value)}>{periods.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}</select>
+        <select className="input max-w-[200px]" value={period} onChange={(e) => { setPeriod(e.target.value); setGroup(''); setReports(null) }} aria-label="Period">{periods.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}</select>
         <select className="input max-w-[200px]" value={group} onChange={(e) => setGroup(e.target.value)}>
           <option value="">All year groups</option>
-          {[...new Set((reports || []).map((r) => r.year_group))].sort().map((g) => <option key={g} value={g}>{g}</option>)}
+          {[...new Set([...(reports || []).map((r) => r.year_group), group].filter(Boolean))].sort(byYearGroup).map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
         {!isHead && myYearGroups && (
           <div className="seg" role="group">
@@ -156,7 +174,7 @@ function ReportsList({ settings }) {
         <Card key={yg} title={`${yg} · ${list.length} report${list.length === 1 ? '' : 's'}`} actions={(
           <div className="flex flex-wrap justify-end gap-2">
             {gaps.length > 0 && <button className="btn-secondary text-xs" disabled={busy === yg} onClick={() => addMissing(yg, gaps)} title="These reports were created before the area was added to this year group"><Plus size={14} /> Add {[...new Set(gaps.map((g) => subjectByKey(settings, g.key).name))].join(', ')} to {new Set(gaps.map((g) => g.r.id)).size} report{new Set(gaps.map((g) => g.r.id)).size === 1 ? '' : 's'}</button>}
-            {isHead && <button className="btn-secondary text-xs" disabled={busy === yg} onClick={() => updateRefs(yg, list)} title="Average this year group's review scores into every report's class reference"><RefreshCw size={14} /> Update class references</button>}
+            {isHead && hasReviewScores(settings, list[0]) && <button className="btn-secondary text-xs" disabled={busy === yg} onClick={() => updateRefs(yg, list)} title="Average this year group's review scores into every report's class reference"><RefreshCw size={14} /> Update class references</button>}
             <Link className="btn-secondary text-xs" to={`/print/reports?year=${encodeURIComponent(settings.schoolYear)}&period=${encodeURIComponent(period)}&group=${encodeURIComponent(yg)}`} target="_blank"><Printer size={14} /> Print all{list.some((r) => r.lang === 'bi') ? ' (English)' : ''}</Link>
             {list.some((r) => r.lang === 'bi') && <Link className="btn-secondary text-xs" to={`/print/reports?year=${encodeURIComponent(settings.schoolYear)}&period=${encodeURIComponent(period)}&group=${encodeURIComponent(yg)}&lang=vi`} target="_blank" title="Only the reports set to English and Vietnamese"><Printer size={14} /> Tiếng Việt ({list.filter((r) => r.lang === 'bi').length})</Link>}
           </div>
@@ -208,31 +226,46 @@ function ReportsList({ settings }) {
         </Card>
       ) })}
 
+      {translating && <TranslationModal settings={settings} students={students} defaultPeriod={period} defaultGroup={group} onClose={() => setTranslating(false)} onDone={load} />}
+
       <Modal open={creating} onClose={() => setCreating(false)} title="Create progress reports">
-        {creating && <CreateForm onClose={() => setCreating(false)} settings={settings} students={students} existing={reports || []} defaultPeriod={period} onDone={() => { setCreating(false); load() }} />}
+        {creating && <CreateForm onClose={() => setCreating(false)} settings={settings} students={students} defaultPeriod={period} defaultGroup={group} onDone={() => { setCreating(false); load() }} />}
       </Modal>
     </div>
   )
 }
 
 // Mounted fresh each time the modal opens, so its state starts from the defaults.
-function CreateForm({ onClose, settings, students, existing, defaultPeriod, onDone }) {
-  const { displayName } = useAuth()
-  const { teachers } = useData()
+function CreateForm({ onClose, settings, students, defaultPeriod, defaultGroup, onDone }) {
+  const { teachers, schedule } = useData()
   const templates = Object.values(settings.templates || {})
-  const [tpl, setTpl] = useState(templates[0]?.key || '')
+  // Start from the template of the year group being looked at, else the one used last time.
+  const firstTpl = () => {
+    let last = ''
+    try { last = localStorage.getItem(TEMPLATE_KEY) || '' } catch { /* ignore */ }
+    return (defaultGroup && templateForYearGroup(settings, defaultGroup)) || settings.templates?.[last] || templates[0]
+  }
+  const [tpl, setTpl] = useState(() => firstTpl()?.key || '')
   const [periodLabel, setPeriodLabel] = useState(defaultPeriod)
-  const [groups, setGroups] = useState(() => templates[0]?.yearGroups || [])
+  const [groups, setGroups] = useState(() => (defaultGroup && firstTpl()?.yearGroups?.includes(defaultGroup) ? [defaultGroup] : firstTpl()?.yearGroups || []))
+  // Reports that already exist for the chosen period (not just the period the list is showing).
+  const [existing, setExisting] = useState(null)
+  useEffect(() => {
+    let alive = true
+    db.reports.list({ school_year: settings.schoolYear, period_label: periodLabel }).then((rs) => alive && setExisting({ period: periodLabel, rs })).catch((e) => alert(e.message))
+    return () => { alive = false }
+  }, [settings.schoolYear, periodLabel])
+  const known = existing?.period === periodLabel ? existing.rs : null
   const [single, setSingle] = useState('')
-  const [homeroom, setHomeroom] = useState(displayName)
   const [busy, setBusy] = useState(false)
 
   const template = settings.templates?.[tpl] || templates[0]
   const period = (settings.periods || []).find((p) => p.label === periodLabel)
-  const already = new Set(existing.filter((r) => r.period_label === periodLabel).map((r) => r.student_id))
-  const active = students.filter((s) => s.active !== false)
+  const already = new Set((known || []).map((r) => r.student_id))
+  const active = students.filter(isEnrolled)
   const candidates = single ? active.filter((s) => s.id === single) : active.filter((s) => groups.includes(s.level))
   const fresh = candidates.filter((s) => !already.has(s.id))
+  const homeroomGroups = single ? candidates.map((s) => s.level) : (template?.yearGroups || []).filter((g) => groups.includes(g))
 
   const create = async () => {
     if (!period || !template) return
@@ -241,12 +274,13 @@ function CreateForm({ onClose, settings, students, existing, defaultPeriod, onDo
       const reports = [], sections = []
       for (const s of fresh) {
         const t = single ? (templateForYearGroup(settings, s.level) || template) : template
-        const r = buildReport(s, period, t, settings, homeroom)
+        const r = buildReport(s, period, t, settings, scheduledHomeroom(schedule, s.level))
         const prev = await loadPreviousSections(s.id, settings.schoolYear, period.index)
         reports.push(r); sections.push(...buildSections(r.id, t, settings, { yearGroup: s.level, prevSections: prev, teachers }))
       }
       await db.reports.saveMany(reports)
       await db.sections.saveMany(sections)
+      try { localStorage.setItem(TEMPLATE_KEY, template.key) } catch { /* ignore */ }
       onDone()
     } catch (e) { alert(e.message) } finally { setBusy(false) }
   }
@@ -268,12 +302,20 @@ function CreateForm({ onClose, settings, students, existing, defaultPeriod, onDo
           </div>
         </div>
       )}
-      <Field label="Homeroom teacher" hint="Printed on the report; can be changed per report later."><TextInput value={homeroom} onChange={setHomeroom} /></Field>
+      {homeroomGroups.length > 0 && (
+        <div>
+          <span className="label">Homeroom teacher</span>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
+            {homeroomGroups.map((g) => <span key={g}>{g}: {scheduledHomeroom(schedule, g) ? <b className="font-semibold">{scheduledHomeroom(schedule, g)}</b> : <span className="text-amber-700">none on the Schedule</span>}</span>)}
+          </div>
+          <span className="mt-1 block text-xs text-slate-400">From the Schedule. Reports follow it when a class's homeroom teacher changes there.</span>
+        </div>
+      )}
       <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
-        {fresh.length} report{fresh.length === 1 ? '' : 's'} will be created{candidates.length - fresh.length > 0 ? `; ${candidates.length - fresh.length} student(s) already have a ${periodLabel} report and are skipped` : ''}.
+        {!known ? 'Checking which reports already exist…' : <>{fresh.length} report{fresh.length === 1 ? '' : 's'} will be created</>}{candidates.length - fresh.length > 0 ? `; ${candidates.length - fresh.length} student(s) already have a ${periodLabel} report and are skipped` : ''}.
         {period && Number(period.index) > 1 && <div className="mt-1 text-xs">Previous levels are copied from each student's most recent earlier report this year.</div>}
       </div>
-      <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={busy || !fresh.length} onClick={create}>Create {fresh.length || ''}</button></div>
+      <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={busy || !known || !fresh.length} onClick={create}>{busy ? 'Creating…' : `Create ${fresh.length || ''}`}</button></div>
     </div>
   )
 }

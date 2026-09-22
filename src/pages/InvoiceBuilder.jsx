@@ -4,10 +4,11 @@ import { Trash2, Plus, ChevronRight, RotateCcw } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
-import { LEVELS, PROGRAMS, periodInfo, mealRateFor, bandFor } from '../lib/fees'
-import { buildDocument, defaultStudentOptions, docTotals, PERIOD_OPTIONS, PLAN_OPTIONS, studentDisplayName, quarterDays, billedDays } from '../lib/pricing'
-import { fmt, todayISO } from '../lib/money'
-import { gmailConfigured, getToken, prepareGmail } from '../lib/gmail'
+import { LEVELS, PROGRAMS, hasProgram, periodInfo, mealRateFor, nextLevel } from '../lib/fees'
+import { buildDocument, defaultStudentOptions, docTotals, PERIOD_OPTIONS, PLAN_OPTIONS, studentDisplayName, quarterDays, billedDays, withStudentChoice, onRoster, defaultQ4Full, orderedStudents, smartDueDate } from '../lib/pricing'
+import { fmt, fmtDate, todayISO } from '../lib/money'
+import { suggestClass } from '../lib/placement'
+import { ageOf, isBillable, isPast, isPending } from '../lib/studentRecords'
 import { Card, Field, TextInput, NumberInput, MoneyInput, Select, Checkbox, Spinner } from '../components/ui'
 
 const PLAN_PERIOD_DEFAULT = { earlyBird: 'year', standard: 'year', quarterly: 'q1', split: 'sem1', weekly: 'custom', trial: 'custom', staff: 'q1', none: 'q1' }
@@ -18,20 +19,8 @@ function blankInputs(lang) {
     splits: [{ pct: 60, due: '2026-05-20' }, { pct: 40, due: '2026-10-08' }], billSplit: 0, splitBase: 'earlyBird',
     customRangeEn: '', customRangeVi: '', customLabelEn: 'the period', customLabelVi: 'kỳ',
     siblingDiscount: true, siblingStudentId: '',
+    dueDate: '', // blank = worked out from the plan
     students: [], deductions: [], extraNotes: [''], cashOnly: false, flags: { forceMajeure: true },
-  }
-}
-
-function dueDateFor(inputs, fees) {
-  const d = fees.deadlines
-  switch (inputs.plan) {
-    case 'earlyBird': return d.earlyBird
-    case 'standard': return d.standard
-    case 'quarterly': { const first = ['q1', 'q2', 'q3', 'q4'].find((q) => inputs.billQuarters.includes(q)) || 'q1'; return d[first] }
-    case 'split': return inputs.splits[inputs.billSplit]?.due || todayISO()
-    default: {
-      const t = new Date(); t.setDate(t.getDate() + 7); return t.toISOString().slice(0, 10)
-    }
   }
 }
 
@@ -46,11 +35,6 @@ export default function InvoiceBuilder() {
   const [editId, setEditId] = useState(null)
   const [loadedFrom, setLoadedFrom] = useState(null)
   const [showInactive, setShowInactive] = useState(false)
-  // Remembered per browser: also make a Gmail draft with the PDF after creating.
-  const [makeDraft, setMakeDraftState] = useState(() => { try { return localStorage.getItem('pra-admin-auto-draft') === '1' } catch { return false } })
-  const setMakeDraft = (v) => { setMakeDraftState(v); try { localStorage.setItem('pra-admin-auto-draft', v ? '1' : '0') } catch { /* ignore */ } }
-
-  useEffect(() => { prepareGmail() }, [])
 
   // ?edit=<id> re-opens an existing invoice's options; ?copy=<id> duplicates.
   useEffect(() => {
@@ -78,40 +62,35 @@ export default function InvoiceBuilder() {
     }
   }
   const pickFamily = (f) => {
-    const kids = students.filter((s) => s.family_id === f.id && s.active !== false)
+    const kids = students.filter((s) => s.family_id === f.id && isBillable(s))
     set({ students: kids.map((s) => ({ student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) })), lang: f.language || inputs.lang })
   }
   const pickInactiveFamily = async (f) => {
     const kids = students.filter((s) => s.family_id === f.id)
     if (!kids.length) return
-    if (!confirm(t('reactivateConfirm'))) return
+    // Returning students go into the class that fits their birthday (last year's
+    // level + 1 when there is no birthday) and pay a full-price Quarter 4.
+    const placed = kids.map((s) => {
+      if (onRoster(s)) return { level: s.level, why: '' }
+      const g = suggestClass(s, students, fees.schoolYear)
+      if (!g) return { level: nextLevel(s.level), why: t('placeNoDob') }
+      const age = ageOf(s.dob)
+      return { level: g.level, why: t(g.combined ? 'placeCombined' : 'placeByAge', { dob: s.dob, age: age ?? '?', group: g.yearGroup }) }
+    })
+    // Returning students come back pending: billable now, on the register once
+    // the office marks them active.
+    const reactivated = kids.map((s, i) => ({ ...s, status: 'pending', active: false, q4_full: true, level: placed[i].level }))
+    const moves = reactivated.map((s, i) => `• ${s.nickname || s.full_name}: ${kids[i].level}${kids[i].level !== s.level ? ` → ${s.level}` : ''}${placed[i].why ? ` (${placed[i].why})` : ''}`).join('\n')
+    if (!confirm(`${t('reactivateConfirm')}\n\n${moves}\n\n${t('placeCanChange')}`)) return
     setBusy(true)
     try {
-      await db.students.saveMany(kids.map((s) => ({ ...s, active: true })))
+      await db.students.saveMany(reactivated)
       await refresh()
-      const reactivated = kids.map((s) => ({ ...s, active: true }))
       set({ students: reactivated.map((s) => ({ student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) })), lang: f.language || inputs.lang })
     } catch (e) { alert(e.message) } finally { setBusy(false) }
   }
-  const setStudentProgram = (studentId, programId) => {
-    set({
-      students: inputs.students.map((e) => {
-        if (e.student.id !== studentId) return e
-        const s = { ...e.student, program: programId }
-        const upper = bandFor(s.level) === 'upper' || ['hybrid', 'independent'].includes(programId)
-        return {
-          student: s,
-          opts: {
-            ...e.opts,
-            upper,
-            // becoming Upper Secondary switches the online fee on; otherwise keep the current choice
-            includeAcellus: upper && !e.opts.upper ? true : e.opts.includeAcellus,
-            mealRate: mealRateFor(s.level, programId, fees),
-            weeklyRate: upper ? fees.weekly.summerUpper : (bandFor(s.level) === 'y7_9' ? fees.weekly.vocationalY7_9 : bandFor(s.level) === 'nursery' ? fees.weekly.globalNursery : fees.weekly.vocationalY1_6),
-          },
-        }
-      }),
-    })
+  const setStudentChoice = (studentId, patch) => {
+    set({ students: inputs.students.map((e) => (e.student.id === studentId ? withStudentChoice(e, patch, fees) : e)) })
   }
   const setOpts = (id, patch) => set({ students: inputs.students.map((e) => (e.student.id === id ? { ...e, opts: { ...e.opts, ...patch } } : e)) })
 
@@ -151,14 +130,15 @@ export default function InvoiceBuilder() {
   const doc = useMemo(() => (fees && calendar ? buildDocument(inputs, fees, calendar) : null), [inputs, fees, calendar])
   const totals = doc ? docTotals(doc) : null
 
+  // Gmail drafts are made from the invoice page that opens next.
   const create = async () => {
     if (!inputs.students.length) return
-    setBusy(true)
+    setBusy('create')
     try {
-      // Ask Google for access now, while this click still counts, so the draft can be made on the next page.
-      if (makeDraft && gmailConfigured) await getToken().catch(() => {})
-      const names = inputs.students.map((e) => e.student.nickname || e.student.full_name).join(', ')
-      const famIds = [...new Set(inputs.students.map((e) => e.student.family_id).filter(Boolean))]
+      // Same order as the invoice tables: priciest student first.
+      const ordered = orderedStudents(inputs, fees)
+      const names = ordered.map((e) => e.student.nickname || e.student.full_name).join(', ')
+      const famIds = [...new Set(ordered.map((e) => e.student.family_id).filter(Boolean))]
       const famName = famIds.map((id) => famById[id]?.name).filter(Boolean).join(' / ')
       const existing = editId ? await db.invoices.get(editId) : null
       const row = {
@@ -166,27 +146,32 @@ export default function InvoiceBuilder() {
         id: existing?.id,
         number: existing?.number || await db.nextNumber('invoice', fees.schoolYear),
         family_id: famIds[0] || null, family_name: famName,
-        student_ids: inputs.students.map((e) => e.student.id), student_names: names,
+        student_ids: ordered.map((e) => e.student.id), student_names: names,
         school_year: fees.schoolYear, lang: inputs.lang,
         period_label: inputs.lang === 'vi' ? doc.periodLabelVi : doc.periodLabelEn,
         status: existing?.status || 'draft',
-        issue_date: existing?.issue_date || todayISO(), due_date: existing?.due_date || dueDateFor(inputs, fees),
+        issue_date: existing?.issue_date || todayISO(),
+        due_date: inputs.dueDate || existing?.due_date || smartDueDate(inputs, fees, existing?.issue_date || todayISO()),
         total: totals.total, paid: existing?.paid || 0,
         inputs, doc, notes: existing?.notes || '',
       }
       const saved = await db.invoices.save(row)
-      navigate(`/invoices/${saved.id}${makeDraft ? '?draft=1' : ''}`)
+      // A level picked on the invoice is the student's level this year: keep the record in step.
+      const moved = inputs.students.map((e) => [students.find((s) => s.id === e.student.id), e.student.level]).filter(([rec, lvl]) => rec && rec.level !== lvl)
+      if (moved.length) { await db.students.saveMany(moved.map(([rec, level]) => ({ ...rec, level }))); await refresh() }
+      navigate(`/invoices/${saved.id}`)
     } finally { setBusy(false) }
   }
 
   if (loading || !fees || !calendar) return <Spinner />
 
   const needle = q.trim().toLowerCase()
-  const visible = students.filter((s) => showInactive || s.active !== false).filter((s) => !needle || `${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''}`.toLowerCase().includes(needle))
+  const visible = students.filter((s) => showInactive || isBillable(s)).filter((s) => !needle || `${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''}`.toLowerCase().includes(needle))
     .sort((a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level) || a.full_name.localeCompare(b.full_name))
 
   const quarterlyLike = inputs.plan === 'quarterly'
   const showTuitionOpts = !['staff', 'trial', 'none'].includes(inputs.plan)
+  const autoDue = smartDueDate(inputs, fees, todayISO())
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
@@ -205,11 +190,11 @@ export default function InvoiceBuilder() {
           </div>
           {(() => {
             const activeFamilies = families
-              .filter((f) => students.some((s) => s.family_id === f.id && s.active !== false))
+              .filter((f) => students.some((s) => s.family_id === f.id && isBillable(s)))
               .filter((f) => !needle || f.name.toLowerCase().includes(needle) || students.some((s) => s.family_id === f.id && `${s.full_name} ${s.nickname}`.toLowerCase().includes(needle)))
               .sort((a, b) => a.name.localeCompare(b.name))
             const inactiveFamilies = showInactive ? families
-              .filter((f) => !students.some((s) => s.family_id === f.id && s.active !== false))
+              .filter((f) => !students.some((s) => s.family_id === f.id && isBillable(s)))
               .filter((f) => students.some((s) => s.family_id === f.id))
               .filter((f) => !needle || f.name.toLowerCase().includes(needle) || students.some((s) => s.family_id === f.id && `${s.full_name} ${s.nickname}`.toLowerCase().includes(needle)))
               .sort((a, b) => a.name.localeCompare(b.name)) : []
@@ -218,7 +203,7 @@ export default function InvoiceBuilder() {
                 {activeFamilies.length > 0 && (
                   <div className="mb-3 flex flex-wrap gap-1.5">
                     {activeFamilies.map((f) => {
-                      const kids = students.filter((s) => s.family_id === f.id && s.active !== false)
+                      const kids = students.filter((s) => s.family_id === f.id && isBillable(s))
                       const allSelected = kids.every((s) => selectedIds.includes(s.id))
                       return (
                         <button key={f.id} onClick={() => pickFamily(f)}
@@ -258,11 +243,12 @@ export default function InvoiceBuilder() {
               const prog = PROGRAMS.find((p) => p.id === s.program)
               const progLabel = prog ? (uiLang === 'vi' ? prog.vi : prog.en) : s.program
               return (
-                <label key={s.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-1.5 text-sm hover:bg-slate-50 ${selectedIds.includes(s.id) ? 'bg-sky-50' : ''} ${s.active === false ? 'opacity-50' : ''}`}>
+                <label key={s.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-1.5 text-sm hover:bg-slate-50 ${selectedIds.includes(s.id) ? 'bg-sky-50' : ''} ${isPast(s) ? 'opacity-50' : ''}`}>
                   <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s)} />
                   <span className="font-semibold">{s.full_name}</span>
                   {s.nickname && <span className="text-slate-500">({s.nickname})</span>}
-                  {s.active === false && <span className="chip bg-amber-100 text-amber-700 text-[10px]">{t('inactive')}</span>}
+                  {isPending(s) && <span className="chip bg-amber-100 text-amber-700 text-[10px]">{t('pending')}</span>}
+                  {isPast(s) && <span className="chip bg-slate-100 text-slate-600 text-[10px]">{t('inactive')}</span>}
                   <span className="ml-auto text-xs text-slate-500">{s.level} · {progLabel} · {famById[s.family_id]?.name || '—'}</span>
                 </label>
               )
@@ -273,9 +259,15 @@ export default function InvoiceBuilder() {
 
         {/* 2. Plan */}
         <Card title={t('choosePlan')}>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field label={t('plan')}><Select value={inputs.plan} onChange={changePlan} options={PLAN_OPTIONS.map((p) => ({ value: p.id, label: uiLang === 'vi' ? p.vi : p.en }))} /></Field>
             <Field label={t('period')}><Select value={inputs.periodId} onChange={changePeriod} options={PERIOD_OPTIONS.map((p) => ({ value: p.id, label: uiLang === 'vi' ? p.vi : p.en }))} /></Field>
+            <Field label={t('dueDate')}>
+              <input type="date" className="input" value={inputs.dueDate || autoDue} onChange={(e) => set({ dueDate: e.target.value })} />
+              {inputs.dueDate
+                ? <button type="button" className="mt-1 text-left text-xs text-pra-blue hover:underline" onClick={() => set({ dueDate: '' })}>{t('dueAutoReset')}</button>
+                : <span className="mt-1 block text-xs text-slate-500">{t('dueAuto')}</span>}
+            </Field>
             <Field label={t('invoiceLang')}><Select value={inputs.lang} onChange={(v) => set({ lang: v })} options={[{ value: 'en', label: t('english') }, { value: 'vi', label: t('vietnamese') }]} /></Field>
           </div>
           {inputs.periodId === 'custom' && (
@@ -331,7 +323,11 @@ export default function InvoiceBuilder() {
         {inputs.students.length > 0 && (
           <Card title={t('perStudent')}>
             <div className="space-y-4">
-              {inputs.students.map(({ student: s, opts }) => (
+              {inputs.students.map(({ student: s, opts }) => {
+                // No program = no tuition for this child: only meals, transport and other fees.
+                const tuitionOpts = showTuitionOpts && hasProgram(s)
+                const quarterly = quarterlyLike && hasProgram(s)
+                return (
                 <div key={s.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="mb-3 flex items-center gap-2">
                     <span className="font-bold">{studentDisplayName(s)}</span>
@@ -339,17 +335,34 @@ export default function InvoiceBuilder() {
                     {s.legacy && <span className="chip bg-purple-100 text-purple-800">legacy</span>}
                     <button className="btn-ghost ml-auto p-1 text-red-500" onClick={() => toggleStudent(s)}><Trash2 size={14} /></button>
                   </div>
-                  <div className="mb-3">
-                    <Field label={t('programForInvoice')}>
-                      <Select value={s.program || 'regular'} onChange={(v) => setStudentProgram(s.id, v)}
+                  <div className="mb-3 grid gap-3 sm:grid-cols-2">
+                    <Field label={t('levelForInvoice')}>
+                      <Select value={s.level} onChange={(v) => setStudentChoice(s.id, { level: v })}
+                        options={[...(LEVELS.includes(s.level) ? [] : [{ value: s.level, label: s.level || '—' }]), ...LEVELS.map((l) => ({ value: l, label: l }))]} />
+                      {(() => {
+                        const g = suggestClass(s, students, fees.schoolYear)
+                        if (!g || g.level === s.level) return null
+                        return (
+                          <button type="button" className="mt-1 text-left text-xs text-amber-700 hover:underline" onClick={() => setStudentChoice(s.id, { level: g.level })}>
+                            {t('placeSuggest', { level: g.level, age: ageOf(s.dob) ?? '?' })}
+                          </button>
+                        )
+                      })()}
+                    </Field>
+                    <Field label={t('programForInvoice')} hint={hasProgram(s) ? '' : t('noProgramHint')}>
+                      <Select value={s.program || 'regular'} onChange={(v) => setStudentChoice(s.id, { program: v })}
                         options={PROGRAMS.map((p) => ({ value: p.id, label: uiLang === 'vi' ? p.vi : p.en }))} />
                     </Field>
+                    {quarterly && (
+                      <Checkbox className="sm:col-span-2 text-xs" checked={opts.q4Full ?? defaultQ4Full(s)} onChange={(v) => setOpts(s.id, { q4Full: v })}
+                        label={onRoster(s) ? t('q4FullRoster') : t('q4FullNew')} />
+                    )}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-3">
-                    {showTuitionOpts && inputs.plan !== 'weekly' && (
+                    {tuitionOpts && inputs.plan !== 'weekly' && (
                       <Field label={t('tuitionOverride')}><MoneyInput value={opts.tuitionOverride} onChange={(v) => setOpts(s.id, { tuitionOverride: v })} allowBlank placeholder="—" /></Field>
                     )}
-                    {showTuitionOpts && <Field label={t('extraDiscount')}><NumberInput value={opts.extraDiscountPct} onChange={(v) => setOpts(s.id, { extraDiscountPct: v })} min={0} max={100} /></Field>}
+                    {tuitionOpts && <Field label={t('extraDiscount')}><NumberInput value={opts.extraDiscountPct} onChange={(v) => setOpts(s.id, { extraDiscountPct: v })} min={0} max={100} /></Field>}
                     {inputs.plan === 'weekly' && (
                       <>
                         <Field label={t('weeks')}><NumberInput value={opts.weeks} onChange={(v) => setOpts(s.id, { weeks: v })} min={0} /></Field>
@@ -357,14 +370,14 @@ export default function InvoiceBuilder() {
                       </>
                     )}
                     {inputs.plan === 'staff' && <Field label={t('staffMonths')}><NumberInput value={opts.staffMonths} onChange={(v) => setOpts(s.id, { staffMonths: v })} min={0} /></Field>}
-                    {opts.upper && showTuitionOpts && inputs.plan !== 'weekly' && (
+                    {opts.upper && tuitionOpts && inputs.plan !== 'weekly' && (
                       <div className="flex flex-col gap-2 sm:col-span-3">
                         <Checkbox checked={opts.includePathway} onChange={(v) => setOpts(s.id, { includePathway: v })} label={t('includePathway')} />
                         <Checkbox checked={opts.includeAcellus} onChange={(v) => setOpts(s.id, { includeAcellus: v })} label={t('includeAcellus')} />
                       </div>
                     )}
                   </div>
-                  {quarterlyLike && (
+                  {quarterly && (
                     <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-3">
                       <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                         <span className="text-sm font-semibold text-slate-700">{t('proratedQuarters')}</span>
@@ -426,7 +439,8 @@ export default function InvoiceBuilder() {
                     </div>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </Card>
         )}
@@ -469,15 +483,12 @@ export default function InvoiceBuilder() {
               {totals.lines.map((l, i) => <div key={i} className="flex justify-between"><span>{l.label}</span><span className="tabular-nums">{fmt(l.amount)}</span></div>)}
               {doc.deductions.map((d) => <div key={d.id} className="flex justify-between text-red-600"><span>{d.label}</span><span className="tabular-nums">-{fmt(d.amount)}</span></div>)}
               <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-base font-black"><span>{t('total')}</span><span className="tabular-nums">{fmt(totals.total)}</span></div>
+              <div className="flex justify-between rounded bg-red-50 px-2 py-1 text-xs font-bold text-red-700"><span>{t('dueDate')}</span><span>{fmtDate(inputs.dueDate || autoDue, uiLang)}</span></div>
               <div className="text-xs text-slate-500">{inputs.students.length} {t('students').toLowerCase()} · {inputs.lang.toUpperCase()}</div>
             </div>
           )}
-          <div className="mt-4 rounded-lg bg-slate-50 p-2.5">
-            <Checkbox checked={makeDraft} onChange={setMakeDraft} label={t('alsoMakeDraft')} className="text-xs font-semibold" />
-            <p className="mt-1 pl-6 text-[11px] leading-snug text-slate-500">{gmailConfigured ? t('alsoMakeDraftHint') : t('gmailNotConfiguredShort')}</p>
-          </div>
-          <button className="btn-green mt-3 w-full justify-center" disabled={!inputs.students.length || busy} onClick={create}>
-            {busy ? t('saving') : (editId ? t('save') : t('createInvoice'))} <ChevronRight size={16} />
+          <button className="btn-green mt-4 w-full justify-center" disabled={!inputs.students.length || !!busy} onClick={create}>
+            {busy === 'create' ? t('saving') : (editId ? t('save') : t('createInvoice'))} <ChevronRight size={16} />
           </button>
         </Card>
       </aside>

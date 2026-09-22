@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Save, RotateCcw, Upload, Download } from 'lucide-react'
+import { Save, RotateCcw, Upload, Download, FileSpreadsheet } from 'lucide-react'
 import { db } from '../lib/db'
+import { useAuth } from '../lib/AuthContext'
+import FolderExportCard from '../components/FolderExportCard'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { DEFAULT_FEES, DEFAULT_CALENDAR, LEVELS, totalSchoolDays } from '../lib/fees'
 import { Card, Field, TextInput, NumberInput, MoneyInput, Spinner } from '../components/ui'
-import { exportWorkbook, readRosterFile } from '../lib/exportExcel'
+import { exportWorkbook, exportStudentList, officeOrder, readRosterFile } from '../lib/exportExcel'
 
 function setPath(obj, path, value) {
   const out = structuredClone(obj)
@@ -25,6 +27,7 @@ export default function SettingsPage() {
 
 function SettingsForm({ data }) {
   const { t } = useT()
+  const { isSuper } = useAuth()
   const [fees, setFees] = useState(() => structuredClone(data.fees))
   const [cal, setCal] = useState(() => structuredClone(data.calendar))
   const [busy, setBusy] = useState(false)
@@ -64,6 +67,12 @@ function SettingsForm({ data }) {
     exportWorkbook({ invoices, payments, students: data.students, families: data.families })
   }
 
+  const exportStudents = async () => {
+    setBusy(true); setMsg('')
+    try { await exportStudentList({ list: officeOrder(data.students), students: data.students, families: data.families, label: 'All students', schoolYear: fees.schoolYear }) }
+    catch (e) { setMsg(e.message) } finally { setBusy(false) }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -76,7 +85,7 @@ function SettingsForm({ data }) {
 
       <Card title={`${t('fees')} · ${fees.schoolYear}`}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="School year"><TextInput value={fees.schoolYear} onChange={(v) => setFees({ ...fees, schoolYear: v })} /></Field>
+          <Field label="Academic year"><TextInput value={fees.schoolYear} onChange={(v) => setFees({ ...fees, schoolYear: v })} /></Field>
         </div>
         <table className="mt-4 w-full text-sm">
           <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-1">Level</th><th>Early Bird</th><th>Standard</th><th>Quarter 1-3</th><th>Quarter 4</th></tr></thead>
@@ -121,14 +130,14 @@ function SettingsForm({ data }) {
         </div>
       </Card>
 
-      <Card title={`${t('calendar')} · ${totalSchoolDays(cal)} school days`}>
+      <Card title={`${t('calendar')} · ${totalSchoolDays(cal)} class days`}>
         <div className="grid gap-2 sm:grid-cols-6 lg:grid-cols-11">
           {cal.months.map((m, i) => (
             <Field key={m.key} label={m.en}><NumberInput value={m.days} onChange={(v) => setCal({ ...cal, months: cal.months.map((x, j) => (j === i ? { ...x, days: v } : x)) })} /></Field>
           ))}
         </div>
         <table className="mt-4 w-full text-sm">
-          <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-1">Quarter</th><th>Range (EN)</th><th>Range (VI)</th><th>School days</th><th>Transport months</th></tr></thead>
+          <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-1">Quarter</th><th>Range (EN)</th><th>Range (VI)</th><th>Class days</th><th>Transport months</th></tr></thead>
           <tbody>
             {cal.quarters.map((q, i) => (
               <tr key={q.id} className="border-t border-slate-100">
@@ -156,6 +165,8 @@ function SettingsForm({ data }) {
         </Card>
         <Card title={t('schoolInfo')}>
           <div className="grid gap-3">
+            {T('Center name on invoices (EN)', 'school.nameEn')}
+            {T('Center name on invoices (VI)', 'school.nameVi')}
             {T('Email', 'school.email')}
             {T('Address (EN)', 'school.addressEn')}
             {T('Address (VI)', 'school.addressVi')}
@@ -170,9 +181,12 @@ function SettingsForm({ data }) {
         <p className="mb-3 text-sm text-slate-500">{t('exportHint')}</p>
         <div className="flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={doExport}><Download size={16} /> {t('export')}</button>
+          <button className="btn-secondary" disabled={busy} onClick={exportStudents}><FileSpreadsheet size={16} /> {t('exportStudentList')}</button>
           <label className="btn-secondary cursor-pointer"><Upload size={16} /> {t('importRoster')}<input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => importRoster(e.target.files?.[0])} /></label>
         </div>
       </Card>
+
+      {isSuper && <FolderExportCard />}
     </div>
   )
 }

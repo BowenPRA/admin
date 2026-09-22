@@ -16,6 +16,7 @@ import PrintBatch from './pages/reports/PrintBatch'
 import Teachers from './pages/reports/Teachers'
 import ReportSettings from './pages/reports/ReportSettings'
 import Attendance from './pages/Attendance'
+import Schedule from './pages/Schedule'
 import { DataProvider } from './lib/DataContext'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { Spinner } from './components/ui'
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/teachers" element={<Teachers />} />
           <Route path="/students" element={<Students />} />
           <Route path="/attendance" element={<Attendance />} />
+          <Route path="/schedule" element={<Schedule />} />
           <Route path="/settings" element={<Office><SettingsPage /></Office>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, KeyRound, ChevronDown, Eye } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -20,7 +20,7 @@ export default function Layout() {
   const navRef = useRef(null)
 
   // On phones the nav scrolls sideways; keep the current page's icon in view.
-  // Re-checked when the nav narrows (e.g. once the logo has loaded) or role-only links and the account menu appear.
+  // Re-checked when the nav narrows or role-only links and the account menu appear.
   useEffect(() => {
     const nav = navRef.current
     if (!nav) return
@@ -45,7 +45,7 @@ export default function Layout() {
 
   const item = (to, Icon, label, end = false) => (
     <NavLink to={to} end={end} title={label}
-      className={({ isActive }) => `flex flex-none items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${isActive ? 'bg-pra-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
+      className={({ isActive }) => `flex flex-none items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-semibold transition-colors ${isActive ? 'bg-pra-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
       <Icon size={18} /> <span className="hidden lg:inline">{label}</span>
     </NavLink>
   )
@@ -55,15 +55,13 @@ export default function Layout() {
     <div className="min-h-screen">
       <header className="no-print sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2">
-          <NavLink to="/" className="mr-1 flex flex-none items-center gap-2">
-            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Palm River Academy" width="2128" height="858" className="h-9 w-auto" />
-          </NavLink>
           <nav ref={navRef} className="-mx-1 no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1">
             {item('/', Home, t('home'), true)}
             {isOffice && item('/invoices', FileText, t('invoices'))}
             {item('/students', Users, t('students'))}
             {item('/reports', ClipboardList, t('reportsNav'))}
             {item('/attendance', CalendarCheck, t('attendance'))}
+            {item('/schedule', CalendarDays, t('schedule'))}
             {isHead && item('/teachers', GraduationCap, t('teachers'))}
             {isOffice && item('/settings', Settings, t('settings'))}
           </nav>

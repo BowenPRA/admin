@@ -5,3 +5,7 @@ dist-ssr
 .DS_Store
 .vite
 .env
+
+# Children's personal data: the full roster and student photos. Never commit these
+# and never move them into public/ (everything there is on the public website).
+private/

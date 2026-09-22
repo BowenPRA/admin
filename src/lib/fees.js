@@ -19,6 +19,12 @@ export function isUpperSecondary(level) {
   return level === 'Upper Secondary' || level === 'Year 9'
 }
 
+// The level a student moves up to for the next school year.
+export function nextLevel(level) {
+  const i = LEVELS.indexOf(level)
+  return i < 0 ? level : LEVELS[Math.min(i + 1, LEVELS.length - 1)]
+}
+
 // Which tuition band a level belongs to.
 export function bandFor(level) {
   if (level === 'Nursery') return 'nursery'
@@ -37,7 +43,14 @@ export const PROGRAMS = [
   { id: 'hybrid', en: 'Hybrid Pathway', vi: 'Lộ trình Hybrid' },
   { id: 'independent', en: 'Independent Pathway', vi: 'Lộ trình Independent' },
   { id: 'staff', en: 'Staff child', vi: 'Con nhân viên' },
+  { id: 'none', en: 'No program', vi: 'Không theo chương trình' },
 ]
+
+// A student with no program pays no tuition: the invoice bills only the extras
+// (meals, transport, admission and other fees).
+export function hasProgram(student) {
+  return (student?.program || 'regular') !== 'none'
+}
 
 export const DEFAULT_FEES = {
   schoolYear: SCHOOL_YEAR,
@@ -96,6 +109,8 @@ export const DEFAULT_FEES = {
     addressVi: 'Thôn Thanh Nhì, Phường Hội An Đông, T.P Đà Nẵng, Việt Nam',
   },
   school: {
+    nameEn: 'Palm River Academy English Language Center',
+    nameVi: 'Trung tâm Anh ngữ Palm River Academy',
     email: 'admin@palmriveracademy.edu.vn',
     addressEn: 'Hoi An Dong Ward, Danang City, Vietnam',
     addressVi: 'Phường Hội An Đông, thành phố Đà Nẵng, Việt Nam',

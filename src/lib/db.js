@@ -8,6 +8,9 @@
 import { supabase, hasSupabase } from './supabaseClient.js'
 import { DEFAULT_FEES, DEFAULT_CALENDAR } from './fees.js'
 import { normalizeReportSettings } from './report/defaults.js'
+import { STATUSES } from './studentRecords.js'
+import { normalizeSchedule } from './schedule.js'
+import { removeProofs, proofError } from './proof.js'
 
 const TABLES = {
   families: 'adm_families',
@@ -64,6 +67,17 @@ const localAdapter = {
     return r
   },
   async upsertMany(table, rows) { const out = []; for (const r of rows) out.push(await this.upsert(table, r)); return out },
+  // Changes some fields of one row, leaving the rest as they are now (not as they were when a page loaded them).
+  async patch(table, id, fields) {
+    const d = lsRead()
+    const rows = d[table] || []
+    const i = rows.findIndex((x) => x.id === id)
+    if (i < 0) throw new Error('This record no longer exists.')
+    rows[i] = { ...rows[i], ...fields, updated_at: new Date().toISOString() }
+    d[table] = rows
+    lsWrite(d)
+    return rows[i]
+  },
   // Insert or replace by a natural key (e.g. one attendance mark per student per day).
   async upsertBy(table, rows, keys) {
     const d = lsRead()
@@ -87,6 +101,7 @@ const localAdapter = {
     if (table === TABLES.reports) d[TABLES.sections] = (d[TABLES.sections] || []).filter((p) => p.report_id !== id)
     lsWrite(d)
   },
+  async removeStrict(table, id) { return this.remove(table, id) },
   async getSetting(key) {
     const d = lsRead()
     return d.settings?.[key] ?? null
@@ -141,6 +156,14 @@ const supaAdapter = {
     throwIf(error)
     return data || []
   },
+  async patch(table, id, fields) {
+    const r = cleanRow(table, { ...fields, updated_at: new Date().toISOString() })
+    delete r.id; delete r.created_at
+    const { data, error } = await supabase.from(table).update(r).eq('id', id).select().maybeSingle()
+    throwIf(error)
+    if (!data) throw new Error('This could not be saved: the record no longer exists, or your account may not change it.')
+    return data
+  },
   async upsertBy(table, rows, keys) {
     if (!rows.length) return []
     const now = new Date().toISOString()
@@ -152,6 +175,12 @@ const supaAdapter = {
   async remove(table, id) {
     const { error } = await supabase.from(table).delete().eq('id', id)
     throwIf(error)
+  },
+  // Row level security hides a refused delete (no error, nothing removed), so ask for the row back.
+  async removeStrict(table, id) {
+    const { data, error } = await supabase.from(table).delete().eq('id', id).select('id')
+    throwIf(error)
+    if (!data?.length) throw new Error('This could not be removed: your account is not allowed to, or it was already removed.')
   },
   async getSetting(key) {
     const { data, error } = await supabase.from(TABLES.settings).select('value').eq('key', key).maybeSingle()
@@ -174,37 +203,87 @@ const crud = (table) => ({
   save: (row) => A.upsert(table, row),
   saveMany: (rows) => A.upsertMany(table, rows),
   remove: (id) => A.remove(table, id),
+  patch: (id, fields) => A.patch(table, id, fields),
 })
+
+// A student's `status` is the source of truth; the older `active` boolean is
+// kept in step on every write so anything still reading it stays correct.
+const withStatus = (row) => {
+  const status = STATUSES.includes(row.status) ? row.status : (row.active === false ? 'inactive' : 'active')
+  return { ...row, status, active: status === 'active' }
+}
+// Until supabase/updates-2026-09-16-pending.sql has run there is no `status`
+// column and Postgres rejects the write; fall back to the boolean on its own.
+const noStatusColumn = (e) => /status/i.test(e?.message || '') && /(does not exist|schema cache)/i.test(e?.message || '')
+const dropStatus = (row) => { const r = { ...row }; delete r.status; return r }
+const saveStudent = async (row) => {
+  const r = withStatus(row)
+  try { return await A.upsert(TABLES.students, r) } catch (e) {
+    if (!noStatusColumn(e)) throw e
+    return A.upsert(TABLES.students, dropStatus(r))
+  }
+}
+const saveStudents = async (rows) => {
+  const rs = rows.map(withStatus)
+  try { return await A.upsertMany(TABLES.students, rs) } catch (e) {
+    if (!noStatusColumn(e)) throw e
+    return A.upsertMany(TABLES.students, rs.map(dropStatus))
+  }
+}
+
+// The record is already gone, so a file that will not delete is only logged.
+const dropProofFiles = (payments) => removeProofs(payments.flatMap((p) => p.proof || [])).catch((e) => console.warn('Proof files not removed:', e.message))
 
 export const db = {
   families: crud(TABLES.families),
-  students: crud(TABLES.students),
+  students: {
+    ...crud(TABLES.students),
+    save: saveStudent,
+    saveMany: saveStudents,
+  },
   teachers: crud(TABLES.teachers),
   reports: crud(TABLES.reports),
   sections: crud(TABLES.sections),
-  courseNotes: crud(TABLES.courseNotes),
+  courseNotes: {
+    ...crud(TABLES.courseNotes),
+    // One note per year group, period and learning area: two editors creating it at once end up sharing it.
+    save: (row) => A.upsertBy(TABLES.courseNotes, [row], ['school_year', 'period_label', 'year_group', 'subject_key']).then((r) => r[0]),
+  },
   attendance: {
     list: (filter) => A.list(TABLES.attendance, filter),
     /** Marks for a date range (inclusive, 'YYYY-MM-DD'). */
     between: (from, to) => A.listRange(TABLES.attendance, 'date', from, to),
     mark: (rows) => A.upsertBy(TABLES.attendance, rows, ['student_id', 'date']),
     remove: (id) => A.remove(TABLES.attendance, id),
+    /** Takes a mark off again; fails loudly if the database refuses. */
+    clear: (id) => A.removeStrict(TABLES.attendance, id),
   },
   invoices: {
     list: () => A.list(TABLES.invoices),
     get: (id) => A.get(TABLES.invoices, id),
     save: (row) => A.upsert(TABLES.invoices, row),
-    remove: (id) => A.remove(TABLES.invoices, id),
+    // Its payments go with it (cascade), so their proof files are cleared too.
+    async remove(id) {
+      const ps = await A.list(TABLES.payments, { invoice_id: id }).catch(() => [])
+      await A.remove(TABLES.invoices, id)
+      await dropProofFiles(ps)
+    },
   },
   payments: {
     list: () => A.list(TABLES.payments),
     get: (id) => A.get(TABLES.payments, id),
-    save: (row) => A.upsert(TABLES.payments, row),
-    remove: (id) => A.remove(TABLES.payments, id),
+    save: (row) => A.upsert(TABLES.payments, row).catch((e) => { throw (row.proof?.length ? proofError(e) : e) }),
+    patch: (id, fields) => A.patch(TABLES.payments, id, fields).catch((e) => { throw ('proof' in fields ? proofError(e) : e) }),
+    async remove(id) {
+      const p = await A.get(TABLES.payments, id).catch(() => null)
+      await A.remove(TABLES.payments, id)
+      await dropProofFiles(p ? [p] : [])
+    },
   },
   async getFees() {
     const v = await A.getSetting('fees')
-    return { ...DEFAULT_FEES, ...(v || {}) }
+    // `school` is merged key by key so fields added later (e.g. the center name) reach older saved settings.
+    return { ...DEFAULT_FEES, ...(v || {}), school: { ...DEFAULT_FEES.school, ...(v?.school || {}) } }
   },
   setFees: (v) => A.setSetting('fees', v),
   async getCalendar() {
@@ -218,6 +297,11 @@ export const db = {
     return normalizeReportSettings(await A.getSetting('reports'))
   },
   setReportSettings: (v) => A.setSetting('reports', v),
+  // Weekly timetable: the built-in 2026-2027 schedule until someone edits it.
+  async getSchedule() {
+    return normalizeSchedule(await A.getSetting('schedule'))
+  },
+  setSchedule: (v) => A.setSetting('schedule', v),
 
   // Sequential document numbers: PRA-2627-0001 / PT-2627-0001
   async nextNumber(kind, schoolYear) {

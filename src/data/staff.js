@@ -20,18 +20,25 @@ export const OFFICE_ACCOUNTS = [
 ]
 
 const years = (subject, groups) => groups.map((g) => `${subject}:${g}`)
+// Years 2 to 5 share their afternoon classes (Art, Craft, Wellbeing, Everyday Experts, Cooking, Technology).
+const Y2_5 = ['Year 2', 'Year 3', 'Year 4', 'Year 5']
+// Nursery and Kindergarten homeroom teachers write every Early Years area except
+// Applied English, which the class's English teacher writes (Ms. Solo teaches the
+// Nursery afternoon session, Ms. Kiu Kindergarten Literacy).
+const EARLY_YEARS_AREAS = ['communication', 'math', 'understanding_world', 'physical', 'expressive_arts']
+const earlyYears = (group) => EARLY_YEARS_AREAS.map((k) => `${k}:${group}`)
 
 export const TEACHER_SCHEDULE = [
-  { email: 'seth@pra.edu.vn', name: 'Seth', title: 'Mr.', role: 'head', subjects: ['art_of_science:Year 7'], homeroom_groups: ['*'] },
+  { email: 'seth@pra.edu.vn', name: 'Seth', title: 'Mr.', role: 'head', subjects: ['art_of_science:Year 7', ...years('cooking', ['Year 1', ...Y2_5])], homeroom_groups: ['*'] },
   { email: 'bowen@pra.edu.vn', name: 'Bowen', title: 'Mr.', role: 'head', subjects: ['math:Year 7', 'science:Year 7'], homeroom_groups: ['Year 7'] },
   { email: 'david@pra.edu.vn', name: 'David', title: 'Mr.', role: 'teacher', subjects: ['english:Year 7', 'math:Year 5'], homeroom_groups: ['Upper Secondary'] },
-  { email: 'solo@pra.edu.vn', name: 'Solo', title: 'Ms.', role: 'teacher', subjects: years('english', ['Year 1']).concat(years('math', ['Year 1']), years('science', ['Year 1'])), homeroom_groups: ['Year 1'] },
-  { email: 'caleb@pra.edu.vn', name: 'Caleb', title: 'Mr.', role: 'teacher', subjects: [...years('english', ['Year 2', 'Year 3']), ...years('math', ['Year 2', 'Year 3']), ...years('science', ['Year 2', 'Year 3']), ...years('technology', ['Year 2', 'Year 3', 'Year 4', 'Year 5']), 'movement:Year 7'], homeroom_groups: ['Year 2', 'Year 3'] },
-  { email: 'kiu@pra.edu.vn', name: 'Kiu', title: 'Ms.', role: 'teacher', subjects: ['english:Year 5', 'science:Year 5', 'history:Year 7', 'executive_function:Year 7', 'wellbeing:Year 7', 'wellbeing:Upper Secondary'], homeroom_groups: ['Year 5'] },
-  { email: 'thanh.n@pra.edu.vn', name: 'Thanh', title: 'Ms.', role: 'teacher', subjects: [...years('english', ['Kindergarten']), ...years('math', ['Kindergarten']), ...years('science', ['Kindergarten'])], homeroom_groups: ['Kindergarten'] },
-  { email: 'duyen.n@pra.edu.vn', name: 'Duyen', title: 'Ms.', role: 'teacher', subjects: ['technology:Year 1'], homeroom_groups: [] },
-  { email: 'tham.n@pra.edu.vn', name: 'Tham N', title: 'Ms.', role: 'teacher', subjects: [...years('english', ['Nursery']), ...years('math', ['Nursery']), ...years('science', ['Nursery'])], homeroom_groups: ['Nursery'] },
-  { email: 'tham.v@pra.edu.vn', name: 'Thắm V', title: 'Ms.', role: 'teacher', subjects: years('technology', ['Year 2', 'Year 3', 'Year 4', 'Year 5']), homeroom_groups: [] },
+  { email: 'solo@pra.edu.vn', name: 'Solo', title: 'Ms.', role: 'teacher', subjects: years('english', ['Year 1']).concat(years('math', ['Year 1']), years('science', ['Year 1']), years('presentation_play', ['Year 1']), ['applied_english:Nursery']), homeroom_groups: ['Year 1'] },
+  { email: 'caleb@pra.edu.vn', name: 'Caleb', title: 'Mr.', role: 'teacher', subjects: [...years('english', ['Year 2', 'Year 3']), ...years('math', ['Year 2', 'Year 3']), ...years('science', ['Year 2', 'Year 3']), ...years('technology', Y2_5), ...years('art_craft', Y2_5), ...years('everyday_experts', Y2_5), 'movement:Year 7'], homeroom_groups: ['Year 2', 'Year 3'] },
+  { email: 'kiu@pra.edu.vn', name: 'Kiu', title: 'Ms.', role: 'teacher', subjects: ['english:Year 5', 'science:Year 5', 'history:Year 7', 'executive_function:Year 7', ...years('wellbeing', Y2_5), 'wellbeing:Year 7', 'wellbeing:Upper Secondary', 'applied_english:Kindergarten'], homeroom_groups: ['Year 5'] },
+  { email: 'thanh.n@pra.edu.vn', name: 'Thanh', title: 'Ms.', role: 'teacher', subjects: earlyYears('Kindergarten'), homeroom_groups: ['Kindergarten'] },
+  { email: 'duyen.n@pra.edu.vn', name: 'Duyen', title: 'Ms.', role: 'teacher', subjects: ['technology:Year 1', 'art_craft:Year 1'], homeroom_groups: [] },
+  { email: 'tham.n@pra.edu.vn', name: 'Tham N', title: 'Ms.', role: 'teacher', subjects: earlyYears('Nursery'), homeroom_groups: ['Nursery'] },
+  { email: 'tham.v@pra.edu.vn', name: 'Thắm V', title: 'Ms.', role: 'teacher', subjects: [...years('technology', Y2_5), ...years('art_craft', Y2_5)], homeroom_groups: [] },
 ]
 
 /** 'english:Year 7' -> ['english', 'Year 7'] (old flat keys give a null year group). */

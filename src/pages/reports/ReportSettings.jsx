@@ -5,6 +5,7 @@ import { useData } from '../../lib/DataContext'
 import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
 import { DEFAULT_REPORT_SETTINGS, TIERS } from '../../lib/report/defaults'
+import { TITLE_FIELDS, reportStrings } from '../../lib/report/strings'
 import { LEVELS as YEAR_GROUPS } from '../../lib/fees'
 import { ICONS } from '../../components/report/icons'
 import { Card, Field, TextInput, TextArea, Select, Checkbox, Empty, Spinner } from '../../components/ui'
@@ -54,13 +55,13 @@ function SettingsForm({ initial }) {
           <Field label="Document title (Vietnamese)"><TextInput value={s.org.docTitle_vi} onChange={(v) => set('org.docTitle_vi', v)} /></Field>
           <Field label="Tagline under the logo"><TextInput value={s.org.tagline} onChange={(v) => set('org.tagline', v)} /></Field>
           <Field label="Footer line (legal name)"><TextInput value={s.org.legalLine} onChange={(v) => set('org.legalLine', v)} /></Field>
-          <Field label="Closing message" className="sm:col-span-2" hint="{nickname} is replaced by the student's nickname. Leave blank to print none."><TextInput value={s.org.closing} onChange={(v) => set('org.closing', v)} /></Field>
+          <Field label="Closing message" className="sm:col-span-2" hint="{nickname} is replaced by the student's legal first name. Leave blank to print none."><TextInput value={s.org.closing} onChange={(v) => set('org.closing', v)} /></Field>
           <Field label="Closing message (Vietnamese report)" className="sm:col-span-2"><TextInput value={s.org.closing_vi || ''} onChange={(v) => set('org.closing_vi', v)} /></Field>
         </div>
       </Card>
 
       <Card title="Year and reporting periods" subtitle="Reports are grouped by period. Dates decide which period is selected by default.">
-        <Field label="School year" className="mb-3 max-w-xs"><TextInput value={s.schoolYear} onChange={(v) => set('schoolYear', v)} /></Field>
+        <Field label="Academic year" className="mb-3 max-w-xs"><TextInput value={s.schoolYear} onChange={(v) => set('schoolYear', v)} /></Field>
         <div className="space-y-2">
           {s.periods.map((p, i) => (
             <div key={i} className="grid items-end gap-2 sm:grid-cols-[60px_1fr_1fr_1fr_auto]">
@@ -75,7 +76,7 @@ function SettingsForm({ initial }) {
         </div>
       </Card>
 
-      <Card title="Progress levels" subtitle="The scale used for every learning area and learner skill.">
+      <Card title="Progress levels" subtitle="The scale used for every learning area and learner skill, listed from first steps to the top, in the order the key prints. The value is how a level is saved on reports, so do not change it once reports use it.">
         <div className="space-y-3">
           {s.levels.map((l, i) => (
             <div key={i} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[50px_60px_1fr_1fr_90px]">
@@ -84,6 +85,8 @@ function SettingsForm({ initial }) {
               <Field label="Name"><TextInput value={l.name} onChange={(v) => set(`levels.${i}.name`, v)} /></Field>
               <Field label="Vietnamese"><TextInput value={l.name_vi} onChange={(v) => set(`levels.${i}.name_vi`, v)} /></Field>
               <Field label="Colour"><input type="color" className="input h-[38px] p-1" value={l.color} onChange={(e) => set(`levels.${i}.color`, e.target.value)} /></Field>
+              <Field label="In the key (a few words)" className="sm:col-span-2" hint="Printed under the name in the level key."><TextInput value={l.short || ''} onChange={(v) => set(`levels.${i}.short`, v)} /></Field>
+              <Field label="In the key (Vietnamese)" className="sm:col-span-3"><TextInput value={l.short_vi || ''} onChange={(v) => set(`levels.${i}.short_vi`, v)} /></Field>
               <Field label="Description" className="sm:col-span-5"><TextArea rows={2} value={l.desc} onChange={(v) => set(`levels.${i}.desc`, v)} /></Field>
               <Field label="Description (Vietnamese)" className="sm:col-span-5"><TextArea rows={2} value={l.desc_vi} onChange={(v) => set(`levels.${i}.desc_vi`, v)} /></Field>
             </div>
@@ -115,7 +118,7 @@ function SettingsForm({ initial }) {
                   })}
                 </div>
               </div>
-              {sub.kind === 'academic' && <div className="sm:col-span-6"><Checkbox checked={sub.scored !== false} onChange={(v) => set(`subjects.${i}.scored`, v)} label="Has scores (Q1–Q4 quarterly reviews and the end-of-year summative test)" /></div>}
+              {sub.kind === 'academic' && <div className="sm:col-span-6"><Checkbox checked={sub.scored !== false} onChange={(v) => set(`subjects.${i}.scored`, v)} label="Has scores (Q1–Q4 quarterly reviews and the end-of-year summative assessment)" /></div>}
             </div>
           ))}
           <button className="btn-secondary text-xs" onClick={() => add('subjects', { key: `subject_${s.subjects.length + 1}`, kind: 'specialist', name: 'New area', name_vi: '', icon: 'star', scored: false })}><Plus size={14} /> Add learning area</button>
@@ -136,7 +139,21 @@ function SettingsForm({ initial }) {
                   <div className="flex items-end justify-end pb-1"><button className="btn-danger text-xs" onClick={() => { if (confirm(`Remove template "${t.name}"?`)) setS((cur) => { const n = clone(cur); delete n.templates[k]; return n }) }}><Trash2 size={14} /> Remove</button></div>
                 </div>
                 <div className="mt-3 grid gap-4 sm:grid-cols-3">
-                  <div><div className="label">Year groups</div><div className="grid grid-cols-2 gap-1">{YEAR_GROUPS.map((g) => <Checkbox key={g} checked={(t.yearGroups || []).includes(g)} onChange={(on) => set(`templates.${k}.yearGroups`, on ? [...t.yearGroups, g] : t.yearGroups.filter((x) => x !== g))} label={g} />)}</div></div>
+                  <div>
+                    <div className="label">Year groups</div><div className="grid grid-cols-2 gap-1">{YEAR_GROUPS.map((g) => <Checkbox key={g} checked={(t.yearGroups || []).includes(g)} onChange={(on) => set(`templates.${k}.yearGroups`, on ? [...(t.yearGroups || []), g] : t.yearGroups.filter((x) => x !== g))} label={g} />)}</div>
+                    {(t.yearGroups || []).length > 0 && (<>
+                      <div className="label mt-3">Progress review scores for <span className="font-normal normal-case text-slate-400">{Array.isArray(t.scoreYearGroups) ? '' : '(every year group)'}</span></div>
+                      <div className="flex flex-wrap gap-1">
+                        {YEAR_GROUPS.filter((g) => t.yearGroups.includes(g)).map((g) => {
+                          const on = !Array.isArray(t.scoreYearGroups) || t.scoreYearGroups.includes(g)
+                          const current = Array.isArray(t.scoreYearGroups) ? t.scoreYearGroups : t.yearGroups
+                          return <button key={g} type="button" aria-pressed={on} onClick={() => set(`templates.${k}.scoreYearGroups`, on ? current.filter((x) => x !== g) : [...current, g])}
+                            className={`chip ${on ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-teal-100'}`}>{g}</button>
+                        })}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-400">Year groups without review scores print the learner skills across the full width instead.</p>
+                    </>)}
+                  </div>
                   <div className="sm:col-span-2">
                     <div className="label">Learning areas</div>
                     <div className="grid gap-3 sm:grid-cols-3">
@@ -151,6 +168,21 @@ function SettingsForm({ initial }) {
                     </div>
                   </div>
                 </div>
+                <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2" open={!!t.titles && Object.values(t.titles).some(Boolean)}>
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-600">Headings on these reports <span className="font-normal text-slate-400">(optional: blank uses the standard wording)</span></summary>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {TITLE_FIELDS.map((f) => (<div key={f.key} className="contents">
+                      <Field label={f.label}><TextInput value={t.titles?.[f.key] || ''} placeholder={reportStrings('en').titles[f.key]} onChange={(v) => set(`templates.${k}.titles`, { ...(t.titles || {}), [f.key]: v })} /></Field>
+                      <Field label={`${f.label} (Vietnamese)`}><TextInput value={t.titles?.[`${f.key}_vi`] || ''} placeholder={reportStrings('vi').titles[f.key]} onChange={(v) => set(`templates.${k}.titles`, { ...(t.titles || {}), [`${f.key}_vi`]: v })} /></Field>
+                    </div>))}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">{'{nickname}'} is replaced by the student's first name and {'{yearGroup}'} by the year group. With its own student's words heading, that box prints without quotation marks.</p>
+                </details>
+                <div className="mt-3">
+                  <Checkbox checked={Array.isArray(t.skillGroups)} label="Its own learner skills (instead of the shared list below)"
+                    onChange={(on) => setS((cur) => { const n = clone(cur); if (on) n.templates[k].skillGroups = clone(cur.skillGroups); else delete n.templates[k].skillGroups; return n })} />
+                  {Array.isArray(t.skillGroups) && <div className="mt-2"><SkillGroupsEditor groups={t.skillGroups} path={`templates.${k}.skillGroups`} set={set} add={add} del={del} iconOpts={iconOpts} /></div>}
+                </div>
               </div>
             )
           })}
@@ -158,31 +190,8 @@ function SettingsForm({ initial }) {
         </div>
       </Card>
 
-      <Card title="Learner skills (How I learn)">
-        <div className="space-y-4">
-          {s.skillGroups.map((g, gi) => (
-            <div key={gi} className="rounded-xl border border-slate-200 p-3">
-              <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                <Field label="Group"><TextInput value={g.name} onChange={(v) => set(`skillGroups.${gi}.name`, v)} /></Field>
-                <Field label="Vietnamese"><TextInput value={g.name_vi} onChange={(v) => set(`skillGroups.${gi}.name_vi`, v)} /></Field>
-                <button className="btn-ghost self-end text-red-500" onClick={() => del('skillGroups', gi)}><Trash2 size={16} /></button>
-              </div>
-              <div className="mt-2 space-y-2">
-                {g.items.map((it, ii) => (
-                  <div key={ii} className="grid gap-2 sm:grid-cols-[1fr_1fr_140px_120px_auto]">
-                    <TextInput value={it.name} onChange={(v) => set(`skillGroups.${gi}.items.${ii}.name`, v)} placeholder="Skill" />
-                    <TextInput value={it.name_vi} onChange={(v) => set(`skillGroups.${gi}.items.${ii}.name_vi`, v)} placeholder="Vietnamese" />
-                    <TextInput value={it.key} onChange={(v) => set(`skillGroups.${gi}.items.${ii}.key`, slug(v))} placeholder="key" />
-                    <Select value={it.icon} onChange={(v) => set(`skillGroups.${gi}.items.${ii}.icon`, v)} options={iconOpts} />
-                    <button className="btn-ghost px-2 text-red-500" onClick={() => del(`skillGroups.${gi}.items`, ii)}><Trash2 size={14} /></button>
-                  </div>
-                ))}
-                <button className="btn-secondary text-xs" onClick={() => add(`skillGroups.${gi}.items`, { key: `skill_${Date.now() % 10000}`, name: '', name_vi: '', icon: 'star' })}><Plus size={14} /> Add skill</button>
-              </div>
-            </div>
-          ))}
-          <button className="btn-secondary text-xs" onClick={() => add('skillGroups', { key: `group_${s.skillGroups.length + 1}`, name: 'New group', name_vi: '', items: [] })}><Plus size={14} /> Add group</button>
-        </div>
+      <Card title="Learner skills (How I learn)" subtitle="Shared by every template that does not have its own learner skills.">
+        <SkillGroupsEditor groups={s.skillGroups} path="skillGroups" set={set} add={add} del={del} iconOpts={iconOpts} />
       </Card>
 
       <Card title="Signature lines" subtitle="Roles printed at the bottom of each report. Names are filled in per report.">
@@ -193,6 +202,36 @@ function SettingsForm({ initial }) {
           <button className="btn-secondary text-xs" onClick={() => add('signatures', { role: 'Principal', name: '' })}><Plus size={14} /> Add signature line</button>
         </div>
       </Card>
+    </div>
+  )
+}
+
+/** Learner skill groups at `path` (the shared list, or a template's own). */
+function SkillGroupsEditor({ groups, path, set, add, del, iconOpts }) {
+  return (
+    <div className="space-y-4">
+      {groups.map((g, gi) => (
+        <div key={gi} className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+            <Field label="Group"><TextInput value={g.name} onChange={(v) => set(`${path}.${gi}.name`, v)} /></Field>
+            <Field label="Vietnamese"><TextInput value={g.name_vi} onChange={(v) => set(`${path}.${gi}.name_vi`, v)} /></Field>
+            <button className="btn-ghost self-end text-red-500" onClick={() => del(path, gi)}><Trash2 size={16} /></button>
+          </div>
+          <div className="mt-2 space-y-2">
+            {g.items.map((it, ii) => (
+              <div key={ii} className="grid gap-2 sm:grid-cols-[1fr_1fr_140px_120px_auto]">
+                <TextInput value={it.name} onChange={(v) => set(`${path}.${gi}.items.${ii}.name`, v)} placeholder="Skill" />
+                <TextInput value={it.name_vi} onChange={(v) => set(`${path}.${gi}.items.${ii}.name_vi`, v)} placeholder="Vietnamese" />
+                <TextInput value={it.key} onChange={(v) => set(`${path}.${gi}.items.${ii}.key`, slug(v))} placeholder="key" />
+                <Select value={it.icon} onChange={(v) => set(`${path}.${gi}.items.${ii}.icon`, v)} options={iconOpts} />
+                <button className="btn-ghost px-2 text-red-500" onClick={() => del(`${path}.${gi}.items`, ii)}><Trash2 size={14} /></button>
+              </div>
+            ))}
+            <button className="btn-secondary text-xs" onClick={() => add(`${path}.${gi}.items`, { key: `skill_${Date.now() % 10000}`, name: '', name_vi: '', icon: 'star' })}><Plus size={14} /> Add skill</button>
+          </div>
+        </div>
+      ))}
+      <button className="btn-secondary text-xs" onClick={() => add(path, { key: `group_${groups.length + 1}`, name: 'New group', name_vi: '', items: [] })}><Plus size={14} /> Add group</button>
     </div>
   )
 }

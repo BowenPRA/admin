@@ -3,18 +3,17 @@ import { Download, ExternalLink, Paperclip, FilePen } from 'lucide-react'
 import { Modal, Field, TextInput } from './ui'
 import { useT } from '../lib/i18n'
 import { useToast } from '../lib/toast'
-import { nodeToPdfBlob, downloadBlob } from '../lib/pdf'
+import { downloadBlob } from '../lib/pdf'
+import { invoicePdfBlob } from '../lib/invoicePdf'
 import { openComposeWindow, gmailConfigured, getToken, SENDER } from '../lib/gmail'
 import { invoiceFilename, emailTemplate } from '../lib/invoiceEmail'
-import { draftInvoice, waitForImages } from '../lib/invoiceDraft'
+import { draftInvoice } from '../lib/invoiceDraft'
 
 /**
  * Review the email for an invoice, then save it as a Gmail draft. The app
  * never sends: the office checks the draft and sends it from Gmail.
- * `docNode` is a ref to a full-size rendered InvoiceDocument (kept off-screen
- * by the editor).
  */
-export default function SendInvoiceModal({ onClose, inv, fees, docNode, defaultTo, onDrafted }) {
+export default function SendInvoiceModal({ onClose, inv, fees, defaultTo, onDrafted }) {
   const { t } = useT()
   const toast = useToast()
   const tpl = emailTemplate(inv, fees)
@@ -25,11 +24,7 @@ export default function SendInvoiceModal({ onClose, inv, fees, docNode, defaultT
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
 
-  const makePdf = async () => {
-    if (!docNode?.current) throw new Error('Preview not ready')
-    await waitForImages(docNode.current)
-    return nodeToPdfBlob(docNode.current)
-  }
+  const makePdf = () => invoicePdfBlob(inv, fees)
   const run = async (kind, fn) => {
     setBusy(kind); setErr('')
     try { await fn() } catch (e) { setErr(e.message || String(e)) } finally { setBusy('') }
@@ -41,7 +36,7 @@ export default function SendInvoiceModal({ onClose, inv, fees, docNode, defaultT
     if (!to.trim()) throw new Error(t('sendToRequired'))
     if (gmailConfigured) {
       await getToken()
-      const d = await draftInvoice({ inv, fees, node: docNode.current, to: to.trim(), cc: cc.trim(), subject, text })
+      const d = await draftInvoice({ inv, fees, to: to.trim(), cc: cc.trim(), subject, text })
       await onDrafted?.(d)
       toast(t('draftSaved'))
     } else {
@@ -56,7 +51,7 @@ export default function SendInvoiceModal({ onClose, inv, fees, docNode, defaultT
   })
 
   return (
-    <Modal open onClose={onClose} title={t('sendInvoice')} subtitle={`${inv.number} · ${inv.student_names}`} wide
+    <Modal open onClose={onClose} title={t('gmailDraft')} subtitle={`${inv.number} · ${inv.student_names}`} wide
       footer={(<>
         <button className="btn-ghost mr-auto" onClick={download} disabled={!!busy}><Download size={16} /> {busy === 'pdf' ? t('loading') : t('downloadPdf')}</button>
         <button className="btn-secondary" onClick={onClose}>{t('cancel')}</button>

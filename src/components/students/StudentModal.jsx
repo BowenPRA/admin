@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Camera, RotateCcw, Trash2, AlertTriangle, Mail, Phone } from 'lucide-react'
-import { LEVELS, PROGRAMS } from '../../lib/fees'
+import { LEVELS, PROGRAMS, SCHOOL_YEAR } from '../../lib/fees'
+import { suggestClass } from '../../lib/placement'
+import { guessFirstName } from '../../lib/names'
 import { resizeImage, photoSrc } from '../../lib/report/photo'
 import { nextStudentCode, codeTakenBy, normalizeCode } from '../../lib/studentIds'
-import { ageOf } from '../../lib/studentRecords'
+import { ageOf, STATUSES, statusOf, withStatus } from '../../lib/studentRecords'
 import { Field, TextInput, Select, Checkbox, Modal, Avatar } from '../ui'
 
 function Section({ title, children }) {
@@ -24,6 +26,15 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
   const [busy, setBusy] = useState(false)
   const set = (k) => (v) => setS((cur) => ({ ...cur, [k]: v }))
   const isNew = !s.id
+  // New students: the class follows the birthday until someone picks a class by hand.
+  const [levelTouched, setLevelTouched] = useState(false)
+  const [levelAuto, setLevelAuto] = useState(false)
+  const setDob = (dob) => {
+    const g = isNew && !levelTouched ? suggestClass({ ...s, dob }, students, SCHOOL_YEAR) : null
+    setS((cur) => ({ ...cur, dob, ...(g ? { level: g.level } : {}) }))
+    setLevelAuto(!!g)
+  }
+  const status = statusOf(s)
   const taken = codeTakenBy(students, s.student_code, s.id)
   const fam = families.find((f) => f.id === s.family_id)
   const programName = (id) => { const p = PROGRAMS.find((x) => x.id === id); return p ? (lang === 'vi' ? p.vi : p.en) : id }
@@ -32,7 +43,10 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
     e?.preventDefault()
     if (!s.full_name.trim() || taken) return
     setBusy(true)
-    try { await onSave({ ...s, full_name: s.full_name.trim(), student_code: normalizeCode(s.student_code) || null }) } finally { setBusy(false) }
+    const row = { ...s, full_name: s.full_name.trim(), student_code: normalizeCode(s.student_code) || null }
+    // first_name needs supabase/updates-2026-09-15-legal-names.sql; leave it out until someone types one.
+    if (!(row.first_name || '').trim() && !('first_name' in value)) delete row.first_name
+    try { await onSave(row) } finally { setBusy(false) }
   }
   const pickPhoto = async (file) => { try { set('photo')(await resizeImage(file)) } catch (err) { alert(err.message) } }
   const age = ageOf(s.dob)
@@ -50,6 +64,7 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
           </div>
         </div>
         <div className="divide-y divide-slate-100">
+          {row(t('legalFirstName'), (s.first_name || '').trim() || guessFirstName(s.full_name, s.nickname))}
           {row(t('classGroup'), s.class_group)}
           {row(t('allergies'), s.allergies && <span className="font-semibold text-red-700">{s.allergies}</span>)}
           {row(t('dob'), s.dob)}
@@ -84,6 +99,9 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
             <div className="grid flex-1 gap-3 sm:grid-cols-6">
               <Field label={t('fullName')} className="sm:col-span-4"><TextInput value={s.full_name} onChange={set('full_name')} autoFocus={isNew} required /></Field>
               <Field label={t('nickname')} className="sm:col-span-2"><TextInput value={s.nickname} onChange={set('nickname')} /></Field>
+              <Field label={t('legalFirstName')} className="sm:col-span-6" hint={!(s.first_name || '').trim() && s.full_name.trim() ? t('legalFirstNameHint', { name: guessFirstName(s.full_name, s.nickname) }) : undefined}>
+                <TextInput value={s.first_name} onChange={set('first_name')} placeholder={guessFirstName(s.full_name, s.nickname)} />
+              </Field>
               <div className="sm:col-span-3">
                 <span className="label">{t('studentCode')}</span>
                 <div className="flex gap-1.5">
@@ -93,16 +111,19 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
                 {taken ? <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-red-600"><AlertTriangle size={13} /> {t('idTaken', { name: taken.full_name })}</span>
                   : isNew && <span className="mt-1 block text-xs text-slate-400">{t('idAutoHint')}</span>}
               </div>
-              <div className="flex items-end pb-2 sm:col-span-3">
-                <Checkbox checked={s.active !== false} onChange={set('active')} label={t('enrolledToggle')} />
-              </div>
+              <Field label={t('status')} className="sm:col-span-3" hint={status === 'pending' ? t('pendingHint') : undefined}>
+                <Select value={status} onChange={(v) => setS((cur) => withStatus(cur, v))}
+                  options={STATUSES.map((v) => ({ value: v, label: t(v === 'active' ? 'enrolled' : v === 'pending' ? 'pending' : 'past') }))} />
+              </Field>
             </div>
           </div>
         </Section>
 
         <Section title={t('sectionEnrollment')}>
           <div className="grid gap-3 sm:grid-cols-4">
-            <Field label={t('yearGroup')}><Select value={s.level} onChange={set('level')} options={LEVELS.map((l) => ({ value: l, label: l }))} /></Field>
+            <Field label={t('yearGroup')} hint={levelAuto && !levelTouched ?t('placeAutoHint') : undefined}>
+              <Select value={s.level} onChange={(v) => { setLevelTouched(true); set('level')(v) }} options={LEVELS.map((l) => ({ value: l, label: l }))} />
+            </Field>
             <Field label={t('program')}><Select value={s.program} onChange={set('program')} options={PROGRAMS.map((p) => ({ value: p.id, label: lang === 'vi' ? p.vi : p.en }))} /></Field>
             <Field label={t('classGroup')}><TextInput value={s.class_group} onChange={set('class_group')} placeholder={s.level} /></Field>
             <Field label={t('startDate')}><TextInput type="date" value={s.start_date || ''} onChange={set('start_date')} /></Field>
@@ -112,7 +133,7 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
 
         <Section title={t('sectionPersonal')}>
           <div className="grid gap-3 sm:grid-cols-4">
-            <Field label={t('dob')} right={age != null ? `${age} ${lang === 'vi' ? 'tuổi' : 'yrs'}` : null}><TextInput type="date" value={s.dob || ''} onChange={set('dob')} /></Field>
+            <Field label={t('dob')} right={age != null ? `${age} ${lang === 'vi' ? 'tuổi' : 'yrs'}` : null}><TextInput type="date" value={s.dob || ''} onChange={setDob} /></Field>
             <Field label={t('gender')}><Select value={s.gender || ''} onChange={set('gender')} options={[{ value: '', label: '—' }, { value: 'female', label: t('female') }, { value: 'male', label: t('male') }]} /></Field>
             <Field label={t('nationality')}><TextInput value={s.nationality} onChange={set('nationality')} /></Field>
             <Field label={t('allergies')}><TextInput value={s.allergies} onChange={set('allergies')} /></Field>

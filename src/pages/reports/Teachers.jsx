@@ -7,7 +7,10 @@ import { useToast } from '../../lib/toast'
 import { db, dbMode } from '../../lib/db'
 import { hasSupabase } from '../../lib/supabaseClient'
 import { LEVELS } from '../../lib/fees'
+import { isEnrolled } from '../../lib/studentRecords'
 import { TEACHER_SCHEDULE, OFFICE_ACCOUNTS, ACCESS_ROLES, splitSubjectKey } from '../../data/staff'
+import { sameTeacher } from '../../lib/schedule'
+import { scheduledHomeroom, templateForYearGroup, areasFor } from '../../lib/report/utils'
 import { Card, Field, TextInput, Select, Checkbox, Modal, Empty, Spinner, Chip, PageHeader, Avatar } from '../../components/ui'
 
 const blank = () => ({ email: '', name: '', title: 'Mr.', role: 'teacher', subjects: [], homeroom_groups: [], active: true })
@@ -24,7 +27,7 @@ function signupClient() {
 
 // Head teacher only: which teacher edits which learning area in which year group.
 export default function Teachers() {
-  const { teachers, students, reportSettings: settings, loading, refresh } = useData()
+  const { teachers, students, reportSettings: settings, schedule, loading, refresh } = useData()
   const { isHead, refreshMe, me, setViewAs } = useAuth()
   const toast = useToast()
   const [editing, setEditing] = useState(null)
@@ -36,15 +39,41 @@ export default function Teachers() {
   const activeTeachers = useMemo(() => teachers.filter((t) => t.active !== false).sort((a, b) => (a.role === 'head' ? 0 : 1) - (b.role === 'head' ? 0 : 1) || a.name.localeCompare(b.name)), [teachers])
   const missingFromSchedule = TEACHER_SCHEDULE.filter((s) => !teachers.some((t) => (t.email || '').toLowerCase() === s.email))
 
+  // Classes on the 2026-27 schedule that a listed teacher does not have yet (e.g. the Primary areas added later).
+  const newClasses = TEACHER_SCHEDULE.map((s) => {
+    const row = teachers.find((t) => (t.email || '').toLowerCase() === s.email)
+    return row ? { row, add: s.subjects.filter((k) => !(row.subjects || []).includes(k)) } : null
+  }).filter((x) => x?.add.length)
+
   // year group -> subject key -> [teacher names]; only year groups with enrolled students.
   const coverage = useMemo(() => {
-    const groups = [...new Set(students.filter((s) => s.active !== false).map((s) => s.level).filter(Boolean))].sort((a, b) => levelIndex(a) - levelIndex(b))
+    const groups = [...new Set(students.filter(isEnrolled).map((s) => s.level).filter(Boolean))].sort((a, b) => levelIndex(a) - levelIndex(b))
     return groups.map((g) => {
       const cells = Object.fromEntries(subjects.map((s) => [s.key, activeTeachers.filter((t) => (t.subjects || []).includes(`${s.key}:${g}`)).map((t) => t.name)]))
-      const homeroom = activeTeachers.filter((t) => (t.homeroom_groups || []).includes(g)).map((t) => t.name)
-      return { group: g, count: students.filter((s) => s.active !== false && s.level === g).length, cells, homeroom }
+      // Areas this year group's reports contain (from its template); the rest are left plain, not flagged.
+      const template = templateForYearGroup(settings, g)
+      const onReport = new Set(template ? areasFor(settings, template, g) : subjects.map((s) => s.key))
+      // The homeroom teacher is the one on the Schedule; flag when their Teachers row cannot write the homeroom parts.
+      const homeroom = scheduledHomeroom(schedule, g)
+      const row = homeroom && activeTeachers.find((t) => sameTeacher(t.name, homeroom))
+      const canWrite = !!row && ['*', g].some((x) => (row.homeroom_groups || []).includes(x))
+      return { group: g, count: students.filter((s) => isEnrolled(s) && s.level === g).length, cells, onReport, homeroom, linked: !!row, canWrite }
     })
-  }, [students, subjects, activeTeachers])
+  }, [students, subjects, activeTeachers, schedule, settings])
+
+  // Year groups whose homeroom teacher on the Schedule cannot write the homeroom parts yet.
+  const homeroomGaps = useMemo(() => {
+    const byRow = new Map()
+    const groups = [...new Set((schedule?.classes || []).flatMap((c) => c.yearGroups || []))]
+    for (const g of groups) {
+      const name = scheduledHomeroom(schedule, g)
+      const row = name && activeTeachers.find((t) => sameTeacher(t.name, name))
+      if (!row || ['*', g].some((x) => (row.homeroom_groups || []).includes(x))) continue
+      if (!byRow.has(row.id)) byRow.set(row.id, { row, add: [] })
+      byRow.get(row.id).add.push(g)
+    }
+    return [...byRow.values()]
+  }, [schedule, activeTeachers])
 
   if (!isHead) return <Empty text="Only the head teacher can manage teachers." />
   if (loading || !settings) return <Spinner />
@@ -68,10 +97,28 @@ export default function Teachers() {
     catch (e) { toast.error(e.message) } finally { setBusy(false) }
   }
 
+  const addNewClasses = async () => {
+    const lines = newClasses.map(({ row, add }) => `${row.name}: ${add.map((k) => { const [s, g] = splitSubjectKey(k); return `${subjName(s)} (${shortLevel(g || '')})` }).join(', ')}`)
+    if (!confirm(`Add these classes from the 2026-27 schedule?\n\n${lines.join('\n')}`)) return
+    setBusy(true)
+    try { await db.teachers.saveMany(newClasses.map(({ row, add }) => ({ ...row, subjects: [...new Set([...(row.subjects || []), ...add])].sort() }))); await refresh(); await refreshMe(); toast('Classes added') }
+    catch (e) { toast.error(e.message) } finally { setBusy(false) }
+  }
+
+  const addHomerooms = async () => {
+    const lines = homeroomGaps.map(({ row, add }) => `${row.name}: ${add.join(', ')}`)
+    if (!confirm(`Let these homeroom teachers from the Schedule write the homeroom parts of their reports?\n\n${lines.join('\n')}`)) return
+    setBusy(true)
+    try { await db.teachers.saveMany(homeroomGaps.map(({ row, add }) => ({ ...row, homeroom_groups: [...new Set([...(row.homeroom_groups || []), ...add])] }))); await refresh(); await refreshMe(); toast('Homeroom access added') }
+    catch (e) { toast.error(e.message) } finally { setBusy(false) }
+  }
+
   return (
     <div className="space-y-5">
       <PageHeader title="Teachers & classes" subtitle="Link each teacher to the learning areas and year groups they teach. They can edit only those parts of progress reports.">
         {missingFromSchedule.length > 0 && <button className="btn-secondary" disabled={busy} onClick={addSchedule}><CalendarPlus size={16} /> Add {missingFromSchedule.length} from 2026-27 schedule</button>}
+        {newClasses.length > 0 && <button className="btn-secondary" disabled={busy} onClick={addNewClasses} title="Classes on the schedule that these teachers are not linked to yet"><CalendarPlus size={16} /> Add {newClasses.reduce((n, x) => n + x.add.length, 0)} new classes from the schedule</button>}
+        {homeroomGaps.length > 0 && <button className="btn-secondary" disabled={busy} onClick={addHomerooms} title="Homeroom teachers on the Schedule who cannot write the homeroom parts of those reports yet"><CalendarPlus size={16} /> Add {homeroomGaps.reduce((n, x) => n + x.add.length, 0)} homerooms from the schedule</button>}
         <button className="btn-green" onClick={() => setEditing(blank())}><Plus size={16} /> Add teacher</button>
       </PageHeader>
 
@@ -149,7 +196,7 @@ export default function Teachers() {
       )}
 
       {coverage.length > 0 && (
-        <Card title="Who teaches what" subtitle="Year groups with enrolled students. Amber cells have no teacher linked yet, so only the head teacher can write that part of the report." className="!p-0 [&>div:first-child]:px-5 [&>div:first-child]:pt-4">
+        <Card title="Who teaches what" subtitle="Year groups with enrolled students. Homeroom teachers come from the Schedule. Amber cells are on that year group's reports but have no teacher linked yet, so only the head teacher can write that part. Grey names are linked to an area those reports do not have." className="!p-0 [&>div:first-child]:px-5 [&>div:first-child]:pt-4">
           <div className="overflow-x-auto pb-2">
             <table className="w-full text-xs">
               <thead><tr className="border-b border-slate-100">
@@ -161,9 +208,13 @@ export default function Teachers() {
                 {coverage.map((row) => (
                   <tr key={row.group} className="border-t border-slate-100">
                     <td className="td whitespace-nowrap pl-5 font-semibold text-slate-700">{row.group} <span className="font-normal text-slate-400">· {row.count}</span></td>
-                    <td className={`td whitespace-nowrap ${row.homeroom.length ? 'text-slate-700' : 'bg-amber-50/70 text-amber-600'}`}>{row.homeroom.join(', ') || '—'}</td>
+                    <td className={`td whitespace-nowrap ${row.canWrite ? 'text-slate-700' : 'bg-amber-50/70 text-amber-600'}`}>
+                      {row.homeroom || '—'}
+                      {row.homeroom && !row.canWrite && <span className="text-amber-700/70"> · {row.linked ? 'no homeroom access' : 'not on this page'}</span>}
+                    </td>
                     {subjects.map((s) => {
                       const names = row.cells[s.key]
+                      if (!row.onReport.has(s.key)) return <td key={s.key} className="td whitespace-nowrap text-slate-300">{names.join(', ')}</td>
                       return <td key={s.key} className={`td whitespace-nowrap ${names.length ? 'text-slate-700' : 'bg-amber-50/70 text-amber-500'}`}>{names.join(', ') || '—'}</td>
                     })}
                   </tr>
@@ -199,7 +250,7 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
   const toggleHomeroom = (g) => onChange({ ...t, homeroom_groups: (t.homeroom_groups || []).includes(g) ? t.homeroom_groups.filter((x) => x !== g) : [...(t.homeroom_groups || []), g] })
 
   // Year groups with enrolled students first; the rest on request.
-  const enrolled = new Set(students.filter((s) => s.active !== false).map((s) => s.level))
+  const enrolled = new Set(students.filter(isEnrolled).map((s) => s.level))
   const assigned = new Set((t.subjects || []).map((k) => splitSubjectKey(k)[1]).concat(t.homeroom_groups || []))
   const groups = LEVELS.filter((g) => allGroups || enrolled.has(g) || assigned.has(g))
   const legacyKeys = (t.subjects || []).filter((k) => !k.includes(':'))

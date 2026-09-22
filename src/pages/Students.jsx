@@ -1,20 +1,20 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard } from 'lucide-react'
+import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet } from 'lucide-react'
 import { db } from '../lib/db'
+import { exportStudentList } from '../lib/exportExcel'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { LEVELS, PROGRAMS } from '../lib/fees'
-import { ROSTER } from '../data/roster'
 import { photoSrc } from '../lib/report/photo'
 import { proposeFamilies, familyNameFor, looksVietnamese, emailsOf } from '../lib/families'
 import { normalizeCode, needsCodeUpdate, nextStudentCode } from '../lib/studentIds'
 import { Card, Checkbox, Empty, Spinner, Avatar, Segmented, SearchInput, PageHeader, Menu } from '../components/ui'
 import StudentModal from '../components/students/StudentModal'
 import FamilyModal from '../components/students/FamilyModal'
-import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact } from '../lib/studentRecords'
+import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact, isEnrolled, isPending, isPast, statusOf } from '../lib/studentRecords'
 
 const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
 const levelIndex = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
@@ -36,7 +36,7 @@ function SortTh({ col, sort, onSort, children, className = '' }) {
 export default function Students() {
   const { t, lang } = useT()
   const toast = useToast()
-  const { loading, students, families, refresh } = useData()
+  const { loading, students, families, fees, refresh } = useData()
   const { isOffice } = useAuth()
   const canEdit = isOffice
   const [params, setParams] = useSearchParams()
@@ -53,6 +53,7 @@ export default function Students() {
   const [editing, setEditing] = useState(null)
   const [editingFam, setEditingFam] = useState(null)
   const [busy, setBusy] = useState(false)
+  const rosterInput = useRef(null)
 
   const famById = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families])
   const kidsByFamily = useMemo(() => {
@@ -63,13 +64,15 @@ export default function Students() {
   const programName = (id) => { const p = PROGRAMS.find((x) => x.id === id); return p ? (lang === 'vi' ? p.vi : p.en).replace(/ Program$| Pathway$/, '') : id }
 
   const counts = useMemo(() => ({
-    active: students.filter((s) => s.active !== false).length,
-    past: students.filter((s) => s.active === false).length,
+    active: students.filter(isEnrolled).length,
+    pending: students.filter(isPending).length,
+    past: students.filter(isPast).length,
   }), [students])
   const toConvert = useMemo(() => students.filter(needsCodeUpdate), [students])
-  const withoutId = useMemo(() => students.filter((s) => s.active !== false && !s.student_code), [students])
+  const withoutId = useMemo(() => students.filter((s) => !isPast(s) && !s.student_code), [students])
 
-  const inStatus = (s) => status === 'all' || (status === 'active' ? s.active !== false : s.active === false)
+  // The 'past' tab is the 'inactive' status; the other two match it by name.
+  const inStatus = (s) => status === 'all' || statusOf(s) === (status === 'past' ? 'inactive' : status)
   const rows = useMemo(() => {
     const needle = norm(q)
     const list = students
@@ -93,9 +96,14 @@ export default function Students() {
 
   const famRows = useMemo(() => {
     const needle = norm(q)
-    const isActive = (f) => (kidsByFamily[f.id] || []).some((s) => s.active !== false)
+    // A family follows its children: enrolled if any child is, otherwise pending
+    // if any child is waiting to start. A family with no children left is past.
+    const famStatus = (f) => {
+      const kids = kidsByFamily[f.id] || []
+      return kids.some(isEnrolled) ? 'active' : kids.some(isPending) ? 'pending' : 'past'
+    }
     return families
-      .filter((f) => status === 'all' || (status === 'active' ? isActive(f) : !isActive(f)))
+      .filter((f) => status === 'all' || famStatus(f) === status)
       .filter((f) => !missingContact || familyMissingContact(f, kidsByFamily[f.id]))
       .filter((f) => !needle || norm(`${f.name} ${f.email} ${f.phone} ${(kidsByFamily[f.id] || []).map((k) => `${k.full_name} ${k.nickname} ${k.student_code}`).join(' ')} ${contactsOf(f, kidsByFamily[f.id]).map((c) => c.name).join(' ')}`).includes(needle))
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -156,17 +164,31 @@ export default function Students() {
     await refresh()
     toast(t('idsAssigned', { n: rows.length }))
   })
-  // Adds students from the built-in 2026-2027 roster that are not here yet
-  // (matched by student ID, then by full name) and fills in blank details.
-  const loadRoster = () => {
+  // Adds students from the office roster file that are not here yet (matched by
+  // student ID, then by full name) and fills in blank details. The file is
+  // private/roster.json on the office computer (scripts/build_roster.py writes it
+  // from the student workbook). It is read in this browser only: children's
+  // details never become part of the public site.
+  const loadRoster = async (file) => {
+    let roster
+    try {
+      roster = JSON.parse(await file.text())
+      if (!Array.isArray(roster) || !roster.length || !roster.every((r) => r && typeof r.full_name === 'string' && r.full_name.trim())) throw new Error()
+    } catch { toast.error(t('rosterFileBad')); return }
     const out = []
     let added = 0, updated = 0
-    for (const r of ROSTER) {
+    for (const r of roster) {
       const code = normalizeCode(r.student_code)
       const existing = students.find((s) => (code && normalizeCode(s.student_code) === code) || norm(s.full_name) === norm(r.full_name))
-      if (!existing) { out.push({ ...blankStudent(), ...r, student_code: code, is_new: false, q4_full: false }); added++; continue }
+      // The roster is the office's list of students already in class, so these
+      // come in active rather than pending.
+      if (!existing) { out.push({ ...blankStudent(), ...r, student_code: code, is_new: false, q4_full: false, status: 'active' }); added++; continue }
       const patch = {}
       for (const [k, v] of Object.entries(r)) if (v && !existing[k]) patch[k] = k === 'student_code' ? code : v
+      // An earlier roster had these two a column out: emails under address, the address under phone.
+      if ((existing.address || '').includes('@')) patch.address = r.address
+      const bare = (v) => norm(v).replace(/[^\p{L}\p{N}]+/gu, '')
+      if (existing.parent_phone && bare(existing.parent_phone) === bare(r.address)) patch.parent_phone = r.parent_phone
       if (Object.keys(patch).length) { out.push({ ...existing, ...patch }); updated++ }
     }
     if (!out.length) { toast.info(t('rosterUpToDate')); return }
@@ -190,6 +212,13 @@ export default function Students() {
       toast(t('familiesBuilt'))
     })
   }
+
+  // The students listed right now (status tab, filters, search and sort) as an Excel file.
+  const exportList = () => run(async () => {
+    const label = [status === 'all' ? 'All students' : status === 'active' ? 'Enrolled' : status === 'pending' ? 'Pending' : 'Past', level, program && programName(program)].filter(Boolean).join(' · ')
+    await exportStudentList({ list: rows, students, families, label, schoolYear: fees?.schoolYear })
+    toast(t('exportStudentListDone', { n: rows.length }))
+  })
 
   // ---- families ----
   const saveFamily = async (f) => {
@@ -220,11 +249,14 @@ export default function Students() {
         subtitle={`${t('studentsCount', { n: counts.active })} ${t('enrolled').toLowerCase()} · ${t('familiesCount', { n: families.length })}`}>
         {canEdit && (
           <Menu label={t('more')} icon={MoreHorizontal} items={[
-            { label: t('loadRoster'), icon: ClipboardList, onClick: loadRoster, disabled: busy, hint: lang === 'vi' ? 'Thêm học sinh còn thiếu từ danh sách của văn phòng' : 'Add anyone missing from the office student list' },
+            { label: t('loadRoster'), icon: ClipboardList, onClick: () => rosterInput.current?.click(), disabled: busy, hint: lang === 'vi' ? 'Chọn private/roster.json để thêm học sinh còn thiếu' : 'Pick private/roster.json to add anyone missing' },
             { label: t('buildFamilies'), icon: Users, onClick: buildFamilies, disabled: busy, hint: lang === 'vi' ? 'Theo email / điện thoại phụ huynh chung' : 'Match siblings by shared parent email or phone' },
             { label: t('addFamily'), icon: Users, onClick: () => setEditingFam(blankFamily()) },
+            { label: t('exportStudentList'), icon: FileSpreadsheet, onClick: exportList, disabled: busy || !rows.length, hint: t('exportStudentListHint', { n: rows.length }) },
           ]} />
         )}
+        {canEdit && <input ref={rosterInput} type="file" accept=".json,application/json" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) loadRoster(f) }} />}
         {canEdit && <button className="btn-primary" onClick={() => setEditing(blankStudent(students))}><UserPlus size={16} /> {t('addStudent')}</button>}
       </PageHeader>
 
@@ -248,6 +280,7 @@ export default function Students() {
         <span className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
         <Segmented value={status} onChange={setStatus} options={[
           { value: 'active', label: `${t('enrolled')}${tab === 'students' ? ` · ${counts.active}` : ''}` },
+          { value: 'pending', label: `${t('pending')}${tab === 'students' ? ` · ${counts.pending}` : ''}` },
           { value: 'past', label: `${t('past')}${tab === 'students' ? ` · ${counts.past}` : ''}` },
           { value: 'all', label: t('all') },
         ]} />
@@ -300,16 +333,16 @@ export default function Students() {
                         </tr>
                       ),
                       <tr key={s.id} onClick={() => setEditing({ ...blankStudent(), ...s })}
-                        className={`cursor-pointer border-t border-slate-100 transition-colors hover:bg-sky-50/50 ${s.active === false ? 'text-slate-400' : ''}`}>
+                        className={`cursor-pointer border-t border-slate-100 transition-colors hover:bg-sky-50/50 ${isPast(s) ? 'text-slate-400' : ''}`}>
                         <td className="td pl-4">
                           {code ? <span className={`code ${needsCodeUpdate(s) ? '!bg-sky-50 !text-sky-700' : ''}`} title={needsCodeUpdate(s) ? `→ ${normalizeCode(code)}` : undefined}>{code}</span>
                             : <span className="text-xs text-amber-600">{t('noId')}</span>}
                         </td>
                         <td className="td">
                           <div className="flex items-center gap-2.5">
-                            <Avatar src={photoSrc(s.photo)} name={s.full_name} size={32} className={s.active === false ? 'opacity-60' : ''} />
+                            <Avatar src={photoSrc(s.photo)} name={s.full_name} size={32} className={isPast(s) ? 'opacity-60' : ''} />
                             <div className="min-w-0">
-                              <div className={`truncate font-semibold ${s.active === false ? '' : 'text-slate-800'}`}>{s.full_name}</div>
+                              <div className={`truncate font-semibold ${isPast(s) ? '' : 'text-slate-800'}`}>{s.full_name}</div>
                               <div className="flex items-center gap-1.5 text-xs text-slate-500">
                                 {s.nickname && <span>“{s.nickname}”</span>}
                                 {s.allergies && <span className="rounded bg-red-50 px-1 text-[10px] font-semibold text-red-700" title={s.allergies}>{lang === 'vi' ? 'dị ứng' : 'allergy'}</span>}
@@ -329,6 +362,7 @@ export default function Students() {
                           ) : <span className="text-slate-600">{famById[s.family_id]?.name || '—'}</span>}
                         </td>
                         <td className="td hidden whitespace-nowrap pr-4 text-right text-xs sm:table-cell">
+                          {isPending(s) && <span className="chip mr-1 bg-amber-100 text-amber-700">{t('pending').toLowerCase()}</span>}
                           {s.is_new && <span className="chip mr-1 bg-green-100 text-green-800">{lang === 'vi' ? 'mới' : 'new'}</span>}
                           {s.legacy && <span className="chip mr-1 bg-purple-100 text-purple-800">legacy</span>}
                           {s.q4_full && <span className="chip bg-slate-100 text-slate-600" title={t('q4Full')}>Q4</span>}
@@ -357,7 +391,7 @@ export default function Students() {
                     <div className="flex flex-wrap content-start gap-1.5">
                       {kids.length ? kids.map((k) => (
                         <button key={k.id} type="button" onClick={() => setEditing({ ...blankStudent(), ...k })}
-                          className={`inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-0.5 pl-0.5 pr-2 text-xs hover:border-pra-blue ${k.active === false ? 'opacity-50' : ''}`}>
+                          className={`inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-0.5 pl-0.5 pr-2 text-xs hover:border-pra-blue ${isPast(k) ? 'opacity-50' : ''}`}>
                           <Avatar src={photoSrc(k.photo)} name={k.full_name} size={20} />
                           <span className="font-semibold text-slate-700">{k.nickname || k.full_name.split(' ')[0]}</span>
                           <span className="text-slate-400">{k.level?.replace('Year ', 'Y')}</span>

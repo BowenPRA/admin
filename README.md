@@ -6,7 +6,8 @@ announcement (invoice). Every invoice is saved with its line items, payments are
 recorded against it, cash receipts (Phiếu thu) print from the same record, and
 everything exports to one Excel workbook.
 
-Live at https://bowenpra.github.io/admin/
+Live at https://current.pra.edu.vn/ (GitHub Pages custom domain; the old
+https://bowenpra.github.io/admin/ address redirects there)
 
 ## Run it
 
@@ -84,8 +85,16 @@ progress reports (Lower Secondary first). Full details are in the code under
 
 1. Run [`supabase/reports.sql`](supabase/reports.sql) once (after `schema.sql`).
    It adds the report tables, extra student columns and the permission rules.
-2. Students → **Load 2026-2027 roster** fills in the student list from the office
-   workbook (`scripts/build_roster.py` regenerates `src/data/roster.js`).
+2. Students → More → **Load roster file…** fills in the student list from the office
+   workbook: `python scripts/build_roster.py "<workbook.xlsx>"` writes
+   `private/roster.json`, and you pick that file. Student photos go in
+   `private/photos` and are uploaded with `node scripts/upload-student-photos.mjs`
+   (after running `supabase/updates-2026-09-22-private-photos.sql`).
+
+   **`private/` is git-ignored and must stay that way.** It holds children's dates
+   of birth, parents' contacts, home addresses and photos. Anything in `public/` or
+   imported by `src/` ends up in the public website files, so personal data only
+   ever reaches the app through Supabase, after someone signs in.
 3. Teachers (head only) → add each teacher with their sign-in email and tick the
    learning areas they may edit and/or the year groups they are homeroom for.
    **Create login** makes a Supabase account with a temporary password.
@@ -179,7 +188,7 @@ with the message filled in; you attach the file by hand.
    Workspace (no test users or review needed); otherwise External and add the office
    accounts as test users. Data access / scopes: add `.../auth/gmail.compose`.
 4. Clients → Create client → **Web application**. Authorized JavaScript origins:
-   `https://bowenpra.github.io` and `http://localhost:5178`.
+   `https://current.pra.edu.vn` and `http://localhost:5178`.
 5. Copy the client ID into `.env` as `VITE_GOOGLE_CLIENT_ID=...`, then
    `npm run deploy`.
 

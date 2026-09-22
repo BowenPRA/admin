@@ -1,6 +1,7 @@
 import { fmt, fmtDate } from './money'
 import { docTotals } from './pricing'
 import { SENDER } from './gmail'
+import { centerName } from './invoicePdfLayout'
 
 export function invoiceFilename(inv) {
   const who = String(inv.student_names || '').replace(/[^\p{L}\p{N} ]/gu, '').replace(/\s+/g, '-')
@@ -16,7 +17,7 @@ export function emailTemplate(inv, fees) {
   const b = fees.bank
   const subject = vi
     ? `Palm River Academy – Thông báo học phí ${period}, năm học ${inv.school_year} (${inv.student_names})`
-    : `Palm River Academy – Fee announcement for ${period}, ${inv.school_year} (${inv.student_names})`
+    : `Palm River Academy – Fee announcement for ${period}, academic year ${inv.school_year} (${inv.student_names})`
   const text = vi
     ? `Kính gửi Quý phụ huynh,
 
@@ -31,15 +32,15 @@ Thông tin chuyển khoản:
   Số tài khoản: ${b.number}
   Ngân hàng: ${b.branch} (SWIFT: ${b.swift})
 
-Phụ huynh chuyển tiền xong vui lòng chụp ảnh màn hình giao dịch thành công gửi lại cho nhà trường để đối chiếu.
+Phụ huynh chuyển tiền xong vui lòng chụp ảnh màn hình giao dịch thành công gửi lại cho trung tâm để đối chiếu.
 
 Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ ${SENDER}.
 
 Trân trọng,
-Palm River Academy`
+${centerName(fees.school, true)}`
     : `Dear Parents,
 
-Please find attached the fee announcement for ${period}, ${inv.school_year} for ${inv.student_names}.
+Please find attached the fee announcement for ${period}, academic year ${inv.school_year}, for ${inv.student_names}.
 
 Total payment: ${fmt(total)} VND
 Due date: ${due}
@@ -55,6 +56,6 @@ After transferring, please send us a screenshot of the successful payment so we 
 If you have any questions, just reply to this email or write to ${SENDER}.
 
 Kind regards,
-Palm River Academy`
+${centerName(fees.school, false)}`
   return { subject, text }
 }

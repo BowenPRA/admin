@@ -1,4 +1,7 @@
 import { genId } from '../db'
+import { TEXT_LIMITS, TEXT_MINIMUMS } from './defaults'
+import { legalFirstName } from '../names'
+import { classForYearGroup } from '../schedule'
 
 export const fmtDate = (d, opts) => {
   if (!d) return ''
@@ -18,6 +21,27 @@ export function levelInfo(settings, value) {
 
 export function templateForYearGroup(settings, yg) {
   return Object.values(settings?.templates || {}).find((t) => (t.yearGroups || []).includes(yg)) || null
+}
+
+/** The template a report was made from (or, failing that, the one for its year group). */
+export const templateOf = (settings, report) =>
+  settings?.templates?.[report?.template] || templateForYearGroup(settings, report?.year_group) || null
+
+/** Whether this report's year group has progress review scores (a template can limit them, e.g. Primary: Years 4 to 6). */
+export function hasReviewScores(settings, report) {
+  const only = templateOf(settings, report)?.scoreYearGroups
+  return !Array.isArray(only) || only.includes(report?.year_group)
+}
+
+/** Character limits for a report's boxes: the standard ones, raised where its template says (Early Years Applied English). */
+export const textLimits = (settings, report) => ({ ...TEXT_LIMITS, ...(templateOf(settings, report)?.limits || {}) })
+/** Suggested minimums, likewise. */
+export const textMinimums = (settings, report) => ({ ...TEXT_MINIMUMS, ...(templateOf(settings, report)?.minimums || {}) })
+
+/** The learner skills rated on a report: its template's own (Early Years) or the shared ones. */
+export function skillGroupsFor(settings, report) {
+  const own = templateOf(settings, report)?.skillGroups
+  return (Array.isArray(own) && own.length ? own : settings?.skillGroups) || []
 }
 
 export const TIER_KEYS = ['academic', 'specialist', 'vocational']
@@ -47,15 +71,45 @@ export function areasFor(settings, template, yearGroup) {
 
 /** Areas a report should have but does not, e.g. Movement on a report created before it was added. */
 export function missingAreas(settings, report, sections) {
-  const template = settings?.templates?.[report.template] || templateForYearGroup(settings, report.year_group)
+  const template = templateOf(settings, report)
   if (!template) return []
   return areasFor(settings, template, report.year_group).filter((k) => !sections.some((s) => s.subject_key === k))
 }
 
-/** "Mr. Caleb" for the active teacher linked to `movement:Year 7`, or ''. */
+/** "Mr. Caleb" for the active teacher(s) linked to `movement:Year 7` on the Teachers page, or ''. */
 export function teacherNameFor(teachers, key, yearGroup) {
-  const t = (teachers || []).find((x) => x.active !== false && (x.subjects || []).includes(`${key}:${yearGroup}`))
-  return t ? `${t.title ? `${t.title} ` : ''}${t.name}` : ''
+  return (teachers || [])
+    .filter((x) => x.active !== false && (x.subjects || []).includes(`${key}:${yearGroup}`))
+    .map((t) => `${t.title ? `${t.title} ` : ''}${t.name}`)
+    .join(' & ')
+}
+
+/**
+ * The teacher shown for a learning area. The Teachers page is the source, so
+ * existing reports follow changes there; a name typed on the report is used
+ * only while nobody is linked to that area and year group.
+ */
+export const sectionTeacher = (teachers, section, yearGroup) =>
+  teacherNameFor(teachers, section.subject_key, yearGroup) || section.teacher_name || ''
+
+/** "Ms. Kiu": the homeroom teacher of the class a year group follows on the Schedule, or ''. */
+export const scheduledHomeroom = (schedule, yearGroup) =>
+  String((schedule && yearGroup && classForYearGroup(schedule, yearGroup)?.homeroom) || '').trim()
+
+/**
+ * The homeroom teacher shown on a report. The Schedule is the source, so
+ * existing reports follow changes there; the name saved on the report is used
+ * only while the Schedule has no homeroom teacher for that year group.
+ */
+export const reportHomeroom = (schedule, report) =>
+  scheduledHomeroom(schedule, report?.year_group) || report?.homeroom_teacher || ''
+
+export const isHomeroomSignature = (sg) => /homeroom/i.test(sg?.role || '')
+
+/** Signature lines, with the homeroom teacher's line named from the Schedule. */
+export function reportSignatures(schedule, report) {
+  const homeroom = scheduledHomeroom(schedule, report?.year_group)
+  return (report?.signatures || []).map((sg) => (homeroom && isHomeroomSignature(sg) ? { ...sg, name: homeroom } : sg))
 }
 
 export function buildSection(reportId, key, settings, { yearGroup, prev, teachers } = {}) {
@@ -101,7 +155,7 @@ export function buildReport(student, period, template, settings, homeroom = '') 
     status: 'draft',
     lang: 'en',
     show_course_notes: false,
-    signatures: (settings.signatures || []).map((s) => ({ ...s })),
+    signatures: (settings.signatures || []).map((s) => (homeroom && isHomeroomSignature(s) && !s.name ? { ...s, name: homeroom } : { ...s })),
   }
 }
 
@@ -115,6 +169,41 @@ export function completion(report, sections, settings) {
   const total = sections.length + 1
   const done = sections.filter((s) => sectionDone(settings, s)).length + ((report.homeroom_note || '').trim() ? 1 : 0)
   return { done, total, pct: Math.round((done / total) * 100) }
+}
+
+export const HOMEROOM_PART = '_homeroom'
+
+/**
+ * One person's own share of the writing in a set of reports: the learning areas on
+ * their Teachers row (`english:Year 7`) plus the homeroom comment for their homeroom
+ * year groups. Heads may edit everything, but only what is assigned to them counts.
+ * Parts of published reports count as done.
+ *   { done, total, groups: [{ yearGroup, done, total, areas: [{ key, name, done, total }] }] }
+ * Areas follow the order of settings.subjects, with the homeroom comment last.
+ */
+export function reportWork(settings, reports, sections, { subjects = [], homeroom_groups = [] } = {}) {
+  const byReport = new Map()
+  for (const s of sections) byReport.set(s.report_id, [...(byReport.get(s.report_id) || []), s])
+  const groups = new Map()
+  const tally = (yearGroup, key, done) => {
+    if (!groups.has(yearGroup)) groups.set(yearGroup, { yearGroup, done: 0, total: 0, areas: new Map() })
+    const g = groups.get(yearGroup)
+    if (!g.areas.has(key)) g.areas.set(key, { key, name: key === HOMEROOM_PART ? 'Homeroom' : subjectByKey(settings, key).name, done: 0, total: 0 })
+    const a = g.areas.get(key)
+    a.total++; g.total++
+    if (done) { a.done++; g.done++ }
+  }
+  for (const r of reports) {
+    const published = r.status === 'published'
+    for (const s of byReport.get(r.id) || []) {
+      if (subjects.includes(`${s.subject_key}:${r.year_group}`)) tally(r.year_group, s.subject_key, published || sectionDone(settings, s))
+    }
+    if (homeroom_groups.includes(r.year_group)) tally(r.year_group, HOMEROOM_PART, published || !!(r.homeroom_note || '').trim())
+  }
+  const keys = (settings?.subjects || []).map((s) => s.key)
+  const order = (k) => (k === HOMEROOM_PART ? Infinity : keys.includes(k) ? keys.indexOf(k) : keys.length)
+  const list = [...groups.values()].map((g) => ({ ...g, areas: [...g.areas.values()].sort((a, b) => order(a.key) - order(b.key)) }))
+  return { done: list.reduce((n, g) => n + g.done, 0), total: list.reduce((n, g) => n + g.total, 0), groups: list }
 }
 
 export const hasNum = (v) => v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v))
@@ -150,6 +239,7 @@ export const isNA = (raw) => /^\s*n\s*\/?\s*a\s*$/i.test(raw || '')
  * (earlier reports show TBD).
  */
 export function reviewRows(settings, { report, sections, history = [], cohortAvg = {}, summativeAvg = {} }) {
+  if (!hasReviewScores(settings, report)) return []
   const periods = settings?.periods || []
   const cur = Number(report.period_index)
   const last = Math.max(...periods.map((p) => Number(p.index)), cur)
@@ -180,12 +270,15 @@ export function avg(nums) {
   return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null
 }
 
-export const firstName = (student) => (student?.nickname || student?.full_name || '').split(' ')[0]
+// Reports use the student's legal first name, never the nickname.
+export const firstName = (student) => legalFirstName(student).name
 
 export const charCount = (t) => (t || '').trim().length
 
 export function currentPeriod(settings) {
-  const t = new Date().toISOString().slice(0, 10)
+  // Today in local time (toISOString is UTC: still yesterday until 7am in Vietnam).
+  const d = new Date()
+  const t = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   const ps = settings?.periods || []
   return ps.find((p) => p.start <= t && t <= p.end) || ps.find((p) => t < p.start) || ps[ps.length - 1] || null
 }

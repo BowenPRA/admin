@@ -1,55 +1,64 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { Printer, ArrowLeft, Minimize2 } from 'lucide-react'
-import ReportDocument from '../../components/report/ReportDocument'
+import { ArrowLeft, Download } from 'lucide-react'
 import { Spinner } from '../../components/ui'
+import { ReportCheckNotes } from '../../components/report/ReportPdfPreview'
 import { useData } from '../../lib/DataContext'
+import { downloadBlob } from '../../lib/pdf'
 import { loadReportBundle } from '../../lib/report/loaders'
-import { LANG_NAMES } from '../../lib/report/strings'
+import { reportPdf, reportFilename } from '../../lib/report/reportPdf'
 
-// The invoice pages print with a 10mm page margin; the report sheet carries its
-// own padding, so the margin is switched off here.
-export const PAGE_STYLE = '@page { size: A4; margin: 0; } @media print { .rpt .sheet { width: 210mm; } }'
-
-/** One report, printed as an English page or a Vietnamese page (each saves as its own PDF). */
+/**
+ * One report's PDF in the browser's PDF viewer, to print or save: an English
+ * page or a Vietnamese page (each is its own PDF).
+ */
 export default function PrintReport() {
   const { id } = useParams()
   const [params, setParams] = useSearchParams()
   const lang = params.get('lang') === 'vi' ? 'vi' : 'en'
-  const { reportSettings: settings } = useData()
+  const { reportSettings: settings, teachers, schedule } = useData()
   const [bundle, setBundle] = useState(null)
+  const [pdf, setPdf] = useState(null)
   const [err, setErr] = useState('')
-  const [compact, setCompact] = useState(false)
-  const [check, setCheck] = useState({ overflow: 0, untranslated: 0 })
 
   useEffect(() => { loadReportBundle(id).then(setBundle).catch((e) => setErr(e.message)) }, [id])
-  // The title becomes the PDF file name, so each language saves separately.
-  useEffect(() => { if (bundle) document.title = `${bundle.student?.full_name} – ${bundle.report.period_label} ${bundle.report.school_year} (${LANG_NAMES[lang]})` }, [bundle, lang])
+  useEffect(() => { if (bundle) document.title = reportFilename(bundle, lang).replace(/\.pdf$/, '') }, [bundle, lang])
+  useEffect(() => {
+    if (!bundle || !settings) return
+    let url = null
+    let alive = true
+    reportPdf([{ bundle, lang }], { settings, teachers, schedule })
+      .then(({ blob, checks }) => {
+        if (!alive) return
+        url = URL.createObjectURL(blob)
+        setPdf({ blob, url, lang, check: checks[0] })
+      })
+      .catch((e) => { if (alive) setErr(e.message || String(e)) })
+    return () => { alive = false; if (url) URL.revokeObjectURL(url) }
+  }, [bundle, settings, teachers, schedule, lang])
 
   if (err) return <div className="p-8 text-red-600">{err}</div>
   if (!bundle || !settings) return <Spinner />
   const setLang = (l) => setParams(l === 'vi' ? { lang: 'vi' } : {}, { replace: true })
   return (
-    <div className="min-h-screen bg-slate-200">
-      <style>{PAGE_STYLE}</style>
-      <div className="no-print sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-slate-300 bg-white/95 px-4 py-2 backdrop-blur">
-        <Link to={`/reports/${id}`} className="btn-ghost"><ArrowLeft size={16} /> Back to editor</Link>
-        <span className="flex-1 truncate text-sm font-semibold text-slate-700">{bundle.student?.full_name} · {bundle.report.period_label} {bundle.report.school_year}</span>
-        {check.overflow > 0 && <span className="text-xs font-semibold text-red-600">{check.overflow} box{check.overflow === 1 ? ' is' : 'es are'} too full (outlined in red){compact ? '' : ' · try Compact'}</span>}
-        {lang === 'vi' && check.untranslated > 0 && <span className="text-xs font-semibold text-amber-700">{check.untranslated} part{check.untranslated === 1 ? ' has' : 's have'} no Vietnamese yet and print in English (highlighted)</span>}
-        <div className="seg" role="group" aria-label="Report language">
-          <button type="button" aria-pressed={lang === 'en'} onClick={() => setLang('en')}>English</button>
-          <button type="button" aria-pressed={lang === 'vi'} onClick={() => setLang('vi')}>Tiếng Việt</button>
-        </div>
-        <button className={compact ? 'btn-primary' : 'btn-secondary'} onClick={() => setCompact((v) => !v)} title="Smaller text if a page overflows"><Minimize2 size={16} /> Compact</button>
-        <button className="btn-primary" onClick={() => window.print()}><Printer size={16} /> Print / Save PDF</button>
+    <div className="flex h-screen flex-col bg-slate-200">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-300 bg-white px-4 py-2">
+        <Link to={`/reports/${id}`} className="btn-secondary"><ArrowLeft size={16} /> Back to editor</Link>
+        <span className="truncate text-sm font-semibold text-slate-700">{bundle.student?.full_name} · {bundle.report.period_label} {bundle.report.school_year}</span>
+        <div className="flex-1" />
+        <span className="hidden text-xs text-slate-500 lg:inline">Print or save from the PDF viewer</span>
+        {bundle.report.lang === 'bi' || lang === 'vi' ? (
+          <div className="seg" role="group" aria-label="Report language">
+            <button type="button" aria-pressed={lang === 'en'} onClick={() => setLang('en')}>English</button>
+            <button type="button" aria-pressed={lang === 'vi'} onClick={() => setLang('vi')}>Tiếng Việt</button>
+          </div>
+        ) : null}
+        <button className="btn-primary" disabled={pdf?.lang !== lang} onClick={() => downloadBlob(pdf.blob, reportFilename(bundle, lang))}><Download size={16} /> Download PDF</button>
       </div>
-      <div className="py-6 print:py-0">
-        <div className="mx-auto shadow-xl print:shadow-none" style={{ width: '210mm' }}>
-          <ReportDocument {...bundle} settings={settings} compact={compact} lang={lang}
-            onCheck={(c) => setCheck((cur) => (cur.overflow === c.overflow && cur.untranslated === c.untranslated ? cur : c))} />
-        </div>
-      </div>
+      {pdf?.check && (pdf.check.overflow > 0 || (lang === 'vi' && pdf.check.untranslated > 0)) && (
+        <ReportCheckNotes check={{ ...pdf.check, shrunk: 0 }} lang={lang} className="border-b border-slate-300 bg-white px-4 py-1.5" />
+      )}
+      {pdf ? <iframe key={pdf.url} title="Learning Progress Report" src={pdf.url} className="w-full flex-1 border-0" /> : <Spinner />}
     </div>
   )
 }

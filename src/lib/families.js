@@ -2,8 +2,10 @@
 // email (or a parent phone number) belong together. Returns proposals; the
 // caller decides whether to save them.
 
-const VN_SURNAMES = ['nguyễn', 'trần', 'lê', 'phạm', 'hoàng', 'huỳnh', 'phan', 'vũ', 'võ', 'đặng', 'bùi', 'đỗ', 'hồ', 'ngô', 'dương', 'lý', 'đinh', 'trịnh', 'mai', 'tạ', 'lai', 'lưu', 'lương', 'cao', 'đoàn', 'vương', 'trương']
-const VN_CHARS = /[ăâđêôơưĂÂĐÊÔƠƯàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/
+import { isPast } from './studentRecords.js'
+
+export const VN_SURNAMES = ['nguyễn', 'trần', 'lê', 'phạm', 'hoàng', 'huỳnh', 'phan', 'vũ', 'võ', 'đặng', 'bùi', 'đỗ', 'hồ', 'ngô', 'dương', 'lý', 'đinh', 'trịnh', 'mai', 'tạ', 'lai', 'lưu', 'lương', 'cao', 'đoàn', 'vương', 'trương']
+export const VN_CHARS = /[ăâđêôơưĂÂĐÊÔƠƯàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/
 
 export function emailsOf(s) {
   return String(s.parents_email || '').split(/[,;\s]+/).map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@'))
@@ -36,7 +38,8 @@ export function familyNameFor(kids) {
  * Returns { create: [{ name, email, phone, language, studentIds }], attach: [{ familyId, studentIds }] }
  */
 export function proposeFamilies(students, families) {
-  const active = students.filter((s) => s.active !== false)
+  // Pending students are grouped too — a family is what an invoice is built from.
+  const active = students.filter((s) => !isPast(s))
   const parent = new Map(active.map((s) => [s.id, s.id]))
   const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x) } return x }
   const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent.set(ra, rb) }
@@ -67,7 +70,7 @@ export function proposeFamilies(students, families) {
       studentIds: kids.map((k) => k.id), names: kids.map((k) => k.nickname || k.full_name),
     })
   }
-  // Two families with the same label (two boys called Louis) get the surname added.
+  // Two families with the same label (two children with the same first name) get the surname added.
   const counts = {}
   create.forEach((c) => { counts[c.name] = (counts[c.name] || 0) + 1 })
   create.forEach((c) => {

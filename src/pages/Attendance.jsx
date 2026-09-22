@@ -7,6 +7,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { LEVELS } from '../lib/fees'
 import { photoSrc } from '../lib/report/photo'
+import { isEnrolled } from '../lib/studentRecords'
 import { Card, Empty, Spinner, Avatar, Segmented, PageHeader } from '../components/ui'
 
 // Daily attendance: one mark per student per school day. Separate from
@@ -36,7 +37,7 @@ export default function Attendance() {
   const [tab, setTab] = useState('take')
   const scoped = !isOffice && !!myYearGroups
 
-  const enrolled = useMemo(() => students.filter((s) => s.active !== false), [students])
+  const enrolled = useMemo(() => students.filter(isEnrolled), [students])
   const groups = useMemo(() => [...new Set(enrolled.map((s) => s.level).filter(Boolean))].sort((a, b) => levelIndex(a) - levelIndex(b)), [enrolled])
   const myGroups = useMemo(() => {
     const allowed = groups.filter(canAttendance)
@@ -73,7 +74,6 @@ function TakeAttendance({ students, groups }) {
   // Marks for the loaded date: student_id -> row. `null` while another date loads.
   const [loaded, setLoaded] = useState({ date: null, map: {} })
   const marks = loaded.date === date ? loaded.map : null
-  const setMarks = (fn) => setLoaded((cur) => ({ date, map: typeof fn === 'function' ? fn(cur.map) : fn }))
   const [noteOpen, setNoteOpen] = useState({})
   const [noteDraft, setNoteDraft] = useState({})
   const activeGroup = groups.includes(group) ? group : groups[0]
@@ -88,17 +88,43 @@ function TakeAttendance({ students, groups }) {
 
   const kids = useMemo(() => students.filter((s) => s.level === activeGroup).sort((a, b) => (a.nickname || a.full_name).localeCompare(b.nickname || b.full_name)), [students, activeGroup])
 
+  // Changes apply to the day they were made on: a slow reply never lands in another day's list.
+  const applyTo = (day, fn) => setLoaded((cur) => (cur.date === day ? { date: day, map: fn(cur.map) } : cur))
   const save = async (rows) => {
-    const prev = marks
-    const next = { ...marks }
-    rows.forEach((r) => { next[r.student_id] = { ...(marks[r.student_id] || {}), ...r } })
-    setMarks(next)
+    const day = date
+    const before = Object.fromEntries(rows.map((r) => [r.student_id, marks[r.student_id]]))
+    const full = rows.map((r) => ({ date: day, year_group: activeGroup, taken_by: displayName, note: marks[r.student_id]?.note || null, ...r }))
+    applyTo(day, (m) => { const n = { ...m }; full.forEach((r) => { n[r.student_id] = { ...(m[r.student_id] || {}), ...r } }); return n })
     try {
-      const saved = await db.attendance.mark(rows.map((r) => ({ date, year_group: activeGroup, taken_by: displayName, note: marks[r.student_id]?.note || null, ...r })))
-      setMarks((cur) => { const m = { ...cur }; saved.forEach((r) => { m[r.student_id] = r }); return m })
-    } catch (e) { setMarks(prev); toast.error(e.message) }
+      const saved = await db.attendance.mark(full)
+      applyTo(day, (m) => { const n = { ...m }; saved.forEach((r) => { n[r.student_id] = r }); return n })
+      return true
+    } catch (e) {
+      // Put back only the rows that failed, so marks made in the meantime stay.
+      applyTo(day, (m) => { const n = { ...m }; rows.forEach((r) => { if (before[r.student_id]) n[r.student_id] = before[r.student_id]; else delete n[r.student_id] }); return n })
+      toast.error(e.message)
+      return false
+    }
   }
-  const setStatus = (s, status) => save([{ student_id: s.id, status }])
+  // Tapping the chosen status again takes the mark off (e.g. the wrong student was tapped).
+  const clearMark = async (s) => {
+    const day = date
+    const row = marks[s.id]
+    if (!row) return
+    if (row.note && !confirm(t('clearMarkConfirm', { name: s.nickname || s.full_name }))) return
+    applyTo(day, (m) => { const n = { ...m }; delete n[s.id]; return n })
+    setNoteDraft((d) => { const n = { ...d }; delete n[s.id]; return n })
+    setNoteOpen((o) => ({ ...o, [s.id]: false }))
+    try {
+      // A mark still being saved has no id yet: save it first so there is a row to remove.
+      const id = row.id || (await db.attendance.mark([{ date: day, year_group: activeGroup, taken_by: displayName, note: null, student_id: s.id, status: row.status }]))[0]?.id
+      await db.attendance.clear(id)
+    } catch (e) {
+      applyTo(day, (m) => (m[s.id] ? m : { ...m, [s.id]: row }))
+      toast.error(e.message)
+    }
+  }
+  const setStatus = (s, status) => (marks[s.id]?.status === status ? clearMark(s) : save([{ student_id: s.id, status }]))
   const saveNote = (s) => {
     const note = (noteDraft[s.id] ?? marks[s.id]?.note ?? '').trim()
     if (note === (marks[s.id]?.note || '')) return
@@ -107,9 +133,9 @@ function TakeAttendance({ students, groups }) {
   const markRestPresent = async () => {
     const rest = kids.filter((s) => !marks[s.id])
     if (!rest.length) return
-    await save(rest.map((s) => ({ student_id: s.id, status: 'present' })))
+    const ok = await save(rest.map((s) => ({ student_id: s.id, status: 'present' })))
     // On phones the bottom bar already turns to "All marked"; a toast would cover it.
-    if (!isPhone()) toast(t('attendanceSaved'))
+    if (ok && !isPhone()) toast(t('attendanceSaved'))
   }
 
   const counts = STATUSES.reduce((m, st) => ({ ...m, [st.key]: kids.filter((s) => marks?.[s.id]?.status === st.key).length }), {})
@@ -197,9 +223,9 @@ function TakeAttendance({ students, groups }) {
                       {m?.note && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-pra-blue sm:right-1 sm:top-1" />}
                     </button>
                     {/* Phones: four big buttons on their own line under the name. */}
-                    <div className="grid basis-full grid-cols-4 gap-1.5 sm:flex sm:basis-auto sm:gap-1" role="radiogroup" aria-label={s.full_name}>
+                    <div className="grid basis-full grid-cols-4 gap-1.5 sm:flex sm:basis-auto sm:gap-1" role="group" aria-label={s.full_name}>
                       {STATUSES.map((st) => (
-                        <button key={st.key} type="button" role="radio" aria-checked={m?.status === st.key} title={t(st.key)} onClick={tap(() => setStatus(s, st.key))}
+                        <button key={st.key} type="button" aria-pressed={m?.status === st.key} title={m?.status === st.key ? t('tapToClear') : t(st.key)} onClick={tap(() => setStatus(s, st.key))}
                           className={`h-11 touch-manipulation select-none rounded-lg border px-0.5 text-xs font-bold transition active:scale-95 min-[350px]:text-[13px] sm:h-9 sm:min-w-[4.5rem] sm:px-2 sm:text-sm ${m?.status === st.key ? st.on : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'}`}>
                           {t(st.key)}
                         </button>
@@ -216,6 +242,7 @@ function TakeAttendance({ students, groups }) {
           </ul>
         )}
       </Card>
+      {marks && done > 0 && <p className="text-xs text-slate-400">{t('unmarkHint')}</p>}
       {marks && kids.some((s) => marks[s.id]?.taken_by) && (
         <p className="text-xs text-slate-400">{t('takenBy', { name: [...new Set(kids.map((s) => marks[s.id]?.taken_by).filter(Boolean))].join(', ') })}</p>
       )}

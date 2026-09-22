@@ -1,7 +1,8 @@
 // Invoice → PDF → Gmail draft in admin@'s Drafts folder, ready to review and send.
 
 import { db } from './db'
-import { nodeToPdfBlob, blobToBase64 } from './pdf'
+import { blobToBase64 } from './pdf'
+import { invoicePdfBlob } from './invoicePdf'
 import { createDraft } from './gmail'
 import { invoiceFilename, emailTemplate } from './invoiceEmail'
 import { docTotals } from './pricing'
@@ -16,22 +17,14 @@ export function invoiceRecipients(inv, families = [], students = []) {
   return [...new Set([...fromFam, ...kids.flatMap(emailsOf)])].join(', ')
 }
 
-/** Resolves once the document's images (logo, QR) have loaded, so they appear in the PDF. */
-export async function waitForImages(node) {
-  const imgs = [...node.querySelectorAll('img')]
-  await Promise.all(imgs.map((img) => (img.complete ? null : new Promise((r) => { img.onload = r; img.onerror = r }))))
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
-}
-
 /**
- * Renders the PDF from `node` (a full-size InvoiceDocument) and saves a Gmail draft.
+ * Makes the invoice PDF and saves a Gmail draft with it attached.
  * Subject and text default to the invoice's email template.
  */
-export async function draftInvoice({ inv, fees, node, to, cc = '', subject, text }) {
+export async function draftInvoice({ inv, fees, to, cc = '', subject, text }) {
   if (!to) throw new Error(`${inv.number}: no parent email on file. Add one to the family, then try again.`)
-  await waitForImages(node)
   const tpl = emailTemplate(inv, fees)
-  const blob = await nodeToPdfBlob(node)
+  const blob = await invoicePdfBlob(inv, fees)
   const draft = await createDraft({
     to, cc, subject: subject || tpl.subject, text: text || tpl.text,
     attachment: { filename: invoiceFilename(inv), base64: await blobToBase64(blob) },

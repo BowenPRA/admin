@@ -217,7 +217,7 @@ export function ReportStatusChip({ status }) {
   return <Chip tone={tone}>{label}</Chip>
 }
 
-/** Picks one of the configured progress levels (1-4). Renders as coloured circles. */
+/** Picks one of the configured progress levels, in scale order. Renders as coloured circles. */
 export function LevelPicker({ value, onChange, levels, disabled, size = 'md' }) {
   const dim = size === 'sm' ? 'h-7 w-7 text-xs' : 'h-9 w-9 text-sm'
   return (
@@ -225,7 +225,7 @@ export function LevelPicker({ value, onChange, levels, disabled, size = 'md' }) 
       {levels.map((l) => {
         const on = Number(value) === l.value
         return (
-          <button key={l.value} type="button" disabled={disabled} title={`${l.name} (${l.value})`}
+          <button key={l.value} type="button" disabled={disabled} title={l.short ? `${l.name} · ${l.short}` : l.name}
             onClick={() => onChange(on ? null : l.value)}
             className={`${dim} rounded-full font-extrabold transition-all ${on ? 'text-white ring-2 ring-offset-2 ring-slate-300 scale-105' : 'bg-white text-slate-400 border border-slate-300 hover:border-slate-400'} disabled:cursor-not-allowed disabled:opacity-60`}
             style={on ? { background: l.color } : undefined}>
@@ -246,7 +246,7 @@ export function SaveState({ state }) {
 }
 
 /** Editable list of short lines. */
-export function BulletList({ items, onChange, disabled, placeholder = 'Add a line…', max = 6 }) {
+export function BulletList({ items, onChange, disabled, placeholder = 'Add a line…', max = 6, inputProps }) {
   const list = items || []
   const set = (i, v) => onChange(list.map((x, j) => (j === i ? v : x)))
   return (
@@ -254,7 +254,7 @@ export function BulletList({ items, onChange, disabled, placeholder = 'Add a lin
       {list.map((it, i) => (
         <div key={i} className="flex items-center gap-2">
           <span className="text-slate-400">•</span>
-          <input className="input" value={it} disabled={disabled} onChange={(e) => set(i, e.target.value)} />
+          <input className="input" value={it} disabled={disabled} onChange={(e) => set(i, e.target.value)} {...inputProps} />
           {!disabled && <button type="button" className="btn-ghost px-2" onClick={() => onChange(list.filter((_, j) => j !== i))}>✕</button>}
         </div>
       ))}
