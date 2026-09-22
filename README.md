@@ -155,7 +155,7 @@ the SQL editor. It adds `q4_full` to students and the sent-email columns to invo
 - **Families.** Each family has a list of parents / guardians (name, relation, email,
   phone). The family email is kept in step because invoices are sent to it.
   *Missing email or phone* on the Families tab lists families to follow up.
-- **Attendance.** Pick a day and a year group, tap Present / Late / Absent / Excused
+- **Attendance.** Pick a day and a year group, tap Present / Late / Absent
   (or *Mark everyone else present*). *Summary* totals each student by month, quarter
   or year against the PRA calendar and highlights anyone under 90%.
 

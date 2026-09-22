@@ -18,9 +18,11 @@ const STATUSES = [
   { key: 'present', on: 'bg-green-600 text-white border-green-600', soft: 'bg-green-100 text-green-800', stripe: 'shadow-[inset_4px_0_0_#16a34a]', bar: 'bg-green-600' },
   { key: 'late', on: 'bg-amber-500 text-white border-amber-500', soft: 'bg-amber-100 text-amber-800', stripe: 'shadow-[inset_4px_0_0_#f59e0b]', bar: 'bg-amber-500' },
   { key: 'absent', on: 'bg-red-600 text-white border-red-600', soft: 'bg-red-100 text-red-700', stripe: 'shadow-[inset_4px_0_0_#dc2626]', bar: 'bg-red-600' },
-  { key: 'excused', on: 'bg-sky-600 text-white border-sky-600', soft: 'bg-sky-100 text-sky-800', stripe: 'shadow-[inset_4px_0_0_#0284c7]', bar: 'bg-sky-600' },
 ]
 const STATUS = Object.fromEntries(STATUSES.map((st) => [st.key, st]))
+// PRA does not use "excused" (removed 22 September 2026): older marks read as absent.
+// supabase/updates-2026-09-22-no-excused.sql changes the saved rows too.
+const asMarked = (r) => (r.status === 'excused' ? { ...r, status: 'absent' } : r)
 const GROUP_KEY = 'pra-attendance-group'
 const isPhone = () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 639px)').matches
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -81,7 +83,7 @@ function TakeAttendance({ students, groups }) {
   useEffect(() => {
     let alive = true
     db.attendance.list({ date })
-      .then((rows) => alive && setLoaded({ date, map: Object.fromEntries(rows.map((r) => [r.student_id, r])) }))
+      .then((rows) => alive && setLoaded({ date, map: Object.fromEntries(rows.map((r) => [r.student_id, asMarked(r)])) }))
       .catch((e) => { toast.error(e.message); if (alive) setLoaded({ date, map: {} }) })
     return () => { alive = false }
   }, [date]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -238,7 +240,7 @@ function TakeAttendance({ students, groups }) {
                       {m?.note && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-pra-blue sm:right-1 sm:top-1" />}
                     </button>
                     {/* Phones: four big buttons on their own line under the name. */}
-                    <div className="grid basis-full grid-cols-4 gap-1.5 sm:flex sm:basis-auto sm:gap-1" role="group" aria-label={s.full_name}>
+                    <div className="grid basis-full grid-cols-3 gap-1.5 sm:flex sm:basis-auto sm:gap-1" role="group" aria-label={s.full_name}>
                       {STATUSES.map((st) => (
                         <button key={st.key} type="button" aria-pressed={m?.status === st.key} title={m?.status === st.key ? t('tapToClear') : t(st.key)} onClick={tap(() => setStatus(s, st.key))}
                           className={`h-11 touch-manipulation select-none rounded-lg border px-0.5 text-xs font-bold transition active:scale-95 min-[350px]:text-[13px] sm:h-9 sm:min-w-[4.5rem] sm:px-2 sm:text-sm ${m?.status === st.key ? st.on : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'}`}>
@@ -320,7 +322,7 @@ function Summary({ students, groups }) {
     let alive = true
     const [from, to] = rangeKey.split('|')
     db.attendance.between(from, to)
-      .then((r) => alive && setLoaded({ key: rangeKey, rows: r }))
+      .then((r) => alive && setLoaded({ key: rangeKey, rows: r.map(asMarked) }))
       .catch((e) => { toast.error(e.message); if (alive) setLoaded({ key: rangeKey, rows: [] }) })
     return () => { alive = false }
   }, [rangeKey]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -330,7 +332,7 @@ function Summary({ students, groups }) {
     const inGroups = students.filter((s) => groups.includes(s.level) && (!group || s.level === group))
     return inGroups.map((s) => {
       const mine = rows.filter((r) => r.student_id === s.id)
-      const c = { present: 0, late: 0, absent: 0, excused: 0 }
+      const c = { present: 0, late: 0, absent: 0 }
       mine.forEach((r) => { c[r.status] = (c[r.status] || 0) + 1 })
       const marked = mine.length
       const rate = marked ? Math.round(((c.present + c.late) / marked) * 100) : null

@@ -316,7 +316,6 @@ const STRINGS = {
   present: ['Present', 'Có mặt'],
   absent: ['Absent', 'Vắng'],
   late: ['Late', 'Đi trễ'],
-  excused: ['Excused', 'Có phép'],
   notMarked: ['Not marked', 'Chưa điểm danh'],
   markAllPresent: ['Mark everyone else present', 'Đánh dấu còn lại có mặt'],
   attendanceSaved: ['Attendance saved', 'Đã lưu điểm danh'],
