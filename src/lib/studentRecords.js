@@ -14,6 +14,15 @@ export const statusOf = (s) => (STATUSES.includes(s?.status) ? s.status : (s?.ac
 export const isEnrolled = (s) => statusOf(s) === 'active'
 export const isPending = (s) => statusOf(s) === 'pending'
 export const isPast = (s) => statusOf(s) === 'inactive'
+/**
+ * Partial-day students join after the morning lessons: `partial_from` is the
+ * time they arrive (e.g. "11:35"), blank for a full day. Mornings are the
+ * academic lessons (Mathematics, Science, English), so their progress reports
+ * have only specialist and vocational learning, and attendance does not mark
+ * them present before they arrive. Needs supabase/updates-2026-09-22-partial-day.sql.
+ */
+export const DEFAULT_PARTIAL_FROM = '11:35'
+export const partialFrom = (s) => String(s?.partial_from || '').trim()
 /** Pending students are billed like enrolled ones — that is how they start. */
 export const isBillable = (s) => statusOf(s) !== 'inactive'
 export const withStatus = (s, status) => ({ ...s, status, active: status === 'active' })

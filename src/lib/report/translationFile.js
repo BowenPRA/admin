@@ -2,7 +2,7 @@
 // one JSON file, has Claude (desktop app) fill in the Vietnamese, then uploads
 // the file Claude returns. Nothing is sent anywhere by the app itself.
 
-import { subjectByKey, sectionsByTier, TIER_KEYS, templateOf, templateForYearGroup, textLimits } from './utils'
+import { subjectByKey, sectionsByTier, studentSections, TIER_KEYS, templateOf, templateForYearGroup, textLimits } from './utils'
 import { reportTitle, voiceQuoted } from './strings'
 import { legalFirstName } from '../names'
 import { wordingIssues } from './wording'
@@ -88,7 +88,7 @@ export function buildTranslationFile({ reports, sections, notes, students, setti
       year_group: r.year_group,
       call_the_student: legal.name,
       nickname_do_not_use: student?.nickname && student.nickname.toLowerCase() !== legal.name.toLowerCase() ? student.nickname : '',
-      parts: reportParts(r, sections.filter((s) => s.report_id === r.id), settings).filter(keep),
+      parts: reportParts(r, studentSections(settings, sections.filter((s) => s.report_id === r.id), student), settings).filter(keep),
     }
   }).filter((r) => r.parts.length)
   const count = shared_topics.filter((p) => !filled(p.vietnamese)).length + out.reduce((n, r) => n + r.parts.filter((p) => !filled(p.vietnamese)).length, 0)

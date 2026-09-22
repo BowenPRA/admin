@@ -7,7 +7,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { LEVELS } from '../lib/fees'
 import { photoSrc } from '../lib/report/photo'
-import { isEnrolled } from '../lib/studentRecords'
+import { isEnrolled, partialFrom } from '../lib/studentRecords'
 import { Card, Empty, Spinner, Avatar, Segmented, PageHeader } from '../components/ui'
 
 // Daily attendance: one mark per student per school day. Separate from
@@ -130,12 +130,24 @@ function TakeAttendance({ students, groups }) {
     if (note === (marks[s.id]?.note || '')) return
     save([{ student_id: s.id, status: marks[s.id]?.status || 'present', note: note || null }])
   }
+  // A partial-day student (see partialFrom) is not marked present in bulk before
+  // they arrive today; the teacher marks them when they come in.
+  const minutes = (hm) => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + (m || 0) }
+  const notArrived = (s) => {
+    if (!partialFrom(s) || date !== todayIso()) return false
+    const now = new Date()
+    return now.getHours() * 60 + now.getMinutes() < minutes(partialFrom(s))
+  }
   const markRestPresent = async () => {
-    const rest = kids.filter((s) => !marks[s.id])
-    if (!rest.length) return
+    const open = kids.filter((s) => !marks[s.id])
+    const waiting = open.filter(notArrived)
+    const rest = open.filter((s) => !notArrived(s))
+    const later = waiting.length ? t('arrivesLater', { names: waiting.map((s) => s.nickname || s.full_name).join(', '), time: partialFrom(waiting[0]) }) : ''
+    if (!rest.length) { if (later) toast.info(later); return }
     const ok = await save(rest.map((s) => ({ student_id: s.id, status: 'present' })))
+    if (ok && later) toast.info(later)
     // On phones the bottom bar already turns to "All marked"; a toast would cover it.
-    if (ok && !isPhone()) toast(t('attendanceSaved'))
+    else if (ok && !isPhone()) toast(t('attendanceSaved'))
   }
 
   const counts = STATUSES.reduce((m, st) => ({ ...m, [st.key]: kids.filter((s) => marks?.[s.id]?.status === st.key).length }), {})
@@ -214,7 +226,10 @@ function TakeAttendance({ students, groups }) {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
                     <Avatar src={photoSrc(s.photo)} name={s.full_name} size={40} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold text-slate-800">{s.nickname || s.full_name}</div>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate font-semibold text-slate-800">{s.nickname || s.full_name}</span>
+                        {partialFrom(s) && <span className="flex-none rounded bg-amber-50 px-1.5 text-[11px] font-semibold text-amber-700" title={t('partialDay')}>{t('fromTime', { time: partialFrom(s) })}</span>}
+                      </div>
                       <div className="truncate text-xs text-slate-500">{s.nickname ? s.full_name : ''} {s.student_code && <span className="font-mono">{s.student_code}</span>}</div>
                     </div>
                     <button type="button" aria-pressed={showNote} className={`relative grid h-11 w-11 flex-none place-items-center rounded-lg sm:order-last sm:h-9 sm:w-9 ${showNote ? 'text-pra-blue' : 'text-slate-400 hover:text-slate-600'} active:bg-slate-100`} title={t('addNote')} aria-label={t('addNote')}

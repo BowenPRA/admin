@@ -1,13 +1,13 @@
 import { db } from '../db'
-import { cohortAverages } from './utils'
+import { cohortAverages, studentSections } from './utils'
 
 const bySort = (a, b) => (a.sort ?? 0) - (b.sort ?? 0)
 
-/** Everything the printed document needs for one report. */
-export async function loadReportBundle(id) {
+/** Everything the printed document needs for one report. A partial-day student's academic sections are left out. */
+export async function loadReportBundle(id, settings = null) {
   const report = await db.reports.get(id)
   if (!report) throw new Error('Report not found')
-  const [sections, student, yearReports, cohortReports, courseNotes] = await Promise.all([
+  const [saved, student, yearReports, cohortReports, courseNotes] = await Promise.all([
     db.sections.list({ report_id: id }),
     report.student_id ? db.students.get(report.student_id) : null,
     report.student_id ? db.reports.list({ student_id: report.student_id, school_year: report.school_year }) : [report],
@@ -20,7 +20,7 @@ export async function loadReportBundle(id) {
     otherIds.length ? db.sections.list({ report_id: otherIds }) : [],
     cohortIds.length ? db.sections.list({ report_id: cohortIds }) : [],
   ])
-  sections.sort(bySort)
+  const sections = studentSections(settings || (await db.getReportSettings()), saved, student).sort(bySort)
   const history = yearReports.map((r) => ({ report: r, sections: r.id === id ? sections : histSections.filter((s) => s.report_id === r.id).sort(bySort) }))
   return {
     report, sections, student: student || { full_name: report.student_name }, history, courseNotes,

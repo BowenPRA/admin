@@ -28,12 +28,12 @@ export default function PrintBatch() {
       const filter = { school_year: year, period_label: period }
       if (group) filter.year_group = group
       const reports = await db.reports.list(filter)
-      const out = await Promise.all(reports.map((r) => loadReportBundle(r.id)))
+      const out = await Promise.all(reports.map((r) => loadReportBundle(r.id, settings)))
       out.sort((a, b) => (a.student?.full_name || '').localeCompare(b.student?.full_name || ''))
       if (alive) setBundles(out)
     })().catch((e) => { if (alive) setErr(e.message || String(e)) })
     return () => { alive = false }
-  }, [year, period, group])
+  }, [year, period, group]) // eslint-disable-line react-hooks/exhaustive-deps -- settings only pick the sections shown
   useEffect(() => { document.title = name }, [name])
 
   const shown = bundles && (lang === 'vi' ? bundles.filter((b) => b.report.lang === 'bi') : bundles)

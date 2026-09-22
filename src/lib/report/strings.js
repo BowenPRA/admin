@@ -5,6 +5,7 @@
 const STRINGS = {
   en: {
     homeroom: 'Homeroom',
+    partialDay: 'Afternoons from',
     homeroomComment: 'Homeroom Teacher Comment',
     notYet: 'Not yet',
     topicsCovered: 'Topics covered:',
@@ -29,6 +30,7 @@ const STRINGS = {
   },
   vi: {
     homeroom: 'GVCN',
+    partialDay: 'Buổi chiều từ',
     homeroomComment: 'Nhận xét của giáo viên chủ nhiệm',
     notYet: 'Chưa đánh giá',
     topicsCovered: 'Nội dung đã học:',

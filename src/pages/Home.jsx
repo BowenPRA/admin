@@ -10,7 +10,7 @@ import { LEVELS } from '../lib/fees'
 import { splitSubjectKey } from '../data/staff'
 import { isEnrolled, activeFamilies } from '../lib/studentRecords'
 import { teacherDay, todayIndex, isNow, subjectTone } from '../lib/schedule'
-import { currentPeriod, reportWork, HOMEROOM_PART } from '../lib/report/utils'
+import { currentPeriod, reportWork, studentSections, HOMEROOM_PART } from '../lib/report/utils'
 import { Card, StatusChip, Empty, Spinner } from '../components/ui'
 
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
@@ -64,7 +64,7 @@ function TodayCard() {
  * assigned to them on the Teachers page; `work` is null while loading.
  */
 function useReportWork() {
-  const { reportSettings: settings } = useData()
+  const { reportSettings: settings, students } = useData()
   const { me } = useAuth()
   const [work, setWork] = useState(null)
   const period = settings ? currentPeriod(settings) : null
@@ -80,7 +80,9 @@ function useReportWork() {
     db.reports.list({ school_year: settings.schoolYear, period_label: periodLabel })
       .then(async (rs) => {
         const mine = rs.filter((r) => groups.has(r.year_group))
-        const ss = mine.length ? await db.sections.list({ report_id: mine.map((r) => r.id) }) : []
+        const saved = mine.length ? await db.sections.list({ report_id: mine.map((r) => r.id) }) : []
+        // A partial-day student's academic sections are not part of their report.
+        const ss = mine.flatMap((r) => studentSections(settings, saved.filter((x) => x.report_id === r.id), students.find((st) => st.id === r.student_id)))
         return reportWork(settings, mine, ss, { subjects, homeroom_groups: homerooms })
       })
       .then((w) => alive && setWork(w))

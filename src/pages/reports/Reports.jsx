@@ -6,7 +6,7 @@ import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
 import { LEVELS } from '../../lib/fees'
 import { loadPreviousSections } from '../../lib/report/loaders'
-import { buildReport, buildSections, buildSection, completion, sectionDone, missingAreas, cohortAverages, templateForYearGroup, fmtDate, subjectByKey, currentPeriod, scheduledHomeroom, hasReviewScores } from '../../lib/report/utils'
+import { buildReport, buildSections, buildSection, completion, sectionDone, missingAreas, studentSections, cohortAverages, templateForYearGroup, fmtDate, subjectByKey, currentPeriod, scheduledHomeroom, hasReviewScores } from '../../lib/report/utils'
 import { photoSrc } from '../../lib/report/photo'
 import { isEnrolled } from '../../lib/studentRecords'
 import { Card, Field, Select, Checkbox, Modal, Empty, Spinner, ReportStatusChip } from '../../components/ui'
@@ -56,6 +56,14 @@ function ReportsList({ settings }) {
   const canTranslate = ['super_admin', 'head'].includes(me?.access)
 
   const load = useCallback(() => setReloadKey((k) => k + 1), [])
+  const studentOf = (r) => students.find((s) => s.id === r.student_id)
+  // What each report is made of: a partial-day student's academic sections are left out.
+  // `sections` keeps every saved row (deleting a report removes them all).
+  const shown = useMemo(() => {
+    const byId = new Map(students.map((s) => [s.id, s]))
+    const reportOf = new Map((reports || []).map((r) => [r.id, r]))
+    return sections.filter((x) => studentSections(settings, [x], byId.get(reportOf.get(x.report_id)?.student_id)).length > 0)
+  }, [sections, reports, students, settings])
   useEffect(() => {
     let alive = true
     fetchPeriod(settings, period).then(({ rs, ss }) => { if (alive) { setReports(rs); setSections(ss) } }).catch((e) => alert(e.message))
@@ -82,12 +90,12 @@ function ReportsList({ settings }) {
     const out = []
     for (const r of reports || []) {
       if (r.status === 'published') continue
-      const mine = sections.filter((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group) && !sectionDone(settings, s))
+      const mine = shown.filter((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group) && !sectionDone(settings, s))
       const overview = canHomeroom(r) && !(r.homeroom_note || '').trim()
       if (mine.length || overview) out.push({ report: r, parts: [...mine.map((s) => subjectByKey(settings, s.subject_key).name), overview ? 'homeroom comment' : null].filter(Boolean) })
     }
     return out
-  }, [reports, sections, settings, me]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reports, shown, settings, me]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const remove = async (r) => {
     if (!confirm(`Delete the ${r.period_label} report for ${r.student_name}? This cannot be undone.`)) return
@@ -112,7 +120,7 @@ function ReportsList({ settings }) {
     } catch (e) { alert(e.message) } finally { setBusy('') }
   }
   // Reports created before an area was added to their year group (e.g. Movement for Year 7).
-  const missingFor = (list) => list.flatMap((r) => missingAreas(settings, r, sections.filter((s) => s.report_id === r.id)).map((key) => ({ r, key })))
+  const missingFor = (list) => list.flatMap((r) => missingAreas(settings, r, shown.filter((s) => s.report_id === r.id), studentOf(r)).map((key) => ({ r, key })))
   const addMissing = async (yg, gaps) => {
     setBusy(yg)
     try { await db.sections.saveMany(gaps.map(({ r, key }) => buildSection(r.id, key, settings, { yearGroup: r.year_group, teachers }))); load() }
@@ -183,7 +191,7 @@ function ReportsList({ settings }) {
             <tbody>
               {list.map((r) => {
                 const student = students.find((s) => s.id === r.student_id)
-                const c = completion(r, sections.filter((s) => s.report_id === r.id), settings)
+                const c = completion(r, shown.filter((s) => s.report_id === r.id), settings)
                 const photo = photoSrc(student?.photo)
                 const age = studentAge(student?.dob)
                 return (
@@ -197,12 +205,12 @@ function ReportsList({ settings }) {
                     <td className="text-xs text-slate-500">
                       {isHead ? (student?.level || r.year_group) : (
                         <div className="flex flex-wrap gap-1 py-1">
-                          {sections.filter((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group)).map((s) => {
+                          {shown.filter((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group)).map((s) => {
                             const done = sectionDone(settings, s)
                             return <span key={s.id} className={`chip ${done ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{done ? '✓ ' : ''}{subjectByKey(settings, s.subject_key).name}</span>
                           })}
                           {canHomeroom(r) && <span className={`chip ${(r.homeroom_note || '').trim() ?'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>Homeroom</span>}
-                          {!sections.some((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group)) && !canHomeroom(r) && <span className="text-slate-400">read-only</span>}
+                          {!shown.some((s) => s.report_id === r.id && canSubject(s.subject_key, r.year_group)) && !canHomeroom(r) && <span className="text-slate-400">read-only</span>}
                         </div>
                       )}
                     </td>
@@ -274,7 +282,7 @@ function CreateForm({ onClose, settings, students, defaultPeriod, defaultGroup, 
         const t = single ? (templateForYearGroup(settings, s.level) || template) : template
         const r = buildReport(s, period, t, settings, scheduledHomeroom(schedule, s.level))
         const prev = await loadPreviousSections(s.id, settings.schoolYear, period.index)
-        reports.push(r); sections.push(...buildSections(r.id, t, settings, { yearGroup: s.level, prevSections: prev, teachers }))
+        reports.push(r); sections.push(...buildSections(r.id, t, settings, { yearGroup: s.level, prevSections: prev, teachers, student: s }))
       }
       await db.reports.saveMany(reports)
       await db.sections.saveMany(sections)

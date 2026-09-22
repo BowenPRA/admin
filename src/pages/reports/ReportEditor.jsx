@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Printer, Eye, EyeOff, Lock, ChevronDown, ChevronUp, Plus, Users, Copy, Check, Languages, AlertTriangle, PenLine } from 'lucide-react'
 import { useData } from '../../lib/DataContext'
 import { photoSrc } from '../../lib/report/photo'
+import { partialFrom } from '../../lib/studentRecords'
 import { useAuth } from '../../lib/AuthContext'
 import { db, genId } from '../../lib/db'
 import { loadReportBundle } from '../../lib/report/loaders'
@@ -167,12 +168,12 @@ export default function ReportEditor() {
   const failed = useRef({})
 
   useEffect(() => {
-    loadReportBundle(id).then((b) => {
+    loadReportBundle(id, settings).then((b) => {
       const notesMap = Object.fromEntries(b.courseNotes.map((n) => [n.subject_key, n]))
       latest.current = { report: b.report, sections: b.sections, notes: notesMap }
       setBundle(b); setReport(b.report); setSections(b.sections); setNotes(notesMap)
     }).catch((e) => setErr(e.message))
-  }, [id])
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps -- load once per report; a settings refresh must not reset the editor
 
   const runKey = useCallback(function run(key) {
     clearTimeout(timers.current[key])
@@ -277,7 +278,7 @@ export default function ReportEditor() {
   const periods = settings.periods || []
   const isLastPeriod = periods.length > 0 && Number(report.period_index) >= Math.max(...periods.map((p) => Number(p.index)))
   const lastLabel = periods.length ? periods[periods.length - 1].label : 'final'
-  const missing = missingAreas(settings, report, sections).filter((k) => subjectOk(k))
+  const missing = missingAreas(settings, report, sections, student).filter((k) => subjectOk(k))
   const teacherNames = teachers.filter((t) => t.active !== false).map((t) => `${t.title ? t.title + ' ' : ''}${t.name}`)
   // The homeroom teacher comes from the Schedule; the name typed here counts only while the Schedule has none.
   const scheduledHr = scheduledHomeroom(schedule, report.year_group)
@@ -305,7 +306,7 @@ export default function ReportEditor() {
             {photoSrc(student?.photo) ? <img src={photoSrc(student.photo)} alt="" className="h-9 w-9 rounded-full object-cover" /> : null}
             <div className="mr-auto">
               <div className="font-bold leading-tight">{student?.full_name || report.student_name}</div>
-              <div className="text-xs text-slate-500">{report.year_group} · {report.period_label} {report.school_year} · {comp.pct}% complete</div>
+              <div className="text-xs text-slate-500">{report.year_group} · {report.period_label} {report.school_year} · {comp.pct}% complete{partialFrom(student) && <> · <span className="font-semibold text-amber-700" title="Joins after the morning lessons, so this report has no academic learning">Partial day, from {partialFrom(student)}</span></>}</div>
             </div>
             <SaveState state={saveState} />
             {homeroomOk ? (

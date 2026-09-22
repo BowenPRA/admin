@@ -14,7 +14,7 @@ import { normalizeCode, needsCodeUpdate, nextStudentCode } from '../lib/studentI
 import { Card, Checkbox, Empty, Spinner, Avatar, Segmented, SearchInput, PageHeader, Menu } from '../components/ui'
 import StudentModal from '../components/students/StudentModal'
 import FamilyModal from '../components/students/FamilyModal'
-import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact, isEnrolled, isPending, isPast, statusOf, familyStatus } from '../lib/studentRecords'
+import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact, isEnrolled, isPending, isPast, statusOf, familyStatus, partialFrom } from '../lib/studentRecords'
 
 const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
 const levelIndex = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
@@ -129,7 +129,7 @@ export default function Students() {
       await refresh()
       setEditing(null)
       toast(t('studentSaved', { name: s.nickname || s.full_name }))
-    } catch (e) { toast.error(e.message) }
+    } catch (e) { toast.error(/partial_from/.test(e.message || '') ? t('partialDaySetup') : e.message) }
   }
   const removeStudent = async (s) => {
     if (!confirm(t('confirmDeleteStudent', { name: s.full_name }))) return
@@ -345,6 +345,7 @@ export default function Students() {
                               <div className="flex items-center gap-1.5 text-xs text-slate-500">
                                 {s.nickname && <span>“{s.nickname}”</span>}
                                 {s.allergies && <span className="rounded bg-red-50 px-1 text-[10px] font-semibold text-red-700" title={s.allergies}>{lang === 'vi' ? 'dị ứng' : 'allergy'}</span>}
+                                {partialFrom(s) && <span className="rounded bg-amber-50 px-1 text-[10px] font-semibold text-amber-700" title={t('partialDay')}>{t('fromTime', { time: partialFrom(s) })}</span>}
                                 <span className="md:hidden">{age != null ? `${age}y` : ''}</span>
                               </div>
                             </div>

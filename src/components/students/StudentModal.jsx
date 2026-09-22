@@ -5,7 +5,7 @@ import { suggestClass } from '../../lib/placement'
 import { guessFirstName } from '../../lib/names'
 import { resizeImage, photoSrc } from '../../lib/report/photo'
 import { nextStudentCode, codeTakenBy, normalizeCode } from '../../lib/studentIds'
-import { ageOf, STATUSES, statusOf, withStatus } from '../../lib/studentRecords'
+import { ageOf, STATUSES, statusOf, withStatus, partialFrom, DEFAULT_PARTIAL_FROM } from '../../lib/studentRecords'
 import { Field, TextInput, Select, Checkbox, Modal, Avatar } from '../ui'
 
 function Section({ title, children }) {
@@ -46,6 +46,8 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
     const row = { ...s, full_name: s.full_name.trim(), student_code: normalizeCode(s.student_code) || null }
     // first_name needs supabase/updates-2026-09-15-legal-names.sql; leave it out until someone types one.
     if (!(row.first_name || '').trim() && !('first_name' in value)) delete row.first_name
+    // Likewise partial_from (supabase/updates-2026-09-22-partial-day.sql): only sent once someone sets it.
+    if (!partialFrom(row) && !('partial_from' in value)) delete row.partial_from
     try { await onSave(row) } finally { setBusy(false) }
   }
   const pickPhoto = async (file) => { try { set('photo')(await resizeImage(file)) } catch (err) { alert(err.message) } }
@@ -67,6 +69,7 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
           {row(t('legalFirstName'), (s.first_name || '').trim() || guessFirstName(s.full_name, s.nickname))}
           {row(t('classGroup'), s.class_group)}
           {row(t('allergies'), s.allergies && <span className="font-semibold text-red-700">{s.allergies}</span>)}
+          {row(t('arrivesAt'), partialFrom(s) && <span className="font-semibold text-amber-700">{partialFrom(s)} · {t('partialDay')}</span>)}
           {row(t('dob'), s.dob)}
           {row(t('nationality'), s.nationality)}
           {row(t('family'), fam?.name)}
@@ -128,6 +131,17 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
             <Field label={t('classGroup')}><TextInput value={s.class_group} onChange={set('class_group')} placeholder={s.level} /></Field>
             <Field label={t('startDate')}><TextInput type="date" value={s.start_date || ''} onChange={set('start_date')} /></Field>
             <Field label={t('enrollmentStatus')} className="sm:col-span-4"><TextInput value={s.enrollment_status} onChange={set('enrollment_status')} placeholder="Enrolled, trial week…" /></Field>
+            <div className="sm:col-span-4">
+              <div className="flex min-h-[38px] flex-wrap items-center gap-x-4 gap-y-2">
+                <Checkbox checked={!!partialFrom(s)} onChange={(on) => set('partial_from')(on ? DEFAULT_PARTIAL_FROM : '')} label={t('partialDay')} />
+                {!!partialFrom(s) && (
+                  <label className="flex items-center gap-2 text-sm text-slate-600">{t('arrivesAt')}
+                    <span className="w-32"><TextInput type="time" value={s.partial_from} onChange={(v) => set('partial_from')(v || DEFAULT_PARTIAL_FROM)} /></span>
+                  </label>
+                )}
+              </div>
+              {!!partialFrom(s) && <p className="mt-1 text-xs text-slate-500">{t('partialDayHint')}</p>}
+            </div>
           </div>
         </Section>
 

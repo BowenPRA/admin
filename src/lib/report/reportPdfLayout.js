@@ -12,6 +12,7 @@
 
 import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor } from './utils'
 import { reportStrings, reportTitle, voiceQuoted, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
+import { partialFrom } from '../studentRecords'
 
 // One family of deep, saturated colours, all at a similar depth so no part
 // shouts louder than another: brand blue and green, with teal, orange and
@@ -612,6 +613,8 @@ function buildPage(item, M, { proof, icons = {} }) {
     student?.nickname && { text: `"${student.nickname}"`, style: { color: C.muted } },
     { text: yearGroup, style: { bold: true } },
     homeroomTeacher && { text: [`${t.homeroom}: `, { text: homeroomTeacher, bold: true }], style: {} },
+    // A partial-day student joins after the morning (academic) lessons, which is why the page has none.
+    partialFrom(student) && { text: [`${t.partialDay} `, { text: partialFrom(student), bold: true }], style: { color: C.muted } },
   ].filter(Boolean)
   let infoY = y + (hrH - (nameFit[nameI] + 2 + infoLines.length * infoPitch)) / 2
   put(infoX, infoY, infoW, nameNode(nameSizes[nameI]))

@@ -21,7 +21,7 @@ export default function PrintReport() {
   const [pdf, setPdf] = useState(null)
   const [err, setErr] = useState('')
 
-  useEffect(() => { loadReportBundle(id).then(setBundle).catch((e) => setErr(e.message)) }, [id])
+  useEffect(() => { loadReportBundle(id, settings).then(setBundle).catch((e) => setErr(e.message)) }, [id]) // eslint-disable-line react-hooks/exhaustive-deps -- load once
   useEffect(() => { if (bundle) document.title = reportFilename(bundle, lang).replace(/\.pdf$/, '') }, [bundle, lang])
   useEffect(() => {
     if (!bundle || !settings) return

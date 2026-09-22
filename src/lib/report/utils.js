@@ -2,6 +2,7 @@ import { genId } from '../db'
 import { TEXT_LIMITS, TEXT_MINIMUMS } from './defaults'
 import { legalFirstName } from '../names'
 import { classForYearGroup } from '../schedule'
+import { partialFrom } from '../studentRecords'
 
 export const fmtDate = (d, opts) => {
   if (!d) return ''
@@ -61,19 +62,33 @@ export function sectionsByTier(settings, sections) {
 
 export const templateAreas = (t) => t?.areas || [...(t?.academic || []), ...(t?.specialist || []), ...(t?.vocational || [])]
 
-/** Learning areas a report for this template and year group contains (Movement is Year 7 only, etc.). */
-export function areasFor(settings, template, yearGroup) {
+/**
+ * Learning areas a report for this template and year group contains (Movement
+ * is Year 7 only, etc.). A partial-day student, who joins after the morning
+ * lessons, has no academic areas.
+ */
+export function areasFor(settings, template, yearGroup, student = null) {
+  const partial = !!partialFrom(student)
   return templateAreas(template).filter((k) => {
-    const only = subjectByKey(settings, k).yearGroups || []
-    return !only.length || only.includes(yearGroup)
+    const s = subjectByKey(settings, k)
+    const only = s.yearGroups || []
+    return (!only.length || only.includes(yearGroup)) && !(partial && s.kind === 'academic')
   })
 }
 
+/**
+ * The sections a student's report is made of. For a partial-day student the
+ * academic sections are left out (made before they went partial-day, they stay
+ * saved and come back if the student returns to full days).
+ */
+export const studentSections = (settings, sections, student) =>
+  (partialFrom(student) ? sections.filter((s) => tierOf(settings, s) !== 'academic') : sections)
+
 /** Areas a report should have but does not, e.g. Movement on a report created before it was added. */
-export function missingAreas(settings, report, sections) {
+export function missingAreas(settings, report, sections, student = null) {
   const template = templateOf(settings, report)
   if (!template) return []
-  return areasFor(settings, template, report.year_group).filter((k) => !sections.some((s) => s.subject_key === k))
+  return areasFor(settings, template, report.year_group, student).filter((k) => !sections.some((s) => s.subject_key === k))
 }
 
 /** "Mr. Caleb" for the active teacher(s) linked to `movement:Year 7` on the Teachers page, or ''. */
@@ -123,8 +138,8 @@ export function buildSection(reportId, key, settings, { yearGroup, prev, teacher
 }
 
 /** Section rows for a brand-new report. */
-export function buildSections(reportId, template, settings, { yearGroup, prevSections = [], teachers = [] } = {}) {
-  return areasFor(settings, template, yearGroup).map((key) =>
+export function buildSections(reportId, template, settings, { yearGroup, prevSections = [], teachers = [], student = null } = {}) {
+  return areasFor(settings, template, yearGroup, student).map((key) =>
     buildSection(reportId, key, settings, { yearGroup, teachers, prev: prevSections.find((p) => p.subject_key === key) }))
 }
 
