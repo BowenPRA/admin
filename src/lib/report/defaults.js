@@ -3,32 +3,35 @@
 // values are only used until the head teacher changes them.
 
 // The progress scale, from first steps to the top, in the order it prints.
-// Confident is the middle level and the goal for the stage, with two levels
+// On Target is the middle level and the goal for the stage, with two levels
 // on each side. `value` is how a level is saved on reports, so it is an ID,
-// not a rank: Accomplished was added in September 2026 (the scale had four
-// levels) and saved as 5, so levels already entered as 1 to 4 keep their
-// meaning. `short` is the few words printed under the name in the level key.
+// not a rank, and each value keeps its place on the scale when names change:
+// 3 is the middle (the goal, "Confident" until 22 September 2026, now "On
+// Target") and 5 the level above it ("Accomplished", now "Confident"), so levels
+// teachers have already entered keep their meaning. `desc` is printed in the
+// level key on every report; `short` is the few words teachers see when they
+// pick a level.
 export const LEVELS = [
   { value: 1, code: 'E', name: 'Emerging', name_vi: 'Làm quen', color: '#d97706',
     short: 'With a lot of support', short_vi: 'Cần nhiều hỗ trợ',
-    desc: 'Just beginning to develop the skills and knowledge in this area. Needs a lot of support and guidance.',
-    desc_vi: 'Mới bắt đầu phát triển kỹ năng và kiến thức trong lĩnh vực này, cần nhiều hỗ trợ và hướng dẫn.' },
+    desc: 'Beginning to develop the skills, with a lot of support.',
+    desc_vi: 'Mới bắt đầu phát triển kỹ năng, cần nhiều hỗ trợ.' },
   { value: 2, code: 'P', name: 'Practicing', name_vi: 'Luyện tập', color: '#0284c7',
     short: 'With some help', short_vi: 'Cần một chút hỗ trợ',
-    desc: 'Building understanding through regular practice. Understands the basics and needs some guidance.',
-    desc_vi: 'Đang xây dựng hiểu biết qua luyện tập thường xuyên, nắm được kiến thức cơ bản và cần được hướng dẫn thêm.' },
-  { value: 3, code: 'C', name: 'Confident', name_vi: 'Tự tin', color: '#5f8f24',
-    short: 'Independently: the goal', short_vi: 'Tự lập, đạt mục tiêu',
-    desc: 'Secure in this area and works independently. This is the goal for the stage.',
-    desc_vi: 'Nắm vững nội dung và tự làm được một cách độc lập. Đây là mục tiêu của giai đoạn này.' },
-  { value: 5, code: 'A', name: 'Accomplished', name_vi: 'Thành thạo', color: '#0e7a74',
+    desc: 'Building understanding through practice, with some help.',
+    desc_vi: 'Đang hiểu dần qua luyện tập, cần thêm hướng dẫn.' },
+  { value: 3, code: 'O', name: 'On Target', name_vi: 'Đạt mục tiêu', color: '#5f8f24',
+    short: 'Independently: the goal', short_vi: 'Tự làm được, đúng mục tiêu',
+    desc: 'Secure and independent. The goal for this stage.',
+    desc_vi: 'Nắm vững và tự làm được. Mục tiêu của giai đoạn này.' },
+  { value: 5, code: 'C', name: 'Confident', name_vi: 'Tự tin', color: '#0e7a74',
     short: 'Consistently and skilfully', short_vi: 'Ổn định và thành thạo',
-    desc: 'Consistently strong. Applies skills accurately and flexibly, including in new situations.',
-    desc_vi: 'Luôn thể hiện tốt, vận dụng kỹ năng chính xác và linh hoạt, kể cả trong tình huống mới.' },
+    desc: 'Consistently strong, even in new situations.',
+    desc_vi: 'Luôn thể hiện tốt, kể cả trong tình huống mới.' },
   { value: 4, code: 'M', name: 'Moving Beyond', name_vi: 'Nổi trội', color: '#1f4e9c',
     short: 'Beyond what is expected', short_vi: 'Vượt mức mong đợi',
-    desc: 'Goes beyond the expectations for this stage. Applies ideas creatively and is ready for extension.',
-    desc_vi: 'Vượt mức mong đợi của giai đoạn này, vận dụng ý tưởng sáng tạo và sẵn sàng cho thử thách mở rộng.' },
+    desc: 'Goes beyond what is expected; ready for extension.',
+    desc_vi: 'Vượt mức mong đợi, sẵn sàng cho thử thách mở rộng.' },
 ]
 
 // The three tiers of learning areas. A subject's `kind` is its tier, and the
@@ -193,7 +196,7 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
-const SETTINGS_VERSION = 6
+const SETTINGS_VERSION = 7
 
 export const DEFAULT_REPORT_SETTINGS = {
   version: SETTINGS_VERSION,
@@ -228,8 +231,10 @@ export const DEFAULT_REPORT_SETTINGS = {
  * version 5 the Early Years template and its areas are added the same way
  * (unless a template already covers Nursery or Kindergarten). Before version 6
  * the four-level scale (E, P, C, M) becomes the five-level one: Accomplished is
- * added between Confident and Moving Beyond. Saving in Report settings then
- * stores the upgraded version.
+ * added between Confident and Moving Beyond. Before version 7 the standard
+ * scale (four or five levels) becomes Emerging, Practicing, On Target,
+ * Confident, Moving Beyond, with a description of each level for the key.
+ * Saving in Report settings then stores the upgraded version.
  */
 export function normalizeReportSettings(stored) {
   const v = stored || {}
@@ -286,7 +291,7 @@ export function normalizeReportSettings(stored) {
     }
   }
   let levels = s.levels
-  if ((Number(v.version) || 1) < 6 && (v.levels || []).map((l) => l.code).join('') === 'EPCM') levels = LEVELS.map((l) => ({ ...l }))
+  if ((Number(v.version) || 1) < 7 && ['EPCM', 'EPCAM'].includes((v.levels || []).map((l) => l.code).join(''))) levels = LEVELS.map((l) => ({ ...l }))
   for (const sub of subjects) if (!tierKeys.includes(sub.kind)) sub.kind = 'vocational'
   for (const [k, t] of Object.entries(templates)) {
     if (!t.areas) templates[k] = { ...t, areas: [...(t.academic || []), ...(t.specialist || []), ...(t.vocational || [])] }

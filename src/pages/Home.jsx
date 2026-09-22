@@ -8,7 +8,7 @@ import { useAuth } from '../lib/AuthContext'
 import { fmt, fmtDate } from '../lib/money'
 import { LEVELS } from '../lib/fees'
 import { splitSubjectKey } from '../data/staff'
-import { isEnrolled } from '../lib/studentRecords'
+import { isEnrolled, activeFamilies } from '../lib/studentRecords'
 import { teacherDay, todayIndex, isNow, subjectTone } from '../lib/schedule'
 import { currentPeriod, reportWork, HOMEROOM_PART } from '../lib/report/utils'
 import { Card, StatusChip, Empty, Spinner } from '../components/ui'
@@ -205,7 +205,7 @@ function OfficeHome() {
         <QuickLink to="/invoices/new" icon={PlusCircle} tone="bg-green-100 text-green-700" title={t('newInvoice')} hint={t('quickStart')} />
         <QuickLink to="/attendance" icon={CalendarCheck} tone="bg-amber-100 text-amber-700" title={t('attendance')}
           hint={att[0]?.loaded ? `${t('today')}: ${markedAll}/${enrolled.length}${absentAll ? ` · ${absentAll} ${t('absent').toLowerCase()}` : ''}` : t('today')} />
-        <QuickLink to="/students" icon={Users} tone="bg-sky-100 text-sky-700" title={t('students')} hint={`${enrolled.length} ${t('enrolled').toLowerCase()} · ${data.families.length} ${t('families').toLowerCase()}`} />
+        <QuickLink to="/students" icon={Users} tone="bg-sky-100 text-sky-700" title={t('students')} hint={`${enrolled.length} ${t('enrolled').toLowerCase()} · ${t('activeFamiliesCount', { n: activeFamilies(data.families, data.students).length })}`} />
         <QuickLink to="/reports" icon={ClipboardList} tone="bg-indigo-100 text-indigo-700" title={t('reports')} hint={data.reportSettings?.schoolYear || ''} />
       </div>
 

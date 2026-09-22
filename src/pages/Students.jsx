@@ -14,7 +14,7 @@ import { normalizeCode, needsCodeUpdate, nextStudentCode } from '../lib/studentI
 import { Card, Checkbox, Empty, Spinner, Avatar, Segmented, SearchInput, PageHeader, Menu } from '../components/ui'
 import StudentModal from '../components/students/StudentModal'
 import FamilyModal from '../components/students/FamilyModal'
-import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact, isEnrolled, isPending, isPast, statusOf } from '../lib/studentRecords'
+import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact, isEnrolled, isPending, isPast, statusOf, familyStatus } from '../lib/studentRecords'
 
 const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
 const levelIndex = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
@@ -68,6 +68,11 @@ export default function Students() {
     pending: students.filter(isPending).length,
     past: students.filter(isPast).length,
   }), [students])
+  const famCounts = useMemo(() => {
+    const c = { active: 0, pending: 0, past: 0 }
+    families.forEach((f) => { c[familyStatus(kidsByFamily[f.id])]++ })
+    return c
+  }, [families, kidsByFamily])
   const toConvert = useMemo(() => students.filter(needsCodeUpdate), [students])
   const withoutId = useMemo(() => students.filter((s) => !isPast(s) && !s.student_code), [students])
 
@@ -96,14 +101,8 @@ export default function Students() {
 
   const famRows = useMemo(() => {
     const needle = norm(q)
-    // A family follows its children: enrolled if any child is, otherwise pending
-    // if any child is waiting to start. A family with no children left is past.
-    const famStatus = (f) => {
-      const kids = kidsByFamily[f.id] || []
-      return kids.some(isEnrolled) ? 'active' : kids.some(isPending) ? 'pending' : 'past'
-    }
     return families
-      .filter((f) => status === 'all' || famStatus(f) === status)
+      .filter((f) => status === 'all' || familyStatus(kidsByFamily[f.id]) === status)
       .filter((f) => !missingContact || familyMissingContact(f, kidsByFamily[f.id]))
       .filter((f) => !needle || norm(`${f.name} ${f.email} ${f.phone} ${(kidsByFamily[f.id] || []).map((k) => `${k.full_name} ${k.nickname} ${k.student_code}`).join(' ')} ${contactsOf(f, kidsByFamily[f.id]).map((c) => c.name).join(' ')}`).includes(needle))
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -246,7 +245,7 @@ export default function Students() {
   return (
     <div className="space-y-5">
       <PageHeader title={tab === 'families' ? t('families') : t('students')}
-        subtitle={`${t('studentsCount', { n: counts.active })} ${t('enrolled').toLowerCase()} · ${t('familiesCount', { n: families.length })}`}>
+        subtitle={`${t('studentsCount', { n: counts.active })} ${t('enrolled').toLowerCase()} · ${t('activeFamiliesCount', { n: famCounts.active })}`}>
         {canEdit && (
           <Menu label={t('more')} icon={MoreHorizontal} items={[
             { label: t('loadRoster'), icon: ClipboardList, onClick: () => rosterInput.current?.click(), disabled: busy, hint: lang === 'vi' ? 'Chọn private/roster.json để thêm học sinh còn thiếu' : 'Pick private/roster.json to add anyone missing' },
@@ -279,9 +278,9 @@ export default function Students() {
         <Segmented value={tab} onChange={setTab} options={[{ value: 'students', label: t('students') }, { value: 'families', label: t('families') }]} />
         <span className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
         <Segmented value={status} onChange={setStatus} options={[
-          { value: 'active', label: `${t('enrolled')}${tab === 'students' ? ` · ${counts.active}` : ''}` },
-          { value: 'pending', label: `${t('pending')}${tab === 'students' ? ` · ${counts.pending}` : ''}` },
-          { value: 'past', label: `${t('past')}${tab === 'students' ? ` · ${counts.past}` : ''}` },
+          { value: 'active', label: `${t('enrolled')} · ${(tab === 'students' ? counts : famCounts).active}` },
+          { value: 'pending', label: `${t('pending')} · ${(tab === 'students' ? counts : famCounts).pending}` },
+          { value: 'past', label: `${t('past')} · ${(tab === 'students' ? counts : famCounts).past}` },
           { value: 'all', label: t('all') },
         ]} />
       </div>

@@ -291,6 +291,7 @@ const STRINGS = {
   removePhoto: ['Remove photo', 'Xoá ảnh'],
   studentsCount: ['{n} students', '{n} học sinh'],
   familiesCount: ['{n} families', '{n} gia đình'],
+  activeFamiliesCount: ['{n} active families', '{n} gia đình đang theo học'],
   newFamilyFor: ['New family', 'Gia đình mới'],
   addChild: ['Add child', 'Thêm con'],
   rosterUpToDate: ['Every student in the roster file is already here.', 'Mọi học sinh trong tệp danh sách đã có.'],

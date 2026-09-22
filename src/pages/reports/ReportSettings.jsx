@@ -85,10 +85,10 @@ function SettingsForm({ initial }) {
               <Field label="Name"><TextInput value={l.name} onChange={(v) => set(`levels.${i}.name`, v)} /></Field>
               <Field label="Vietnamese"><TextInput value={l.name_vi} onChange={(v) => set(`levels.${i}.name_vi`, v)} /></Field>
               <Field label="Colour"><input type="color" className="input h-[38px] p-1" value={l.color} onChange={(e) => set(`levels.${i}.color`, e.target.value)} /></Field>
-              <Field label="In the key (a few words)" className="sm:col-span-2" hint="Printed under the name in the level key."><TextInput value={l.short || ''} onChange={(v) => set(`levels.${i}.short`, v)} /></Field>
-              <Field label="In the key (Vietnamese)" className="sm:col-span-3"><TextInput value={l.short_vi || ''} onChange={(v) => set(`levels.${i}.short_vi`, v)} /></Field>
-              <Field label="Description" className="sm:col-span-5"><TextArea rows={2} value={l.desc} onChange={(v) => set(`levels.${i}.desc`, v)} /></Field>
-              <Field label="Description (Vietnamese)" className="sm:col-span-5"><TextArea rows={2} value={l.desc_vi} onChange={(v) => set(`levels.${i}.desc_vi`, v)} /></Field>
+              <Field label="For teachers (a few words)" className="sm:col-span-2" hint="Shown when a teacher picks a level."><TextInput value={l.short || ''} onChange={(v) => set(`levels.${i}.short`, v)} /></Field>
+              <Field label="For teachers (Vietnamese)" className="sm:col-span-3"><TextInput value={l.short_vi || ''} onChange={(v) => set(`levels.${i}.short_vi`, v)} /></Field>
+              <Field label="Description" className="sm:col-span-5" hint="Printed under the name in the level key on every report. About 55 characters fits on two lines; longer ones make the key taller."><TextArea rows={2} value={l.desc} onChange={(v) => set(`levels.${i}.desc`, v)} /></Field>
+              <Field label="Description (Vietnamese)" className="sm:col-span-5" hint="Printed in the key on Vietnamese reports."><TextArea rows={2} value={l.desc_vi} onChange={(v) => set(`levels.${i}.desc_vi`, v)} /></Field>
             </div>
           ))}
         </div>

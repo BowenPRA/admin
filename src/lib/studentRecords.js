@@ -17,6 +17,13 @@ export const isPast = (s) => statusOf(s) === 'inactive'
 /** Pending students are billed like enrolled ones — that is how they start. */
 export const isBillable = (s) => statusOf(s) !== 'inactive'
 export const withStatus = (s, status) => ({ ...s, status, active: status === 'active' })
+/**
+ * A family follows its children: 'active' (enrolled) if any child is, otherwise
+ * 'pending' if any child is waiting to start, and 'past' once no child is left.
+ */
+export const familyStatus = (kids = []) => (kids.some(isEnrolled) ? 'active' : kids.some(isPending) ? 'pending' : 'past')
+/** Families with at least one enrolled student: the families counted as active, like the enrolled students. */
+export const activeFamilies = (families, students) => families.filter((f) => familyStatus(students.filter((s) => s.family_id === f.id)) === 'active')
 
 /**
  * Empty student. Pass the current students for a brand-new one: it then gets

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Plus, Printer, Trash2, RefreshCw, ExternalLink, Settings, ArrowRight, Database, Languages } from 'lucide-react'
+import { Plus, Printer, Trash2, RefreshCw, ExternalLink, Settings, ArrowRight, Languages } from 'lucide-react'
 import { useData } from '../../lib/DataContext'
 import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
@@ -51,7 +51,6 @@ function ReportsList({ settings }) {
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
-  const [seeding, setSeeding] = useState(false)
   const [translating, setTranslating] = useState(false)
   // Translation files write every teacher's parts, so only head teachers and super admins get them.
   const canTranslate = ['super_admin', 'head'].includes(me?.access)
@@ -136,7 +135,6 @@ function ReportsList({ settings }) {
         </div>
         {isHead && <Link to="/reports/settings" className="btn-secondary"><Settings size={16} /> Report settings</Link>}
         {canTranslate && <button className="btn-secondary" onClick={() => setTranslating(true)} title="Download the reports for translation in the Claude desktop app, then upload the Vietnamese"><Languages size={16} /> Translate with Claude</button>}
-        {import.meta.env.DEV && isHead && <button className="btn-secondary" disabled={seeding} title="Development only" onClick={async () => { if (!confirm('Fill Year 7 with demo scores, levels and comments for Quarter 1? Existing Year 7 Quarter 1 reports are changed.')) return; setSeeding(true); try { const { seedYear7 } = await import('../../lib/seedYear7'); const r = await seedYear7(); alert(r.msg); load() } catch (e) { alert(e.message) } finally { setSeeding(false) } }}><Database size={16} /> {seeding ? 'Seeding…' : 'Seed Year 7 demo'}</button>}
         {isHead && <button className="btn-green" onClick={() => setCreating(true)}><Plus size={16} /> Create reports</button>}
       </div>
       <div className="flex flex-wrap gap-2">

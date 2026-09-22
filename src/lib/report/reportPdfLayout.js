@@ -42,7 +42,7 @@ const ICON_INK = '#163a63'
 const F = {
   body: 8.25, bodyMin: 6.75,
   topics: 7.2, next: 7.5, title: 9, cardTitle: 8.8, teacher: 6.8, pill: 6.6, bar: 8.7, barSub: 6.9, kicker: 6.6,
-  skill: 7, score: 8.8, ref: 5.8, head: 6.3, key: 6.1, exp: 7.5, quote: 8.2, sig: 9.3, role: 6.9, level: 6.8, levelShort: 5.7,
+  skill: 7, score: 8.8, ref: 5.8, head: 6.3, key: 6.1, exp: 7.5, quote: 8.2, sig: 9.3, role: 6.9, level: 6.8, levelDesc: 5.9, levelDescMin: 5.4,
   foot: 6.6, name: 10.2, info: 7.5, docTitle: 17.5, period: 8.8, tagline: 6.5,
 }
 
@@ -57,7 +57,8 @@ const FOOT_GAP = 5.5 // above the footer rule
 const R = 7
 const BAR = 14
 const BOTTOM_H = 60
-const KEY_H = 18 // the level key under the header
+const KEY_PAD = 3.4 // the level key under the header: padding above and below
+const KEY_NAME = 8.6 // its line of dots and names, above the descriptions
 // Room to spare is shared out in proportion to these weights, and the review
 // scores, skills and bottom row grow by at most GROW points. Academic learning
 // has the most text but a lower weight, so the rest of the page breathes.
@@ -444,33 +445,40 @@ function buildPage(item, M, { proof, icons = {} }) {
   rect(PAGE_W / 2 - periodW / 2, TOP + 24, periodW, 14.5, { r: 7.25, fill: C.periodFill })
   put(PAGE_W / 2 - periodW / 2, midTop(TOP + 31.25, F.period, true), periodW, { ...period, alignment: 'center' })
   // =========================================================================
-  // Level key: the whole scale in order, first steps to the top, as one track
-  // under the header. Every pill and dot on the page reads from it, so it sits
-  // outside the sections, with a few words on what each level means. Its
-  // outline is the header's accent: one continuous blue-to-green gradient.
+  // Level key: the whole scale in order, first steps to the top, as one band
+  // under the header, each level with what it means (its description from
+  // Report settings). Every pill and dot on the page reads from it, so it sits
+  // outside the sections. Its outline is the header's accent: one continuous
+  // blue-to-green gradient. The band is as tall as the longest description
+  // needs: two lines, set a little smaller before it takes a third.
   const accent = [THEME.academic.accent, THEME.academic.accent, THEME.vocational.accent]
   const keyY = TOP + 42.5
+  const labelW = 54
+  const cellW = levels.length ? (W - labelW - 4) / levels.length : 0
+  const descW = cellW - 9 // clear of the chevron
+  const DESC_PITCH = 1.16
+  const descOf = (l) => ((vi && l.desc_vi) || l.desc || '').trim()
+  const descNode = (l, size) => ({ text: descOf(l), ...T(size, { color: C.muted, pitch: DESC_PITCH }) })
+  const descLines = (size) => Math.max(0, ...levels.map((l) => (descOf(l) ? Math.round(M.height(descNode(l, size), descW) / (size * DESC_PITCH)) : 0)))
+  const descSize = sizesOf({ base: F.levelDesc, min: F.levelDescMin }).find((s) => descLines(s) <= 2) ?? F.levelDesc
+  const keyLines = descLines(descSize)
+  const keyH = 2 * KEY_PAD + KEY_NAME + keyLines * descSize * DESC_PITCH
   if (!levels.length) rect(X, TOP + 42, W, 2.6, { r: 1.3, gradient: accent })
   else {
-    rect(X, keyY, W, KEY_H, { r: KEY_H / 2, gradient: accent })
-    rect(X + 1.2, keyY + 1.2, W - 2.4, KEY_H - 2.4, { r: KEY_H / 2 - 1.2, fill: C.keyFill })
-    const labelW = 66
+    rect(X, keyY, W, keyH, { r: 9, gradient: accent })
+    rect(X + 1.2, keyY + 1.2, W - 2.4, keyH - 2.4, { r: 7.8, fill: C.keyFill })
     const label = { text: t.levelsKey.toUpperCase(), ...T(6, { bold: true, color: C.muted, spacing: 0.4, pitch: 1.1 }) }
-    put(X + 11, keyY + (KEY_H - M.height(label, labelW - 14)) / 2 + 0.6, labelW - 14, label)
-    const cellW = (W - labelW - 4) / levels.length
-    const nameCy = keyY + KEY_H / 2 - 3.1
-    const shortCy = keyY + KEY_H / 2 + 4.1
+    put(X + 10, keyY + (keyH - M.height(label, labelW - 13)) / 2 + 0.6, labelW - 13, label)
+    const nameCy = keyY + KEY_PAD + KEY_NAME / 2
     levels.forEach((l, i) => {
       const cx = X + labelW + i * cellW
-      dot(l.value, cx + 6.5, keyY + KEY_H / 2, 11)
-      const tw = cellW - 14 - 9
-      putLine(cx + 14, midTop(nameCy, F.level), tw, nameIn(l), F.level, { bold: true, color: l.color, min: 0.85 })
-      const short = ((vi && l.short_vi) || l.short || '').trim()
-      if (short) putLine(cx + 14, midTop(shortCy, F.levelShort), tw, short, F.levelShort, { color: C.muted, min: 0.85 })
+      dot(l.value, cx + 4.5, nameCy, 9)
+      putLine(cx + 11.5, midTop(nameCy, F.level), cellW - 11.5 - 9, nameIn(l), F.level, { bold: true, color: l.color, min: 0.85 })
+      if (descOf(l)) put(cx, keyY + KEY_PAD + KEY_NAME, descW, descNode(l, descSize))
       // A small chevron leads on to the next level.
       if (i < levels.length - 1) {
         const ax = cx + cellW - 3.5
-        const ay = keyY + KEY_H / 2
+        const ay = keyY + keyH / 2
         line(ax - 1.8, ay - 2.6, ax + 0.8, ay, { color: C.tag, lw: 0.9, cap: 'round' })
         line(ax + 0.8, ay, ax - 1.8, ay + 2.6, { color: C.tag, lw: 0.9, cap: 'round' })
       }
@@ -479,7 +487,7 @@ function buildPage(item, M, { proof, icons = {} }) {
 
   // =========================================================================
   // Prepare the parts that share the page's height.
-  const startY = levels.length ? keyY + KEY_H + GAP : TOP + 49.5
+  const startY = levels.length ? keyY + keyH + GAP : TOP + 49.5
   const photoD = 58
   const infoW = 150 - photoD - 8
   const hrX = X + 156
