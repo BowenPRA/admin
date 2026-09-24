@@ -3,7 +3,7 @@ import { createContext, useContext, useState, useCallback } from 'react'
 
 // UI strings. Invoice output strings live in pricing.js / print components.
 const STRINGS = {
-  appName: ['PRA Admin', 'PRA Admin'],
+  appName: ['The Current', 'The Current'],
   q4Full: ['Full-price Quarter 4 (joined after the 2026-27 fee schedule)', 'Quý 4 giá đầy đủ (nhập học sau khi công bố biểu phí 2026-27)'],
   buildFamilies: ['Group into families', 'Gom thành gia đình'],
   buildFamiliesNone: ['Every student already has a family, and no new groups were found.', 'Mọi học sinh đã có gia đình, không tìm thấy nhóm mới.'],
@@ -49,7 +49,7 @@ const STRINGS = {
   families: ['Families', 'Gia đình'],
   settings: ['Settings', 'Cài đặt'],
   newInvoice: ['New invoice', 'Tạo hoá đơn'],
-  home: ['Home', 'Trang chủ'],
+  home: ['The Current', 'The Current'],
   reports: ['Progress reports', 'Báo cáo tiến bộ'],
   reportsNav: ['Reports', 'Báo cáo'],
   teachers: ['Teachers', 'Giáo viên'],

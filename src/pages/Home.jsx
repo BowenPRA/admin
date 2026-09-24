@@ -17,10 +17,15 @@ const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${Stri
 const levelIndex = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
 
 function Greeting({ name }) {
-  const { lang } = useT()
+  const { t, lang } = useT()
   const h = new Date().getHours()
   const hello = lang === 'vi' ? 'Xin chào' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
-  return <h1 className="text-2xl font-black tracking-tight text-slate-800">{hello}{name ? `, ${name}` : ''}</h1>
+  return (
+    <>
+      <div className="text-xs font-bold uppercase tracking-widest text-pra-blue">{t('appName')}</div>
+      <h1 className="text-2xl font-black tracking-tight text-slate-800">{hello}{name ? `, ${name}` : ''}</h1>
+    </>
+  )
 }
 
 /** Today's attendance progress for the given year groups. */
