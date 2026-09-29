@@ -1,17 +1,25 @@
 // Layout of the Learning Progress Report as a pdfmake document: one A4 page
-// per report, in English or in Vietnamese. Header, homeroom comment, academic
-// rows, review scores and learner skills, specialist and vocational cards,
-// experiences and signatures, each part with its own colour.
+// per report, in English or in Vietnamese. Top to bottom: header, level key,
+// student and homeroom comment, academic rows (course description above the
+// individual comment), review scores and learner skills, specialist cards
+// (individual comments), vocational cards (course descriptions), a slim
+// signature row and the footer, each part with its own colour.
 //
 // Text is measured with pdfmake itself before it is placed. All comments share
 // one text size: the largest at which every comment fits once the page height
 // is shared out between the sections (a section with more to say gets a little
-// more room). Only if the smallest size still does not fit is text cut short,
-// and that is reported so the editor can say which box is too full. No browser
-// APIs here: `reportPdf.js` loads pdfmake, the logo, photos and icons.
+// more room). Course descriptions are set in their own smaller style. Only if
+// the smallest size still does not fit is text cut short, and that is reported
+// so the editor can say which box is too full. No browser APIs here:
+// `reportPdf.js` loads pdfmake, the logo, photos and icons.
+//
+// Measured 24 September 2026 with real English and Vietnamese text at every
+// TEXT_LIMITS length, for Nursery, Years 1, 3, 4, 7 and 8 and two partial-day
+// pages: nothing cut, comments at 8pt (Years 1 to 7) or the usual 8.25pt
+// (Nursery, Year 8, partial day), and 8.25pt everywhere with boxes 85% full.
 
 import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor } from './utils'
-import { reportStrings, reportTitle, voiceQuoted, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
+import { reportStrings, reportTitle, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
 import { partialFrom } from '../studentRecords'
 
 // One family of deep, saturated colours, all at a similar depth so no part
@@ -22,9 +30,8 @@ const C = {
   navy: '#15355c', blue: '#1f6fbf', green: '#43922a', ink: '#222d3a', muted: '#5f6b79', line: '#dde4ec',
   empty: '#e5e9ef', emptyText: '#6f7b88', tag: '#9aa5b1', topics: '#4f5a66', nameCol: '#f2f7fd',
   homeroomFill: '#e9f2fc', homeroomLine: '#b9d3ef', homeroomInk: '#185a9d',
-  voiceFill: '#fff3d4', voiceLine: '#efc55a', voiceInk: '#9a5700', quote: '#2f3f55', quoteMark: '#e8a317',
   photoFill: '#e7f0fa', photoRing: '#b9d3ef', initials: '#5f84ad', periodFill: '#e3eefa', periodDot: '#7fa8d6',
-  keyFill: '#f5f8fc',
+  keyFill: '#f5f8fc', sigLine: '#aebccb',
 }
 
 // Each part of the page: accent (title band and icons), deep (words), tint
@@ -40,10 +47,13 @@ const THEME = {
 const ICON_INK = '#163a63'
 
 // Text sizes (pt). Comments start at `body` and may go down to `bodyMin`.
+// Course descriptions (the "Topics covered" lines and the vocational cards)
+// are set at `topics`, down to `topicsMin`, so course text reads as course
+// text and comments about the child stand out.
 const F = {
   body: 8.25, bodyMin: 6.75,
-  topics: 7.2, next: 7.5, title: 9, cardTitle: 8.8, teacher: 6.8, pill: 6.6, bar: 8.7, barSub: 6.9, kicker: 6.6,
-  skill: 7, score: 8.8, ref: 5.8, head: 6.3, key: 6.1, exp: 7.5, quote: 8.2, sig: 9.3, role: 6.9, level: 6.8, levelDesc: 5.9, levelDescMin: 5.4,
+  topics: 7.2, topicsMin: 6.8, title: 9, cardTitle: 8.8, teacher: 6.8, pill: 6.6, bar: 8.7, barSub: 6.9, kicker: 6.6,
+  skill: 7, score: 8.8, ref: 5.8, head: 6.3, key: 6.1, sig: 9.3, role: 6.9, closing: 7, level: 6.8, levelDesc: 5.9, levelDescMin: 5.4,
   foot: 6.6, name: 10.2, info: 7.5, docTitle: 17.5, period: 8.8, tagline: 6.5,
 }
 
@@ -57,14 +67,16 @@ const GAP = 3
 const FOOT_GAP = 5.5 // above the footer rule
 const R = 7
 const BAR = 14
-const BOTTOM_H = 60
+const SIG_H = 27 // the signature row above the footer: closing message left, signature lines right
 const KEY_PAD = 3.4 // the level key under the header: padding above and below
 const KEY_NAME = 8.6 // its line of dots and names, above the descriptions
-// Room to spare is shared out in proportion to these weights, and the review
-// scores, skills and bottom row grow by at most GROW points. Academic learning
-// has the most text but a lower weight, so the rest of the page breathes.
-const WEIGHT = { homeroom: 74, academic: 205, mid: 100, specialist: 150, vocational: 126, bottom: 70 }
-const GROW = { homeroom: 14, mid: 16, bottom: 10 }
+// Room to spare is shared out in proportion to these weights, and the homeroom
+// comment, the review scores and skills, and the vocational cards (course
+// descriptions at a fixed size) grow by at most GROW points, so spare room goes
+// to the individual comments. Specialist cards now carry the longest comments
+// after the academic rows, so they take the second-largest share.
+const WEIGHT = { homeroom: 74, academic: 260, mid: 100, specialist: 165, vocational: 90 }
+const GROW = { homeroom: 14, mid: 16, vocational: 10 }
 
 // Roboto metrics (em): line box, ascender, cap height, x-height.
 const LINE = 1.1718
@@ -144,7 +156,6 @@ function shareHeight(needs, total, weights = needs.map(() => 1), caps = needs.ma
 }
 
 const plain = (t) => (Array.isArray(t) ? t.map((p) => (typeof p === 'string' ? p : plain(p.text))).join('') : String(t ?? ''))
-const clean = (list) => (list || []).map((e) => (e || '').trim()).filter(Boolean)
 const sum = (list) => list.reduce((a, b) => a + b, 0)
 
 // ---------------------------------------------------------------------------
@@ -357,6 +368,8 @@ function buildPage(item, M, { proof, icons = {} }) {
     })
   }
   const BODY = { min: F.bodyMin, usual: F.body, body: true, style: { pitch: 1.23 } }
+  // Course descriptions: the same small muted style on the academic rows and the vocational cards.
+  const TOPICS = { base: F.topics, min: F.topicsMin, style: { pitch: 1.22, color: C.topics }, label: t.topicsCovered }
   const picked = (en, v) => {
     const p = pick(en, v)
     return { content: (p.text || '').trim(), missing: p.missing }
@@ -502,7 +515,7 @@ function buildPage(item, M, { proof, icons = {} }) {
   const bw = W - nameW - 18
   const PAD_T = 3.5
   const PAD_B = 3.25
-  const RULE = 3 // gap, dotted rule and gap between the parts of an academic row
+  const RULE = 3 // gap, dotted rule and gap between the course description and the comment
   const ROW_MIN = 50
   const ROW_COMFY = 80 // room for the name, teacher, level and a large icon
   // One or two lines, whichever the text needs.
@@ -510,13 +523,11 @@ function buildPage(item, M, { proof, icons = {} }) {
   const rows = tiers.academic.map((s) => {
     const area = subjectByKey(settings, s.subject_key).name
     const note = noteFor(s.subject_key)
+    // The course description on top (left out of a draft while it is still empty), then the comment.
     const topics = (note?.description || '').trim()
-      ? { name: `${area} topics covered`, base: F.topics, min: 6.8, style: { pitch: 1.22, color: C.topics }, label: t.topicsCovered, labelColor: THEME.vocational.deep, x: bx, w: bw, ...picked(note.description, note.description_vi) }
+      ? { ...TOPICS, name: `${area} course description`, labelColor: THEME.vocational.deep, x: bx, w: bw, ...picked(note.description, note.description_vi) }
       : null
     if (topics) topics.h = lines(topics)
-    const nextText = picked(s.next_focus, s.next_focus_vi)
-    const next = nextText.content ? { name: `${area} next focus`, base: F.next, min: 7, style: { pitch: 1.22 }, label: t.nextFocus, labelColor: THEME.academic.accent, x: bx, w: bw, ...nextText } : null
-    if (next) next.h = lines(next)
     const comment = { ...BODY, name: `${area} comment`, x: bx, w: bw, ...picked(s.comment, s.comment_vi) }
     // The name column: name, teacher and level. A long name ("Communication & Language")
     // wraps onto two lines, a little smaller, rather than being cut.
@@ -533,24 +544,43 @@ function buildPage(item, M, { proof, icons = {} }) {
     const nameH = wrap ? wrap.h + 1 : F.title * LINE
     const textH = nameH + (teacher ? 2 + F.teacher * LINE : 0) + 4.5 + pillFit(s.level, nameW - 12).h
     const label = { teacher, wrap, nameH, textH, min: textH + 11.5 }
-    return { s, topics, next, comment, label, fixed: PAD_T + PAD_B + (topics ? topics.h + RULE : 0) + (next ? next.h + RULE : 0) }
+    return { s, topics, comment, label, fixed: PAD_T + PAD_B + (topics ? topics.h + RULE : 0) }
   })
 
   const cardTiers = ['specialist', 'vocational'].filter((k) => tiers[k].length)
   // Each tier's cards share the full width (two areas make two wide cards, one area one full-width card).
   const cardW = Object.fromEntries(cardTiers.map((k) => [k, W / tiers[k].length]))
-  const CARD_TOP = 25
+  // Card header: the icon badge, area name and level pill on one line under the
+  // band. The teacher's name joins that line when it fits on every card of the
+  // tier, else each card gives it a line of its own, so the cards of a tier
+  // look alike and their text boxes line up.
+  const CARD_HEAD = 3.5
   const CARD_PAD = 4
+  const HEAD_ONE = CARD_HEAD + PILL_H + 4 // text top when the teacher shares the title line
+  const TEACHER_Y = CARD_HEAD + PILL_H + 0.5 // the teacher's own line, when needed
+  const HEAD_TWO = TEACHER_Y + F.teacher * LINE + 1
   const cards = Object.fromEntries(cardTiers.map((tier) => [tier, tiers[tier].map((s) => {
     const sub = subjectByKey(settings, s.subject_key)
     const note = noteFor(s.subject_key)
     const voc = tier === 'vocational'
+    const cw = cardW[tier]
+    const teacher = teacherOf(s)
+    const titleW = M.width({ text: nameIn(sub), ...T(F.cardTitle, { bold: true, pitch: 1 }) })
+    const teacherW = teacher ? M.width({ text: teacher, ...T(F.teacher, { pitch: 1 }) }) : 0
+    const roomForTeacher = cw - 27 - 8 - pillFit(s.level, cw * 0.55).w - 5 - titleW - 6
+    const oneLine = !teacher || teacherW <= roomForTeacher
+    // Specialist cards hold the individual comment (the shared body size); vocational cards the course description.
     return {
-      ...BODY, s, sub, name: `${sub.name} ${voc ? 'topics covered' : 'comment'}`, w: cardW[tier] - 16,
+      ...(voc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, teacher, titleW, oneLine,
+      name: `${sub.name} ${voc ? 'course description' : 'comment'}`, w: cw - 16,
       label: voc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
       ...(voc ? picked(note?.description, note?.description_vi) : picked(s.comment, s.comment_vi)),
     }
   })]))
+  const tierOneLine = Object.fromEntries(cardTiers.map((k) => [k, cards[k].every((c) => c.oneLine)]))
+  const cardTop = Object.fromEntries(cardTiers.map((k) => [k, tierOneLine[k] ? HEAD_ONE : HEAD_TWO]))
+  // A card's text height at comment size `s` (vocational cards keep their own size).
+  const cardText = (c, s) => M.height(boxNode(c, c.body ? s : c.base), c.w)
 
   const reviews = reviewRows(settings, { report, sections, history, cohortAvg, summativeAvg })
   const periods = (settings.periods || []).map((p) => ({ ...p, short: p.label.replace(/Quarter\s*/i, 'Q').replace(/Semester\s*/i, 'S').replace(/Term\s*/i, 'T') }))
@@ -560,9 +590,11 @@ function buildPage(item, M, { proof, icons = {} }) {
   const SCORE_KEY = 10.5
   const midMin = Math.max(reviews.length ? BAR + SCORE_HEAD + reviews.length * 17 + SCORE_KEY : 0, groups.length ? BAR + 13.5 + maxItems * 10.8 + 3 : 0)
 
-  // Every part from the homeroom row down to the bottom row shares the page's height.
-  const flexKeys = ['homeroom', ...(rows.length ? ['academic'] : []), ...(midMin ? ['mid'] : []), ...cardTiers, 'bottom']
-  const flexTotal = FOOT_Y - FOOT_GAP - startY - GAP * (flexKeys.length - 1)
+  // Every part from the homeroom row down to the last card tier shares the page's
+  // height; the signature row above the footer is a fixed height.
+  const flexKeys = ['homeroom', ...(rows.length ? ['academic'] : []), ...(midMin ? ['mid'] : []), ...cardTiers]
+  const sigY = FOOT_Y - FOOT_GAP - SIG_H
+  const flexTotal = sigY - GAP - startY - GAP * (flexKeys.length - 1)
 
   // The largest comment size at which everything fits.
   const rowNeed = (r, s) => Math.max(ROW_MIN, r.label.min, r.fixed + M.height(boxNode(r.comment, s), bw) + 0.5)
@@ -570,8 +602,7 @@ function buildPage(item, M, { proof, icons = {} }) {
     if (k === 'homeroom') return Math.max(photoD + 10, HR_TOP + M.height(boxNode(homeroom, s), homeroom.w) + HR_PAD)
     if (k === 'academic') return BAR + sum(rows.map((r) => rowNeed(r, s)))
     if (k === 'mid') return midMin
-    if (k === 'bottom') return BOTTOM_H
-    return BAR + CARD_TOP + Math.max(...cards[k].map((c) => M.height(boxNode(c, s), c.w))) + CARD_PAD
+    return BAR + cardTop[k] + Math.max(...cards[k].map((c) => cardText(c, s))) + CARD_PAD
   })
   const bodySizes = sizesOf({ base: F.body, min: F.bodyMin })
   const allNeeds = bodySizes.map(needsAt)
@@ -587,8 +618,6 @@ function buildPage(item, M, { proof, icons = {} }) {
   const shared = shareHeight(shareNeeds, flexTotal, flexKeys.map(weightOf), flexKeys.map((k, i) => (k in GROW ? shareNeeds[i] + GROW[k] : Infinity)))
   const heights = Object.fromEntries(flexKeys.map((k, i) => [k, shared[i]]))
   const midH = heights.mid || 0
-  const bottomH = heights.bottom
-  const bottomY = FOOT_Y - FOOT_GAP - bottomH
 
   // =========================================================================
   // Student and homeroom teacher comment
@@ -665,19 +694,14 @@ function buildPage(item, M, { proof, icons = {} }) {
       }
       pill(r.s.level, colMid, cy + 4.5, nameW - 12, 'center')
 
+      // The course description, a dotted rule, then the comment filling the rest of the row.
       let yTop = ry + PAD_T
-      let yBottom = ry + rowH - PAD_B
+      const yBottom = ry + rowH - PAD_B
       if (r.topics) {
         placeBoxes([{ ...r.topics, y: yTop }])
         yTop += r.topics.h + 1.5
         dotted(bx, yTop, bx + bw, yTop, theme.edge)
         yTop += RULE - 1.5
-      }
-      if (r.next) {
-        placeBoxes([{ ...r.next, y: yBottom - r.next.h }])
-        yBottom -= r.next.h + 1.5
-        dotted(bx, yBottom, bx + bw, yBottom, theme.edge)
-        yBottom -= RULE - 1.5
       }
       comments.push({ ...r.comment, base: body, y: yTop, h: yBottom - yTop })
       ry += rowH
@@ -769,72 +793,48 @@ function buildPage(item, M, { proof, icons = {} }) {
     const h = heights[tier]
     const cw = cardW[tier]
     frame(X, y, W, h, theme, title(tier), title(tier === 'specialist' ? 'specialistNote' : 'vocationalNote'))
+    const top = cardTop[tier]
     const boxes = cards[tier].map((c, i) => {
       const cx = X + i * cw
       const cy = y + BAR
       if (i > 0) dotted(cx, cy + 6, cx, y + h - 6, theme.edge)
-      const p = pill(c.s.level, cx + cw - 8, cy + 4.5, cw * 0.55, 'right')
-      badge(c.sub.icon, cx + 8 + 7.5, cy + 4.5 + PILL_H / 2, 15, theme.tint, theme.accent)
-      putLine(cx + 27, midTop(cy + 4.5 + PILL_H / 2, F.cardTitle, true), cw - 27 - 8 - p.w - 5, nameIn(c.sub), F.cardTitle, { bold: true, color: C.navy })
-      const teacher = teacherOf(c.s)
-      if (teacher) putLine(cx + 27, cy + 16.25, cw - 35, teacher, F.teacher, { color: C.muted })
-      return { ...c, base: body, x: cx + 8, y: cy + CARD_TOP, h: y + h - CARD_PAD - (cy + CARD_TOP) }
+      const p = pill(c.s.level, cx + cw - 8, cy + CARD_HEAD, cw * 0.55, 'right')
+      const mid = cy + CARD_HEAD + PILL_H / 2
+      badge(c.sub.icon, cx + 8 + 7.5, mid, 15, theme.tint, theme.accent)
+      const titleMax = cw - 27 - 8 - p.w - 5
+      const tw = putLine(cx + 27, midTop(mid, F.cardTitle, true), titleMax, nameIn(c.sub), F.cardTitle, { bold: true, color: C.navy })
+      if (c.teacher && tierOneLine[tier]) putLine(cx + 27 + tw + 6, midTop(mid, F.teacher), titleMax - tw - 6, c.teacher, F.teacher, { color: C.muted })
+      else if (c.teacher) putLine(cx + 27, cy + TEACHER_Y, cw - 35, c.teacher, F.teacher, { color: C.muted })
+      return { ...c, base: c.body ? body : c.base, x: cx + 8, y: cy + top, h: y + h - CARD_PAD - (cy + top) }
     })
     placeBoxes(boxes)
     y += h + GAP
   }
 
   // =========================================================================
-  // Experiences, student voice, signatures
-  const colGap = 9
-  const unit = (W - 2 * colGap) / (1.15 + 1.3 + 0.7)
-  const c1 = unit * 1.15
-  const c2 = unit * 1.3
-  const c3 = W - 2 * colGap - c1 - c2
-  const green = THEME.vocational
-  // The three bottom columns share one heading line.
-  icon('award', X, bottomY + 5, 8.5, green.accent)
-  kicker(X + 11, bottomY + 6, c1 - 11, t.experiences, green.deep)
-  const expEn = clean(report.experiences)
-  const expVi = clean(report.experiences_vi)
-  const exp = pick(expEn.join('\n'), expVi.join('\n'))
-  // Fewer Vietnamese lines than English ones: some are still to translate.
-  if (vi && expVi.length > 0 && expVi.length < expEn.length) exp.missing = true
-  placeBoxes([{
-    name: 'Experiences', base: F.exp, min: 6.8, style: { pitch: 1.22 }, list: true, marker: green.accent, x: X, y: bottomY + 15.5, w: c1, h: bottomH - 15.5,
-    content: exp.text ? exp.text.split('\n') : [], missing: exp.missing,
-  }])
-
-  const vx = X + c1 + colGap
-  // The standard heading ("In …'s words") quotes the student; a template's own heading ("What … loves") does not.
-  const quoted = voiceQuoted(template)
-  rect(vx, bottomY, c2, bottomH, { r: 9, fill: C.voiceFill, stroke: C.voiceLine })
-  icon(quoted ? 'quote' : 'star', vx + c2 - 19, bottomY + 3.5, 11, C.quoteMark)
-  kicker(vx + 9, bottomY + 6, c2 - 36, title('voice'), C.voiceInk)
-  const voice = picked(report.student_voice, report.student_voice_vi)
-  placeBoxes([{
-    name: "Student's words", base: F.quote, min: 7, style: { pitch: 1.2, italics: quoted, color: C.quote }, x: vx + 9, y: bottomY + 15, w: c2 - 18, h: bottomH - 15 - 4,
-    content: voice.content ? (quoted ? `“${voice.content}”` : voice.content) : '', missing: voice.missing,
-  }])
-
-  const sigX = vx + c2 + colGap
+  // Signatures: the closing message on the left, the signature lines side by
+  // side on the right, in one slim row above the footer.
   const sigs = reportSignatures(schedule, report)
-  const slot = bottomH / Math.max(1, sigs.length)
+  const SIG_GAP = 14
+  const sigW = sigs.length ? Math.min(150, (W * 0.5 - SIG_GAP * (sigs.length - 1)) / sigs.length) : 0
+  const sigX0 = X + W - (sigs.length ? sigs.length * sigW + SIG_GAP * (sigs.length - 1) : 0)
   sigs.forEach((sg, i) => {
-    const sy = bottomY + i * slot + (slot - 27) / 2
-    if (sg.name) putLine(sigX, sy + 1, c3, sg.name, F.sig, { italics: true, color: C.navy })
-    line(sigX, sy + 15, sigX + c3, sy + 15, { color: '#aebccb', lw: 0.8, cap: 'round' })
-    putLine(sigX, sy + 17.5, c3, roleLabel(sg.role, lang), F.role, { bold: true })
+    const sx = sigX0 + i * (sigW + SIG_GAP)
+    if (sg.name) putLine(sx, sigY + 1, sigW, sg.name, F.sig, { italics: true, color: C.navy })
+    line(sx, sigY + 14.5, sx + sigW, sigY + 14.5, { color: C.sigLine, lw: 0.8, cap: 'round' })
+    putLine(sx, sigY + 17, sigW, roleLabel(sg.role, lang), F.role, { bold: true })
   })
+  const closing = ((vi && org.closing_vi) || org.closing || '').replace('{nickname}', nick).replace('{name}', student?.full_name || '')
+  if (closing) {
+    const cw = sigX0 - SIG_GAP - X
+    const node = { text: closing, ...T(F.closing, { italics: true, color: C.muted, pitch: 1.22 }) }
+    put(X, sigY + Math.max(0, (SIG_H - M.height(node, cw)) / 2), cw, node)
+  }
 
   // =========================================================================
-  // Footer
+  // Footer: the legal line.
   line(X, FOOT_Y, X + W, FOOT_Y, { color: C.line })
-  const legal = org.legalLine || ''
-  const legalW = legal ? Math.min(W * 0.55, M.width({ text: legal, ...T(F.foot, { pitch: 1 }) })) : 0
-  if (legal) putLine(X + W - legalW, FOOT_Y + 3.5, legalW, legal, F.foot, { color: C.muted, align: 'right' })
-  const closing = ((vi && org.closing_vi) || org.closing || '').replace('{nickname}', nick).replace('{name}', student?.full_name || '')
-  if (closing) putLine(X, FOOT_Y + 3.5, W - legalW - 12, closing, F.foot, { italics: true, color: C.muted })
+  if (org.legalLine) putLine(X, FOOT_Y + 3.5, W, org.legalLine, F.foot, { color: C.muted, align: 'center' })
 
   return { fills, strokes, nodes, checks }
 }

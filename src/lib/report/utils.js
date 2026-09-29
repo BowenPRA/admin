@@ -47,6 +47,18 @@ export function skillGroupsFor(settings, report) {
 
 export const TIER_KEYS = ['academic', 'specialist', 'vocational']
 
+/**
+ * What teachers write for a learning area: an individual comment on each
+ * student, one course description for the year group, or both (core areas).
+ * The tier (subject.kind) decides; every screen reads this so they agree.
+ */
+export const WRITING = {
+  academic: { comment: true, description: true },
+  specialist: { comment: true, description: false },
+  vocational: { comment: false, description: true },
+}
+export const writingFor = (settings, key) => WRITING[subjectByKey(settings, key).kind] || WRITING.vocational
+
 /** A section's tier comes from the current settings, so re-tiering an area applies to existing reports. */
 export function tierOf(settings, section) {
   return (settings?.subjects || []).find((s) => s.key === section.subject_key)?.kind || section.kind || 'vocational'
@@ -174,46 +186,107 @@ export function buildReport(student, period, template, settings, homeroom = '') 
   }
 }
 
-/** A section is done when it has a level and, except for vocational areas, a comment. */
-export function sectionDone(settings, s) {
-  return !!s.level && (tierOf(settings, s) === 'vocational' || !!(s.comment || '').trim())
+/** Whether `text` is written: at least `min` characters (a box with no minimum only needs some text). */
+const written = (text, min) => charCount(text) >= Math.max(1, min || 0)
+
+/**
+ * A section is done when it has a level and, for areas with an individual
+ * comment, a comment at least as long as its minimum. A shorter comment is
+ * flagged as incomplete everywhere (completion, task lists), though nothing
+ * stops it being saved. `report` picks the template's minimums (Early Years).
+ */
+export function sectionDone(settings, s, report = null) {
+  if (!s.level) return false
+  const tier = tierOf(settings, s)
+  if (!(WRITING[tier] || WRITING.vocational).comment) return true
+  return written(s.comment, textMinimums(settings, report)[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
+}
+
+/** The homeroom teacher comment is done once it reaches its minimum. */
+export const homeroomDone = (settings, report) => written(report?.homeroom_note, textMinimums(settings, report).homeroom_note)
+
+/** A course description (shared note) for `key` in `yearGroup` is done once it reaches its minimum (core areas have none). */
+export function descriptionDone(settings, note, yearGroup) {
+  const kind = subjectByKey(settings, note?.subject_key || '').kind
+  const min = textMinimums(settings, { year_group: yearGroup })[kind === 'academic' ? 'academic_topics' : 'vocational_topics']
+  return written(note?.description, min)
 }
 
 /** How much of a report is filled in: every section plus the homeroom teacher comment. */
 export function completion(report, sections, settings) {
   const total = sections.length + 1
-  const done = sections.filter((s) => sectionDone(settings, s)).length + ((report.homeroom_note || '').trim() ? 1 : 0)
+  const done = sections.filter((s) => sectionDone(settings, s, report)).length + (homeroomDone(settings, report) ? 1 : 0)
   return { done, total, pct: Math.round((done / total) * 100) }
 }
 
 export const HOMEROOM_PART = '_homeroom'
 
 /**
+ * The course descriptions one person still writes for these reports: one per
+ * (year group, area) that is on their Teachers row (`subjects`), needs a
+ * description (writingFor) and appears on at least one of the reports. Done
+ * once the note has enough English text, or every report of the group is
+ * published. `notes` are the period's adm_course_notes rows.
+ *   [{ yearGroup, key, name, note, done, report }]  (report = where to write it: the first unpublished one)
+ */
+export function descriptionTasks(settings, reports, sections, { subjects = [], notes = [] } = {}) {
+  const out = []
+  for (const yearGroup of [...new Set(reports.map((r) => r.year_group))]) {
+    const rs = reports.filter((r) => r.year_group === yearGroup)
+    const ids = new Set(rs.map((r) => r.id))
+    const keys = [...new Set(sections.filter((s) => ids.has(s.report_id)).map((s) => s.subject_key))]
+    for (const key of keys) {
+      if (!subjects.includes(`${key}:${yearGroup}`) || !writingFor(settings, key).description) continue
+      const note = notes.find((n) => n.year_group === yearGroup && n.subject_key === key) || null
+      const done = rs.every((r) => r.status === 'published') || descriptionDone(settings, note || { subject_key: key }, yearGroup)
+      out.push({ yearGroup, key, name: subjectByKey(settings, key).name, note, done, report: rs.find((r) => r.status !== 'published') || rs[0] })
+    }
+  }
+  return out
+}
+
+/**
  * One person's own share of the writing in a set of reports: the learning areas on
  * their Teachers row (`english:Year 7`) plus the homeroom comment for their homeroom
  * year groups. Heads may edit everything, but only what is assigned to them counts.
- * Parts of published reports count as done.
- *   { done, total, groups: [{ yearGroup, done, total, areas: [{ key, name, done, total }] }] }
- * Areas follow the order of settings.subjects, with the homeroom comment last.
+ * Parts of published reports count as done. Each area has a per-student part
+ * (a level, plus an individual comment where the area has one) and, where the
+ * area has a course description, one description task for the year group.
+ *   { done, total, groups: [{ yearGroup, done, total,
+ *       areas: [{ key, name, tier, done, total, description: null | { done } }] }] }
+ * Group and overall totals include the description tasks. Areas follow the
+ * order of settings.subjects, with the homeroom comment last.
  */
-export function reportWork(settings, reports, sections, { subjects = [], homeroom_groups = [] } = {}) {
+export function reportWork(settings, reports, sections, { subjects = [], homeroom_groups = [], notes = [] } = {}) {
   const byReport = new Map()
   for (const s of sections) byReport.set(s.report_id, [...(byReport.get(s.report_id) || []), s])
   const groups = new Map()
-  const tally = (yearGroup, key, done) => {
+  const areaOf = (yearGroup, key) => {
     if (!groups.has(yearGroup)) groups.set(yearGroup, { yearGroup, done: 0, total: 0, areas: new Map() })
     const g = groups.get(yearGroup)
-    if (!g.areas.has(key)) g.areas.set(key, { key, name: key === HOMEROOM_PART ? 'Homeroom' : subjectByKey(settings, key).name, done: 0, total: 0 })
-    const a = g.areas.get(key)
+    if (!g.areas.has(key)) {
+      const homeroom = key === HOMEROOM_PART
+      g.areas.set(key, { key, name: homeroom ? 'Homeroom' : subjectByKey(settings, key).name, tier: homeroom ? null : subjectByKey(settings, key).kind, done: 0, total: 0, description: null })
+    }
+    return [g, g.areas.get(key)]
+  }
+  const tally = (yearGroup, key, done) => {
+    const [g, a] = areaOf(yearGroup, key)
     a.total++; g.total++
     if (done) { a.done++; g.done++ }
   }
   for (const r of reports) {
     const published = r.status === 'published'
     for (const s of byReport.get(r.id) || []) {
-      if (subjects.includes(`${s.subject_key}:${r.year_group}`)) tally(r.year_group, s.subject_key, published || sectionDone(settings, s))
+      if (subjects.includes(`${s.subject_key}:${r.year_group}`)) tally(r.year_group, s.subject_key, published || sectionDone(settings, s, r))
     }
-    if (homeroom_groups.includes(r.year_group)) tally(r.year_group, HOMEROOM_PART, published || !!(r.homeroom_note || '').trim())
+    if (homeroom_groups.includes(r.year_group)) tally(r.year_group, HOMEROOM_PART, published || homeroomDone(settings, r))
+  }
+  for (const d of descriptionTasks(settings, reports, sections, { subjects, notes })) {
+    const [g, a] = areaOf(d.yearGroup, d.key)
+    a.description = { done: d.done }
+    g.total++
+    if (d.done) g.done++
   }
   const keys = (settings?.subjects || []).map((s) => s.key)
   const order = (k) => (k === HOMEROOM_PART ? Infinity : keys.includes(k) ? keys.indexOf(k) : keys.length)

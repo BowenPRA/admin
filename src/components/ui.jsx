@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Lock, Search, X } from 'lucide-react'
+import { Lock, Search, X, CloudCheck } from 'lucide-react'
 import { fmt, parseMoney } from '../lib/money'
 
 export function Field({ label, children, className = '', hint, right }) {
@@ -237,10 +237,15 @@ export function LevelPicker({ value, onChange, levels, disabled, size = 'md' }) 
   )
 }
 
-/** Small "Saved" / "Saving…" indicator: state is 'idle' | 'saving' | 'saved' | 'error'. */
+/**
+ * Small "Saved" / "Saving…" indicator: state is 'idle' | 'saving' | 'saved' | 'synced' | 'error'.
+ * 'saved' is the moment a save lands; 'synced' stays up afterwards so the
+ * writer can see that what is on screen is still saved.
+ */
 export function SaveState({ state }) {
   if (state === 'saving') return <span className="text-xs font-semibold text-slate-400">Saving…</span>
   if (state === 'saved') return <span className="text-xs font-semibold text-green-600">Saved ✓</span>
+  if (state === 'synced') return <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500" title="Everything you typed is saved"><CloudCheck size={14} className="text-green-600" /> All changes saved</span>
   if (state === 'error') return <span className="text-xs font-semibold text-red-600">Not saved</span>
   return null
 }

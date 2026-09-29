@@ -2,8 +2,7 @@
 // one JSON file, has Claude (desktop app) fill in the Vietnamese, then uploads
 // the file Claude returns. Nothing is sent anywhere by the app itself.
 
-import { subjectByKey, sectionsByTier, studentSections, TIER_KEYS, templateOf, templateForYearGroup, textLimits } from './utils'
-import { reportTitle, voiceQuoted } from './strings'
+import { subjectByKey, sectionsByTier, studentSections, TIER_KEYS, templateForYearGroup, textLimits, writingFor } from './utils'
 import { legalFirstName } from '../names'
 import { wordingIssues } from './wording'
 
@@ -17,7 +16,7 @@ const INSTRUCTIONS = [
   'Scores are "điểm" and assessments are "bài đánh giá". Never write "bài kiểm tra", "bài thi" or "thi".',
   'Use the Vietnamese in "glossary" for learning areas, levels and skills. Keep people\'s names and titles (e.g. Mr. Caleb), program names, numbers, percentages and scores exactly as written.',
   'Each part has "max_chars", the most characters its box on the one-page report can hold. Stay within it; if Vietnamese runs long, say the same thing more concisely rather than dropping meaning.',
-  '"In the student\'s words" parts are the student\'s own voice: keep them first person and simple. Experience lines are short bullet points.',
+  'Reporting periods are quarters: write "quý", never "học kỳ" or "kỳ".',
   'Plain text only, no markdown. Translate only what is there: no greetings, additions or notes.',
   'When done, give back the complete file as a downloadable JSON file with exactly the same structure, named like the original with "-vi" added.',
 ]
@@ -50,16 +49,9 @@ function reportParts(report, sections, settings) {
   for (const tier of TIER_KEYS) {
     for (const s of tiers[tier] || []) {
       const name = subjectByKey(settings, s.subject_key).name
-      if (tier !== 'vocational') add(`section:${s.id}:comment`, `${name}: teacher comment`, s.comment, s.comment_vi, limits[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
-      if (tier === 'academic') add(`section:${s.id}:next_focus`, `${name}: next focus (one short sentence)`, s.next_focus, s.next_focus_vi, limits.next_focus)
+      if (writingFor(settings, s.subject_key).comment) add(`section:${s.id}:comment`, `${name}: individual teacher comment`, s.comment, s.comment_vi, limits[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
     }
   }
-  ;(report.experiences || []).forEach((e, i) => add(`report:${report.id}:exp:${i}`, 'Experiences & growth this quarter (one short bullet line)', e, report.experiences_vi?.[i], limits.experience))
-  const template = templateOf(settings, report)
-  const voiceWhere = voiceQuoted(template)
-    ? "In the student's words: what they enjoyed most (the student's own voice)"
-    : `${reportTitle(template, 'voice', 'en', { nickname: 'the student' })}: favourite activities, written by the teacher (anything in quotation marks is the child's own words)`
-  add(`report:${report.id}:student_voice`, voiceWhere, report.student_voice, report.student_voice_vi, limits.student_voice)
   return parts
 }
 
@@ -75,9 +67,9 @@ export function buildTranslationFile({ reports, sections, notes, students, setti
   const groups = new Set(bi.map((r) => r.year_group))
   const shared_topics = notes
     .filter((n) => groups.has(n.year_group) && filled(n.description))
-    // Only areas that are topics on the page (academic topics and vocational descriptions).
-    .filter((n) => subjectByKey(settings, n.subject_key).kind !== 'specialist')
-    .map((n) => ({ id: `note:${n.id}:description`, year_group: n.year_group, where: `${subjectByKey(settings, n.subject_key).name}: topics covered this quarter, shared by every ${n.year_group} report`, max_chars: topicsLimit(settings, n.subject_key, n.year_group), english: n.description.trim(), vietnamese: n.description_vi || '' }))
+    // Only areas with a course description on the page (core and vocational areas).
+    .filter((n) => writingFor(settings, n.subject_key).description)
+    .map((n) => ({ id: `note:${n.id}:description`, year_group: n.year_group, where: `${subjectByKey(settings, n.subject_key).name}: course description (topics covered this quarter), shared by every ${n.year_group} report`, max_chars: topicsLimit(settings, n.subject_key, n.year_group), english: n.description.trim(), vietnamese: n.description_vi || '' }))
     .filter(keep)
   const out = bi.map((r) => {
     const student = students.find((s) => s.id === r.student_id)
@@ -149,19 +141,16 @@ export function planTranslationImport(data, { reports, sections, notes, students
   for (const part of collectParts(data)) {
     const vi = String(part.vietnamese || '').normalize('NFC').trim()
     if (!vi) { emptyParts++; continue }
-    const [kind, rowId, field, index] = part.id.split(':')
+    // Parts from older files (next focus, experiences, student's words) no longer print, so they count as not found.
+    const [kind, rowId, field] = part.id.split(':')
     let row, english, current, max, report, where = part.where || ''
     if (kind === 'report' && (row = reportById.get(rowId))) {
       report = row
-      const limits = textLimits(settings, row)
-      if (field === 'exp') { english = row.experiences?.[Number(index)]; current = row.experiences_vi?.[Number(index)]; max = limits.experience }
-      else if (field === 'homeroom_note' || field === 'student_voice') { english = row[field]; current = row[`${field}_vi`]; max = limits[field] }
+      if (field === 'homeroom_note') { english = row.homeroom_note; current = row.homeroom_note_vi; max = textLimits(settings, row).homeroom_note }
     } else if (kind === 'section' && (row = sectionById.get(rowId))) {
       report = reportById.get(row.report_id)
       const tier = subjectByKey(settings, row.subject_key).kind
-      const limits = textLimits(settings, report)
-      if (field === 'comment') { english = row.comment; current = row.comment_vi; max = limits[tier === 'academic' ? 'academic_comment' : 'specialist_comment'] }
-      else if (field === 'next_focus') { english = row.next_focus; current = row.next_focus_vi; max = limits.next_focus }
+      if (field === 'comment' && writingFor(settings, row.subject_key).comment) { english = row.comment; current = row.comment_vi; max = textLimits(settings, report)[tier === 'academic' ? 'academic_comment' : 'specialist_comment'] }
     } else if (kind === 'note' && field === 'description' && (row = noteById.get(rowId))) {
       english = row.description; current = row.description_vi; max = topicsLimit(settings, row.subject_key, row.year_group)
     }
@@ -169,7 +158,7 @@ export function planTranslationImport(data, { reports, sections, notes, students
     if ((current || '').trim() === vi) { unchanged++; continue }
     const n = kind === 'note' ? { who: `All ${row.year_group} reports`, legal: '', nickname: '' } : nameFor(report)
     changes.push({
-      id: part.id, kind, rowId, field, index: index != null ? Number(index) : undefined, vi, current: current || '', where, who: n.who,
+      id: part.id, kind, rowId, field, vi, current: current || '', where, who: n.who,
       englishChanged: (english || '').trim() !== String(part.english || '').trim(),
       over: vi.length > max, max, published: report?.status === 'published',
       issues: wordingIssues(vi, { lang: 'vi', legalName: n.legal, nickname: n.nickname, messages: 'en' }),
@@ -189,14 +178,7 @@ export async function applyTranslationImport(changes, db, { period, schoolYear }
   for (const c of changes) {
     const base = touched[c.kind].get(c.rowId) || source[c.kind].get(c.rowId)
     if (!base) continue
-    const row = { ...base }
-    if (c.field === 'exp') {
-      const list = [...(row.experiences_vi || [])]
-      list[c.index] = c.vi
-      row.experiences_vi = (row.experiences || []).map((_, i) => list[i] || '')
-    } else {
-      row[`${c.field}_vi`] = c.vi
-    }
+    const row = { ...base, [`${c.field}_vi`]: c.vi }
     touched[c.kind].set(c.rowId, row)
   }
   if (touched.report.size) await db.reports.saveMany([...touched.report.values()])

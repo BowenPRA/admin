@@ -94,14 +94,14 @@ function SettingsForm({ initial }) {
         </div>
       </Card>
 
-      <Card title="Learning areas" subtitle="The tier decides how an area prints: academic (level, review score, comment), specialist (level, comment) or vocational (level, plus topics covered shared by the year group). The key gives teachers their permissions, so avoid renaming keys once reports exist.">
+      <Card title="Learning areas" subtitle="The tier decides what teachers write and how it prints: academic (level, review score, individual comment and course description), specialist (level and individual comment) or vocational (level and a course description shared by the year group). The key gives teachers their permissions, so avoid renaming keys once reports exist.">
         <div className="space-y-3">
           {s.subjects.map((sub, i) => (
             <div key={i} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_130px_120px_auto]">
               <Field label="Name"><TextInput value={sub.name} onChange={(v) => set(`subjects.${i}.name`, v)} /></Field>
               <Field label="Vietnamese"><TextInput value={sub.name_vi} onChange={(v) => set(`subjects.${i}.name_vi`, v)} /></Field>
               <Field label="Key"><TextInput value={sub.key} onChange={(v) => set(`subjects.${i}.key`, slug(v))} /></Field>
-              <Field label="Tier"><Select value={sub.kind} onChange={(v) => set(`subjects.${i}.kind`, v)} options={TIERS.map((t) => ({ value: t.key, label: t.short }))} /></Field>
+              <Field label="Tier"><Select value={sub.kind} onChange={(v) => set(`subjects.${i}.kind`, v)} options={TIERS.map((t) => ({ value: t.key, label: `${t.short} (${{ academic: 'comment + description', specialist: 'comment', vocational: 'description' }[t.key]})` }))} /></Field>
               <Field label="Icon"><Select value={sub.icon} onChange={(v) => set(`subjects.${i}.icon`, v)} options={iconOpts} /></Field>
               <div className="flex items-end gap-1 pb-1">
                 <button className="btn-ghost px-2" onClick={() => move('subjects', i, -1)}><ArrowUp size={14} /></button>
@@ -176,7 +176,7 @@ function SettingsForm({ initial }) {
                       <Field label={`${f.label} (Vietnamese)`}><TextInput value={t.titles?.[`${f.key}_vi`] || ''} placeholder={reportStrings('vi').titles[f.key]} onChange={(v) => set(`templates.${k}.titles`, { ...(t.titles || {}), [`${f.key}_vi`]: v })} /></Field>
                     </div>))}
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">{'{nickname}'} is replaced by the student's first name and {'{yearGroup}'} by the year group. With its own student's words heading, that box prints without quotation marks.</p>
+                  <p className="mt-1 text-xs text-slate-400">{'{nickname}'} is replaced by the student's first name and {'{yearGroup}'} by the year group.</p>
                 </details>
                 <div className="mt-3">
                   <Checkbox checked={Array.isArray(t.skillGroups)} label="Its own learner skills (instead of the shared list below)"

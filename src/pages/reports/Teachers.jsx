@@ -10,8 +10,12 @@ import { LEVELS } from '../../lib/fees'
 import { isEnrolled } from '../../lib/studentRecords'
 import { TEACHER_SCHEDULE, OFFICE_ACCOUNTS, ACCESS_ROLES, splitSubjectKey } from '../../data/staff'
 import { sameTeacher } from '../../lib/schedule'
-import { scheduledHomeroom, templateForYearGroup, areasFor } from '../../lib/report/utils'
+import { scheduledHomeroom, templateForYearGroup, areasFor, writingFor } from '../../lib/report/utils'
 import { Card, Field, TextInput, Select, Checkbox, Modal, Empty, Spinner, Chip, PageHeader, Avatar } from '../../components/ui'
+import { WritingTags, WritingLegend } from '../../components/report/WritingTags'
+
+// Inside a year-group pill: core areas (both) first, then comment areas, then description areas.
+const writingOrder = (settings, k) => { const w = writingFor(settings, k); return w.comment && w.description ? 0 : w.comment ? 1 : 2 }
 
 const blank = () => ({ email: '', name: '', title: 'Mr.', role: 'teacher', subjects: [], homeroom_groups: [], active: true })
 const shortLevel = (g) => (g === 'Nursery' ? 'N' : g === 'Kindergarten' ? 'K' : g === 'Upper Secondary' ? 'US' : g === '*' ? 'All' : g.replace('Year ', 'Y'))
@@ -154,7 +158,7 @@ export default function Teachers() {
       {!teachers.length ? <Empty text="No teachers yet. " >{missingFromSchedule.length > 0 && <button className="font-semibold text-pra-blue" onClick={addSchedule}>Add the 2026-27 teachers →</button>}</Empty> : (
         <Card className="!p-0 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50/60"><tr><th className="th pl-5">Teacher</th><th className="th">Teaches</th><th className="th">Homeroom</th><th className="th" /></tr></thead>
+            <thead className="border-b border-slate-100 bg-slate-50/60"><tr><th className="th pl-5">Teacher</th><th className="th"><span className="flex flex-wrap items-center gap-x-3">Teaches <WritingLegend className="font-normal normal-case tracking-normal" /></span></th><th className="th">Homeroom</th><th className="th" /></tr></thead>
             <tbody>
               {[...activeTeachers, ...teachers.filter((t) => t.active === false)].map((t) => {
                 const byGroup = {}
@@ -176,7 +180,11 @@ export default function Teachers() {
                         {Object.entries(byGroup).sort((a, b) => levelIndex(a[0]) - levelIndex(b[0])).map(([g, subs]) => (
                           <span key={g} className="inline-flex items-center overflow-hidden rounded-full border border-sky-200 text-xs">
                             <span className="bg-sky-100 px-2 py-0.5 font-bold text-sky-800">{g === 'any' ? 'Any year' : shortLevel(g)}</span>
-                            <span className="px-2 py-0.5 text-slate-700">{subs.map(subjName).join(', ')}</span>
+                            <span className="flex flex-wrap items-center gap-x-2 px-2 py-0.5 text-slate-700">
+                              {[...subs].sort((a, b) => writingOrder(settings, a) - writingOrder(settings, b)).map((k) => (
+                                <span key={k} className="inline-flex items-center gap-0.5 whitespace-nowrap">{subjName(k)} <WritingTags settings={settings} subjectKey={k} compact size={11} /></span>
+                              ))}
+                            </span>
                           </span>
                         ))}
                         {!(t.subjects || []).length && t.role !== 'head' && <span className="text-xs text-slate-400">No learning areas</span>}
@@ -196,13 +204,13 @@ export default function Teachers() {
       )}
 
       {coverage.length > 0 && (
-        <Card title="Who teaches what" subtitle="Year groups with enrolled students. Homeroom teachers come from the Schedule. Amber cells are on that year group's reports but have no teacher linked yet, so only the head teacher can write that part. Grey names are linked to an area those reports do not have." className="!p-0 [&>div:first-child]:px-5 [&>div:first-child]:pt-4">
+        <Card title="Who teaches what" subtitle={<>Year groups with enrolled students. Homeroom teachers come from the Schedule. Amber cells are on that year group's reports but have no teacher linked yet, so only the head teacher can write that part. Grey names are linked to an area those reports do not have. <WritingLegend className="mt-0.5" /></>} className="!p-0 [&>div:first-child]:px-5 [&>div:first-child]:pt-4">
           <div className="overflow-x-auto pb-2">
             <table className="w-full text-xs">
               <thead><tr className="border-b border-slate-100">
                 <th className="th pl-5">Year group</th>
                 <th className="th">Homeroom</th>
-                {subjects.map((s) => <th key={s.key} className="th whitespace-nowrap">{s.name}</th>)}
+                {subjects.map((s) => <th key={s.key} className="th whitespace-nowrap align-bottom">{s.name}<span className="block"><WritingTags settings={settings} subjectKey={s.key} compact /></span></th>)}
               </tr></thead>
               <tbody>
                 {coverage.map((row) => (
@@ -297,6 +305,7 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
             <Checkbox checked={allGroups} onChange={setAllGroups} label="Show every year group" className="text-xs" />
           </div>
           {legacyKeys.length > 0 && <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Old assignments without a year group ({legacyKeys.join(', ')}) no longer grant access. Tick the year groups below, then save.</p>}
+          <WritingLegend className="mb-1.5" />
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-xs">
               <thead className="bg-slate-50"><tr>
@@ -306,7 +315,7 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
               <tbody>
                 {settings.subjects.map((s) => (
                   <tr key={s.key} className="border-t border-slate-100">
-                    <td className="whitespace-nowrap py-1.5 pl-3 pr-3 font-semibold text-slate-700">{s.name} <span className="font-normal text-slate-400">{s.kind === 'specialist' ? '· spec.' : s.kind === 'vocational' ? '· voc.' : ''}</span></td>
+                    <td className="whitespace-nowrap py-1.5 pl-3 pr-3 font-semibold text-slate-700">{s.name} <WritingTags settings={settings} subjectKey={s.key} compact className="ml-1" /></td>
                     {groups.map((g) => {
                       const k = `${s.key}:${g}`
                       return (

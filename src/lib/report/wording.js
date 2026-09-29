@@ -12,11 +12,15 @@ const RULES = {
     { re: word('report\\s+cards?'), msg: 'This is a Learning Progress Report, not a "report card".' },
     { re: word('grades?|graded|grading'), msg: 'Say "scores" or "levels" instead of "grades".' },
     { re: /(?<!fair\s)(?<![\p{L}\p{N}])(?:tests?|tested|testing|exams?)(?![\p{L}\p{N}])/iu, msg: 'Say "assessments" instead of "tests".' },
+    // The reporting period is a quarter. Only "term" as a period of time: not
+    // "long-term", "in terms of", "key terms" (plural) or the term "fraction".
+    { re: /(?<![\p{L}\p{N}-])(?:term|termly)(?![\p{L}\p{N}])(?!\s*["'“‘])/iu, msg: 'Say "quarter" instead of "term".' },
   ],
   vi: [
     { re: /(?<!môi\s)(?<![\p{L}])trường(?![\p{L}])(?!\s+hợp)/iu, msg: 'Không gọi Palm River Academy là "trường". Dùng "Palm River Academy" hoặc "trung tâm".', en: 'Says "trường" (school). Use "Palm River Academy" or "trung tâm".' },
     { re: word('học bạ|sổ liên lạc'), msg: 'Đây là Báo cáo tiến bộ học tập, không phải "học bạ".', en: 'Says "học bạ" (report card). It is a "Báo cáo tiến bộ học tập".' },
     { re: word('(?:bài\\s+)?kiểm tra|bài thi|thi cử'), msg: 'Dùng "bài đánh giá" thay cho "kiểm tra" / "bài thi".', en: 'Says "kiểm tra" / "bài thi" (test). Use "bài đánh giá" (assessment).' },
+    { re: word('học kỳ|học kì'), msg: 'Dùng "quý" thay cho "học kỳ".', en: 'Says "học kỳ" (term). Use "quý" (quarter).' },
   ],
 }
 

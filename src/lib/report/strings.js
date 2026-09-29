@@ -10,7 +10,6 @@ const STRINGS = {
     notYet: 'Not yet',
     topicsCovered: 'Topics covered:',
     comment: 'Comment:',
-    nextFocus: 'Next focus:',
     scores: 'Progress Review Scores',
     learningArea: 'Learning area',
     summative: 'Summative',
@@ -19,13 +18,11 @@ const STRINGS = {
     scoresKey: 'TBD: still to come · N/A: not enrolled or not assessed',
     howILearn: 'How I Learn',
     levelsKey: 'Progress levels',
-    experiences: 'Experiences & growth',
     // Headings a template may reword ({nickname}, {yearGroup} are filled in).
     titles: {
       academic: 'Academic Learning', specialist: 'Specialist Learning', vocational: 'Vocational Learning',
       specialistNote: "Individual comments on {nickname}'s progress",
       vocationalNote: 'Course descriptions: topics the {yearGroup} group covered this quarter',
-      voice: "In {nickname}'s words",
     },
   },
   vi: {
@@ -35,7 +32,6 @@ const STRINGS = {
     notYet: 'Chưa đánh giá',
     topicsCovered: 'Nội dung đã học:',
     comment: 'Nhận xét:',
-    nextFocus: 'Mục tiêu tới:',
     scores: 'Điểm đánh giá tiến bộ',
     learningArea: 'Lĩnh vực',
     summative: 'Tổng kết',
@@ -44,12 +40,10 @@ const STRINGS = {
     scoresKey: 'TBD: chưa đến kỳ · N/A: không theo học hoặc không đánh giá',
     howILearn: 'Kỹ năng học tập',
     levelsKey: 'Mức độ tiến bộ',
-    experiences: 'Trải nghiệm & phát triển',
     titles: {
       academic: 'Học thuật', specialist: 'Môn chuyên biệt', vocational: 'Hướng nghiệp',
       specialistNote: 'Nhận xét riêng về sự tiến bộ của {nickname}',
       vocationalNote: 'Mô tả khóa học: nội dung {yearGroup} đã học trong quý này',
-      voice: 'Chia sẻ của {nickname}',
     },
   },
 }
@@ -63,7 +57,6 @@ export const TITLE_FIELDS = [
   { key: 'specialistNote', label: 'Specialist subtitle' },
   { key: 'vocational', label: 'Vocational tier heading' },
   { key: 'vocationalNote', label: 'Vocational subtitle' },
-  { key: 'voice', label: "Student's words heading" },
 ]
 
 const fill = (text, vars = {}) => String(text || '').replace(/\{(nickname|yearGroup)\}/g, (_, k) => vars[k] ?? '')
@@ -77,9 +70,6 @@ export function reportTitle(template, key, lang, vars) {
   const own = template?.titles?.[lang === 'vi' ? `${key}_vi` : key]
   return fill((own || '').trim() || reportStrings(lang).titles[key], vars)
 }
-
-/** Whether the student's words print in quotation marks: only under the standard "In …'s words" heading. */
-export const voiceQuoted = (template) => !(template?.titles?.voice || '').trim()
 
 export const LANG_NAMES = { en: 'English', vi: 'Tiếng Việt' }
 

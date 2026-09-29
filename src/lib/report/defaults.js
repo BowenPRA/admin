@@ -36,18 +36,20 @@ export const LEVELS = [
 
 // The three tiers of learning areas. A subject's `kind` is its tier, and the
 // tier decides what teachers write and how it prints:
-//   academic    level, progress review score, comment and next focus, plus an
-//               optional "topics covered" line shared by the year group
-//   specialist  level and a comment
-//   vocational  level, plus one "topics covered" description shared by the
-//               whole year group (no comment on the individual student)
+//   academic    level, progress review score and an individual comment for
+//               each student, plus one course description ("topics covered")
+//               shared by the year group
+//   specialist  level and an individual comment for each student
+//   vocational  level for each student, plus one course description shared by
+//               the whole year group (no individual comment)
+// WRITING in utils.js holds the same split as data, for the screens.
 export const TIERS = [
   { key: 'academic', name: 'Academic Learning', name_vi: 'Học thuật', short: 'Academic',
-    hint: 'Level, progress review score, comment and next focus for each student. Topics covered is optional and shared by the year group.' },
+    hint: 'Level, progress review score and an individual comment for each student, plus one course description shared by the year group.' },
   { key: 'specialist', name: 'Specialist Learning', name_vi: 'Môn chuyên biệt', short: 'Specialist',
-    hint: 'Level and a comment for each student.' },
+    hint: 'Level and an individual comment for each student.' },
   { key: 'vocational', name: 'Vocational Learning', name_vi: 'Hướng nghiệp', short: 'Vocational',
-    hint: 'Level for each student. Instead of a comment, one description of the topics covered is shared by the whole year group.' },
+    hint: 'Level for each student, plus one course description shared by the year group. No individual comment.' },
 ]
 
 // `yearGroups` limits an area to some year groups (empty = every year group
@@ -87,35 +89,31 @@ export const SUBJECTS = [
 // Character limits for the printed boxes. The report is one A4 page, printed
 // in English or in Vietnamese (never both on one page), so the same limit
 // applies to each language. With every box at its limit, the PDF
-// (reportPdfLayout.js) still fits without cutting anything: comments print at
-// 8pt in English and at the usual 8.25pt in Vietnamese (checked
-// with 3 academic, 3 specialist and 3 vocational areas). Longer text is set
+// (reportPdfLayout.js) still fits without cutting anything: see the measured
+// sizes in the header of reportPdfLayout.js (checked with 3 academic, 3
+// specialist and 3 vocational areas, in both languages). Longer text is set
 // smaller, then cut. Bowen does not want these limits lowered. A template can
 // raise a limit with its own `limits` (and `minimums`): Early Years has one
 // full-width Applied English card, which holds a longer comment.
+// Since 24 September 2026 there is no next focus, student voice or experiences
+// box: those columns stay in the database but no longer print.
 export const TEXT_LIMITS = {
-  homeroom_note: 490,
-  academic_topics: 115,
-  academic_comment: 600,
-  next_focus: 110,
-  specialist_comment: 360,
-  vocational_topics: 260,
-  student_voice: 190,
-  experience: 50,
-  experience_lines: 5,
+  homeroom_note: 500,
+  academic_topics: 120,
+  academic_comment: 750,
+  specialist_comment: 550,
+  vocational_topics: 250,
 }
 
-// Suggested minimums, shown beside each counter so teachers know roughly how
-// much to write. Advice only: nothing is blocked below them. Academic topics
-// are optional, so they have none.
+// Minimums, shown beside each counter so teachers know how much to write.
+// Nothing is blocked below them, but a comment or description shorter than its
+// minimum counts as not written yet (sectionDone in utils.js), so it stays on
+// the teacher's task list. The core course description has no minimum.
 export const TEXT_MINIMUMS = {
-  homeroom_note: 300,
-  academic_comment: 360,
-  next_focus: 50,
-  specialist_comment: 220,
+  homeroom_note: 400,
+  academic_comment: 650,
+  specialist_comment: 450,
   vocational_topics: 150,
-  student_voice: 60,
-  experience_lines: 3,
 }
 
 export const SKILL_GROUPS = [
@@ -174,7 +172,6 @@ export const TEMPLATES = {
       academic: 'Areas of Learning', academic_vi: 'Các lĩnh vực học tập',
       vocational: 'Physical & Creative Development', vocational_vi: 'Phát triển thể chất & Sáng tạo',
       vocationalNote: 'What the {yearGroup} class explored together this quarter', vocationalNote_vi: 'Những gì lớp {yearGroup} đã cùng khám phá trong quý này',
-      voice: 'What {nickname} loves', voice_vi: 'Điều {nickname} yêu thích',
     },
   },
   primary: {

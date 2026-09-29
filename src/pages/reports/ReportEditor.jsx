@@ -7,11 +7,12 @@ import { partialFrom } from '../../lib/studentRecords'
 import { useAuth } from '../../lib/AuthContext'
 import { db, genId } from '../../lib/db'
 import { loadReportBundle } from '../../lib/report/loaders'
-import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums } from '../../lib/report/utils'
-import { TIERS, TEXT_LIMITS, TEXT_MINIMUMS } from '../../lib/report/defaults'
-import { reportTitle, voiceQuoted } from '../../lib/report/strings'
-import { Card, Field, TextInput, TextArea, NumberInput, Select, Spinner, LevelPicker, SaveState, BulletList, ReportStatusChip } from '../../components/ui'
+import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor } from '../../lib/report/utils'
+import { TIERS } from '../../lib/report/defaults'
+import { reportTitle } from '../../lib/report/strings'
+import { Card, Field, TextInput, TextArea, NumberInput, Select, Spinner, LevelPicker, SaveState, ReportStatusChip } from '../../components/ui'
 import { Icon } from '../../components/report/icons'
+import { WritingTags } from '../../components/report/WritingTags'
 import ReportPdfPreview, { ReportCheckNotes } from '../../components/report/ReportPdfPreview'
 import { wordingIssues } from '../../lib/report/wording'
 import { legalFirstName } from '../../lib/names'
@@ -61,6 +62,8 @@ function WritingGuide({ name }) {
             <li>Never refer to Palm River Academy as a <b>school</b>. Say “Palm River Academy” or “our learning community”.</li>
             <li>Never call this a <b>report card</b>. It is a Learning Progress Report.</li>
             <li>Avoid <b>grades</b> and <b>tests</b>. Say <b>scores</b> and <b>assessments</b>.</li>
+            <li>Call the reporting period a <b>quarter</b>, never a term.</li>
+            <li>A comment shorter than its minimum counts as not written yet, so it stays on your task list.</li>
             <li className="sm:col-span-2">Spell check is on: fix words underlined in red (right-click a word for suggestions). Words that break these rules are flagged under the box as you type.</li>
           </ul>
           {name.legal && name.guessed && <p className="mt-1.5 text-xs text-indigo-900/70">“{name.legal}” was worked out from the full name “{name.full}”. If it is not right, ask the office to enter the legal first name on the student record.</p>}
@@ -100,23 +103,24 @@ function ViPanel({ pairs, openAll, children }) {
 }
 
 const COUNT_TONES = {
-  short: { text: 'text-sky-700', bar: 'bg-sky-400' },
+  empty: { text: 'text-slate-500', bar: 'bg-slate-300' },
+  short: { text: 'font-semibold text-amber-700', bar: 'bg-amber-400' },
   ok: { text: 'text-green-700', bar: 'bg-green-500' },
   full: { text: 'text-green-700', bar: 'bg-amber-400' },
   over: { text: 'font-semibold text-red-600', bar: 'bg-red-500' },
 }
 
 /**
- * "312 / 480" with a small meter: blue below the suggested minimum (advice
- * only, never blocks saving), green in range (the meter turns amber when nearly
- * full), red when it will not fit. The tick on the meter marks the suggested minimum.
+ * "312 / 480" with a small meter: amber below the minimum (the box still saves,
+ * but counts as not written yet), green in range (the meter turns amber when
+ * nearly full), red when it will not fit. The tick on the meter marks the minimum.
  */
 function Count({ text, max, min }) {
   const n = charCount(text)
-  const state = n > max ? 'over' : min && n < min ? 'short' : n > max * 0.9 ? 'full' : 'ok'
-  const note = { over: 'too long to fit', short: `suggested at least ${min}`, full: 'nearly full', ok: '' }[state]
+  const state = n > max ? 'over' : min && n < min ? (n ? 'short' : 'empty') : n > max * 0.9 ? 'full' : 'ok'
+  const note = { over: 'too long to fit', short: `too short: at least ${min} to count as written`, empty: `at least ${min}`, full: 'nearly full', ok: '' }[state]
   return (
-    <span className={`inline-flex items-center gap-2 ${COUNT_TONES[state].text}`} title={min ? `Suggested ${min}–${max} characters` : `Up to ${max} characters`}>
+    <span className={`inline-flex items-center gap-2 ${COUNT_TONES[state].text}`} title={min ? `${min}–${max} characters. Below ${min} it counts as not written yet.` : `Up to ${max} characters`}>
       <span className="relative h-1.5 w-16 overflow-hidden rounded-full bg-slate-200">
         <span className={`absolute inset-y-0 left-0 ${COUNT_TONES[state].bar}`} style={{ width: `${Math.min(100, (n / max) * 100)}%` }} />
         {min ? <span className="absolute inset-y-0 w-0.5 bg-slate-500/70" style={{ left: `${(min / max) * 100}%` }} /> : null}
@@ -126,15 +130,15 @@ function Count({ text, max, min }) {
   )
 }
 
-/** "2 of 5 lines · suggested at least 3" for the experiences list. */
-function LineCount({ items, limits = TEXT_LIMITS, minimums = TEXT_MINIMUMS }) {
-  const n = (items || []).filter((e) => (e || '').trim()).length
-  const short = n < minimums.experience_lines
-  return (
-    <span className={`text-xs ${short ? 'text-sky-700' : 'text-green-700'}`}>
-      {n} of {limits.experience_lines} lines{short ? ` · suggested at least ${minimums.experience_lines}` : ''} · up to {limits.experience} characters each
-    </span>
-  )
+/**
+ * Text written for a box that no longer prints (next focus, the student's
+ * words, experiences: dropped 24 September 2026). It stays saved; this shows it
+ * so the teacher can move it into a comment. Read-only.
+ */
+function NoLongerPrinted({ label, text }) {
+  const shown = (Array.isArray(text) ? text.map((x) => (x || '').trim()).filter(Boolean).join(' · ') : (text || '')).trim()
+  if (!shown) return null
+  return <p className="mt-1 text-xs text-slate-500"><b className="font-semibold">{label} is no longer printed.</b> What you wrote: “{shown}”. Move it into the comment if you want to keep it.</p>
 }
 
 export default function ReportEditor() {
@@ -192,7 +196,8 @@ export default function ReportEditor() {
       })
       .then(() => {
         if (Object.keys(failed.current).length) setSaveState('error')
-        else if (!Object.keys(waiting.current).length) { setSaveState('saved'); setTimeout(() => setSaveState((st) => (st === 'saved' ? 'idle' : st)), 2500) }
+        // "Saved ✓" for a moment, then "All changes saved" stays up until the next edit.
+        else if (!Object.keys(waiting.current).length) { setSaveState('saved'); setTimeout(() => setSaveState((st) => (st === 'saved' ? 'synced' : st)), 2500) }
       })
     return chains.current[key]
   }, [])
@@ -240,16 +245,6 @@ export default function ReportEditor() {
     // Notes are shared by the year group and saved whole, by year group + period + area.
     queue(`note:${key}`, n, (note) => db.courseNotes.save(note))
   }
-  // Vietnamese lines are paired with the English ones by position, so removing an English line removes its pair.
-  const setExperiences = (v) => {
-    const old = latest.current.report.experiences || []
-    const vi = latest.current.report.experiences_vi || []
-    if (v.length === old.length - 1 && vi.length) {
-      let at = v.findIndex((x, i) => x !== old[i])
-      if (at < 0) at = old.length - 1
-      patchReport({ experiences: v, experiences_vi: vi.filter((_, j) => j !== at) })
-    } else patchReport({ experiences: v })
-  }
   const [adding, setAdding] = useState('')
   const addArea = async (key) => {
     if (adding) return
@@ -292,10 +287,8 @@ export default function ReportEditor() {
   const cardProps = { reviewScores, settings, levels, bi, teachers, isHead, signName: displayName, yearGroup: report.year_group, isLastPeriod, lastLabel, name, viAll, limits: L, minimums: MIN }
   // Headings and learner skills follow the report's template (Early Years has its own).
   const template = templateOf(settings, report)
-  const tierHint = (tier) => (tier.key === 'academic' && !reviewScores ? 'Level, comment and next focus for each student. Topics covered is optional and shared by the year group.' : tier.hint)
-  const quotedVoice = voiceQuoted(template)
-  const voiceLabel = quotedVoice ? "In the student's words" : reportTitle(template, 'voice', 'en', { nickname: name.legal || 'the student' })
-  const voiceHint = quotedVoice ? 'What they enjoyed most this quarter.' : 'Favourite activities, songs, games or friends this quarter. Put anything they said in quotation marks.'
+  // Reports without review scores (Early Years, Years 1 to 3) leave that part out of the hint.
+  const tierHint = (tier) => (tier.key === 'academic' && !reviewScores ? tier.hint.replace(', progress review score', '') : tier.hint)
 
   return (
     <div className={`grid gap-6 ${preview ? 'xl:grid-cols-[1fr_auto]' : ''}`}>
@@ -368,6 +361,8 @@ export default function ReportEditor() {
             <Field label="Homeroom teacher comment" className="mt-3" right={<Count text={report.homeroom_note} max={L.homeroom_note} min={MIN.homeroom_note} />} hint={<Wording text={report.homeroom_note} name={name} />}>
               <TextArea {...EN} rows={4} value={report.homeroom_note} onChange={(v) => patchReport({ homeroom_note: v })} disabled={!homeroomOk} placeholder={`How has ${name.legal || 'the student'} settled in and approached learning this quarter?`} />
             </Field>
+            <NoLongerPrinted label="The student's words box" text={report.student_voice || report.student_voice_vi} />
+            <NoLongerPrinted label="The experiences list" text={(report.experiences || []).some((e) => (e || '').trim()) ? report.experiences : report.experiences_vi} />
             {bi && (
               <div className="mt-3">
                 <ViPanel pairs={[[report.homeroom_note, report.homeroom_note_vi]]} openAll={viAll}>
@@ -412,31 +407,6 @@ export default function ReportEditor() {
             </div>
           </Card>
 
-          <Card title="Experiences and student voice" locked={!homeroomOk}>
-            <div className="mb-1 flex items-center justify-between">
-              <span className="label !mb-0">Experiences &amp; growth this quarter</span>
-              <LineCount items={report.experiences} limits={L} minimums={MIN} />
-            </div>
-            <BulletList items={report.experiences} onChange={setExperiences} disabled={!homeroomOk} placeholder="Add an experience" max={L.experience_lines} inputProps={EN} />
-            <div className="text-xs"><Wording text={report.experiences} name={name} /></div>
-            {[...(report.experiences || []), ...(bi ? report.experiences_vi || [] : [])].some((e) => charCount(e) > L.experience) && <p className="mt-1 text-xs font-semibold text-red-600">A line is longer than {L.experience} characters and may not fit.</p>}
-            <Field label={voiceLabel} className="mt-4" hint={<>{voiceHint}<Wording text={report.student_voice} name={name} /></>} right={<Count text={report.student_voice} max={L.student_voice} min={MIN.student_voice} />}>
-              <TextArea {...EN} rows={2} value={report.student_voice} onChange={(v) => patchReport({ student_voice: v })} disabled={!homeroomOk} />
-            </Field>
-            {bi && (
-              <div className="mt-3">
-                <ViPanel pairs={[[report.experiences, report.experiences_vi], [report.student_voice, report.student_voice_vi]]} openAll={viAll}>
-                  <div className="flex items-center justify-between"><span className="label !mb-0">Experiences &amp; growth</span><LineCount items={report.experiences_vi} limits={L} minimums={MIN} /></div>
-                  <BulletList items={report.experiences_vi} onChange={(v) => patchReport({ experiences_vi: v })} disabled={!homeroomOk} placeholder="Thêm trải nghiệm" max={L.experience_lines} inputProps={VI} />
-                  <div className="text-xs"><Wording lang="vi" text={report.experiences_vi} name={name} /></div>
-                  <Field label={voiceLabel} right={<Count text={report.student_voice_vi} max={L.student_voice} min={MIN.student_voice} />} hint={<Wording lang="vi" text={report.student_voice_vi} name={name} />}>
-                    <TextArea {...VI} rows={2} value={report.student_voice_vi} onChange={(v) => patchReport({ student_voice_vi: v })} disabled={!homeroomOk} />
-                  </Field>
-                </ViPanel>
-              </div>
-            )}
-          </Card>
-
           <Card title="Signatures" locked={!homeroomOk} subtitle="Names printed on the signature lines.">
             <div className="grid gap-3 sm:grid-cols-2">
               {(report.signatures || []).map((sg, i) => (
@@ -473,24 +443,29 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
   const linkedTeacher = teacherNameFor(teachers, s.subject_key, yearGroup)
   const teacher = sectionTeacher(teachers, s, yearGroup)
   const scored = reviewScores && tier === 'academic' && sub.scored !== false
+  // What this area needs: an individual comment, a course description, or both (core areas).
+  const writing = writingFor(settings, s.subject_key)
 
   if (!editable) {
     const lvl = levelInfo(settings, s.level)
-    const text = tier === 'vocational' ? note?.description : s.comment
     return (
       <section id={`sec-${s.subject_key}`} className="card flex items-start gap-3 bg-slate-50/70 !px-4 !py-3">
         <Icon name={sub.icon} size={18} className="mt-0.5 flex-none text-slate-400" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-bold text-slate-700">{sub.name}</span>
+            <WritingTags writing={writing} compact />
             {lvl ? <span className="chip text-white" style={{ background: lvl.color }}>{lvl.code} · {lvl.name}</span> : <span className="chip bg-slate-100 text-slate-500">Not yet assessed</span>}
             {scored && (isNA(s.score_raw) ? <span className="text-xs text-slate-500">N/A</span> : hasNum(s.score_pct) && <span className="text-xs text-slate-500">{s.score_pct}%</span>)}
             {teacher && <span className="text-xs text-slate-400">{teacher}</span>}
             <Lock size={12} className="ml-auto text-slate-300" />
           </div>
-          {(text || '').trim()
-            ? <p className="mt-1 line-clamp-2 text-xs text-slate-600">{tier === 'vocational' && <b className="font-semibold">Topics: </b>}{text}</p>
-            : <p className="mt-1 text-xs italic text-slate-400">{tier === 'vocational' ? 'No topics described yet' : 'No comment yet'}</p>}
+          {writing.description && ((note?.description || '').trim()
+            ? <p className="mt-1 line-clamp-2 text-xs text-slate-600"><b className="font-semibold">Course description: </b>{note.description}</p>
+            : <p className="mt-1 text-xs italic text-slate-400">No course description yet</p>)}
+          {writing.comment && ((s.comment || '').trim()
+            ? <p className="mt-1 line-clamp-2 text-xs text-slate-600">{writing.description && <b className="font-semibold">Comment: </b>}{s.comment}</p>
+            : <p className="mt-1 text-xs italic text-slate-400">No comment yet</p>)}
         </div>
       </section>
     )
@@ -512,7 +487,7 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
 
   return (
     <div id={`sec-${s.subject_key}`} className="scroll-mt-28">
-      <Card className="!p-4" title={<span className="flex items-center gap-2"><Icon name={sub.icon} size={18} className="text-pra-navy" /> {sub.name}</span>}
+      <Card className="!p-4" title={<span className="flex flex-wrap items-center gap-2"><Icon name={sub.icon} size={18} className="text-pra-navy" /> {sub.name} <WritingTags writing={writing} className="ml-1" /></span>}
         actions={!teacher && signName ? <button className="btn-ghost text-xs" onClick={() => onPatch({ teacher_name: signName })}>Sign as {signName}</button> : null}>
         <div className="grid gap-4 lg:grid-cols-[auto_1fr]">
           <div className="space-y-3">
@@ -548,28 +523,24 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
           </div>
 
           <div className="space-y-3">
-            {tier !== 'specialist' && (
+            {writing.description && (
               <div className="space-y-2 rounded-lg border border-dashed border-slate-300 p-3">
-                <Field label={tier === 'academic' ? 'Topics covered this quarter (optional)' : 'Topics covered this quarter'} right={<Count text={note?.description} max={limits[topicsKey]} min={minimums[topicsKey]} />} hint={<Wording text={note?.description} />}>
-                  <TextArea {...EN} rows={tier === 'academic' ? 2 : 3} value={note?.description || ''} onChange={(v) => onNote({ description: v, teacher_name: teacher || note?.teacher_name || '' })} placeholder={`What the ${yearGroup} group explored in ${sub.name} this quarter…`} />
+                <Field label="Course description" right={<Count text={note?.description} max={limits[topicsKey]} min={minimums[topicsKey]} />} hint={<Wording text={note?.description} />}>
+                  <TextArea {...EN} rows={tier === 'academic' ? 2 : 3} value={note?.description || ''} onChange={(v) => onNote({ description: v, teacher_name: teacher || note?.teacher_name || '' })} placeholder={`What the ${yearGroup} group covered in ${sub.name} this quarter…`} />
                 </Field>
                 <p className="flex items-center gap-1 text-xs text-slate-500">
                   <Users size={13} /> Shared by every {yearGroup} report this quarter, so it only needs writing once.
-                  {tier === 'vocational' ? ` It prints as the course description; there is no individual comment for ${sub.name}.` : ' It prints above the comment.'}
+                  {writing.comment ? " It prints above each student's comment." : ` It prints as the course description; there is no individual comment for ${sub.name}.`}
                 </p>
               </div>
             )}
-            {tier !== 'vocational' && (<>
-              <Field label="Teacher comment" right={<Count text={s.comment} max={commentMax} min={commentMin} />} hint={<Wording text={s.comment} name={name} />}>
-                <TextArea {...EN} rows={tier === 'academic' ? 5 : 4} value={s.comment} onChange={(v) => onPatch({ comment: v })} placeholder={`${name?.legal ? `${name.legal}'s s` : 'S'}trengths, progress and evidence from this quarter…`} />
+            {writing.comment && (<>
+              <Field label="Individual comment" right={<Count text={s.comment} max={commentMax} min={commentMin} />} hint={<Wording text={s.comment} name={name} />}>
+                <TextArea {...EN} rows={tier === 'academic' ? 6 : 5} value={s.comment} onChange={(v) => onPatch({ comment: v })} placeholder={`${name?.legal ? `${name.legal}'s s` : 'S'}trengths, progress and evidence from this quarter…`} />
               </Field>
+              <NoLongerPrinted label="Next focus" text={s.next_focus || s.next_focus_vi} />
             </>)}
-            <div className={`grid gap-3 ${tier === 'academic' ? 'sm:grid-cols-[1fr_auto]' : 'sm:max-w-xs'}`}>
-              {tier === 'academic' && (
-                <Field label="Next focus" hint={<>One short sentence.<Wording text={s.next_focus} name={name} /></>} right={<Count text={s.next_focus} max={limits.next_focus} min={minimums.next_focus} />}>
-                  <TextInput {...EN} value={s.next_focus} onChange={(v) => onPatch({ next_focus: v })} />
-                </Field>
-              )}
+            <div className="grid gap-3 sm:max-w-xs">
               {linkedTeacher ? (
                 <Field label="Teacher" hint={<>Linked on the {isHead ? <Link to="/teachers" className="font-semibold text-pra-blue">Teachers page</Link> : 'Teachers page'}</>}>
                   <div className="input flex items-center bg-slate-50 text-slate-700">{linkedTeacher}</div>
@@ -582,23 +553,17 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
             </div>
             {bi && (
               <ViPanel openAll={viAll} pairs={[
-                ...(tier !== 'specialist' ? [[note?.description, note?.description_vi]] : []),
-                ...(tier !== 'vocational' ? [[s.comment, s.comment_vi]] : []),
-                ...(tier === 'academic' ? [[s.next_focus, s.next_focus_vi]] : []),
+                ...(writing.description ? [[note?.description, note?.description_vi]] : []),
+                ...(writing.comment ? [[s.comment, s.comment_vi]] : []),
               ]}>
-                {tier !== 'specialist' && (
-                  <Field label={<span className="inline-flex items-center gap-1">Topics covered <Users size={12} className="text-slate-400" /></span>} right={<Count text={note?.description_vi} max={limits[topicsKey]} min={minimums[topicsKey]} />} hint={<Wording lang="vi" text={note?.description_vi} />}>
+                {writing.description && (
+                  <Field label={<span className="inline-flex items-center gap-1">Course description <Users size={12} className="text-slate-400" /></span>} right={<Count text={note?.description_vi} max={limits[topicsKey]} min={minimums[topicsKey]} />} hint={<Wording lang="vi" text={note?.description_vi} />}>
                     <TextArea {...VI} rows={2} value={note?.description_vi || ''} onChange={(v) => onNote({ description_vi: v })} />
                   </Field>
                 )}
-                {tier !== 'vocational' && (
-                  <Field label="Teacher comment" right={<Count text={s.comment_vi} max={commentMax} min={commentMin} />} hint={<Wording lang="vi" text={s.comment_vi} name={name} />}>
-                    <TextArea {...VI} rows={3} value={s.comment_vi} onChange={(v) => onPatch({ comment_vi: v })} />
-                  </Field>
-                )}
-                {tier === 'academic' && (
-                  <Field label="Next focus" right={<Count text={s.next_focus_vi} max={limits.next_focus} min={minimums.next_focus} />} hint={<Wording lang="vi" text={s.next_focus_vi} name={name} />}>
-                    <TextInput {...VI} value={s.next_focus_vi} onChange={(v) => onPatch({ next_focus_vi: v })} />
+                {writing.comment && (
+                  <Field label="Individual comment" right={<Count text={s.comment_vi} max={commentMax} min={commentMin} />} hint={<Wording lang="vi" text={s.comment_vi} name={name} />}>
+                    <TextArea {...VI} rows={4} value={s.comment_vi} onChange={(v) => onPatch({ comment_vi: v })} />
                   </Field>
                 )}
               </ViPanel>
