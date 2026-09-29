@@ -26,7 +26,7 @@ const links = new Map() // storage key -> { url, expires }
 export const LOOKS = ['original', 'A', 'B', 'C']
 export const FACEBOOK_PAGE = 'https://www.facebook.com/palmriveracademy'
 // Where the public website is served. Its photos are at <this>/assets/img/photos/<slug>-<width>.webp
-export const WEBSITE_URL = (import.meta.env.VITE_WEBSITE_URL || 'https://bowenpra.github.io/website').replace(/\/$/, '')
+export const WEBSITE_URL = (import.meta.env.VITE_WEBSITE_URL || 'https://pra.edu.vn').replace(/\/$/, '')
 export const SHAPES = { '4:5': [1440, 1800], '1:1': [1440, 1440], '3:2': [2048, 1365], '16:9': [2048, 1152] }
 
 const setupHint = 'Event photos are not set up in the database yet. Run supabase/updates-2026-09-28-event-photos.sql in Supabase, then try again.'
