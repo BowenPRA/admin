@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Maximize2, ShieldCheck, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { ArrowLeft, Maximize2, Plus, RotateCcw, ShieldCheck, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { db } from '../../lib/db'
 import { useAuth } from '../../lib/AuthContext'
@@ -123,6 +123,24 @@ export default function PhotoEvent() {
     if (out.waiting.length) toast.info(t('phWebWaiting', { n: out.waiting.length, moved: out.moved }))
     else toast(t('phWebMoved', { n: out.moved }))
   }
+  // Deleting a post marks it "not used" rather than removing the row, so uploading
+  // the event again from the laptop does not bring it back. It can be restored,
+  // or deleted for good from the Deleted posts list.
+  const addPost = async () => {
+    const seq = Math.max(0, ...posts.map((p) => Number(p.seq) || 0)) + 1
+    try {
+      const row = await db.eventPosts.save({ event_id: event.id, kind: 'office', seq, title: t('phPostNew'), caption: '', photo_codes: [], other_first_lines: [], shape: '4:5', status: 'draft', results: {} })
+      setPosts((ps) => [...ps, row])
+      toast(t('phPostAdded'))
+      setTimeout(() => document.getElementById(`post-${row.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+    } catch (e) { toast.error(photoError(e).message) }
+  }
+  const deletePost = async (post) => { await patchPost(post, { status: 'dropped' }); toast(t('phPostDeleted')) }
+  const deleteForGood = async (post) => {
+    if (!window.confirm(t('phPostForGoodConfirm', { title: post.title || t('phPostRecap') }))) return
+    try { await db.eventPosts.remove(post.id); setPosts((ps) => ps.filter((p) => p.id !== post.id)) } catch (e) { toast.error(photoError(e).message) }
+  }
+
   const remove = async (photo) => {
     if (!window.confirm(t('phRemoveConfirm', { title: photo.title || photo.code }))) return
     try {
@@ -246,8 +264,35 @@ export default function PhotoEvent() {
 
       {view === 'facebook' && (
         <div className="space-y-5">
-          {!posts.length && <Empty text={t('phCountPosts', { n: 0 })} />}
-          {posts.map((post) => <PostCard key={post.id} event={event} post={post} photos={photos} onPatch={(fields) => patchPost(post, fields)} onOpenPhoto={(pid) => { setView('photos'); openPhoto(pid, 'edit') }} onRelist={(p) => setListed(p, true)} />)}
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="mr-auto text-sm text-slate-500">{t('phCountPosts', { n: posts.filter((p) => p.status === 'draft').length })}</p>
+            <button className="btn-primary" onClick={addPost}><Plus size={16} /> {t('phPostNew')}</button>
+          </div>
+          {!posts.some((p) => p.status !== 'dropped') && <Empty text={t('phNoPosts')} />}
+          {posts.filter((p) => p.status !== 'dropped').map((post) => (
+            <div key={post.id} id={`post-${post.id}`} className="scroll-mt-4">
+              <PostCard event={event} post={post} photos={photos} onPatch={(fields) => patchPost(post, fields)} onOpenPhoto={(pid) => { setView('photos'); openPhoto(pid, 'edit') }}
+                onRelist={(p) => setListed(p, true)} onDelete={() => deletePost(post)} />
+            </div>
+          ))}
+          {posts.some((p) => p.status === 'dropped') && (
+            <details className="card p-4">
+              <summary className="cursor-pointer text-sm font-bold text-slate-700">{t('phPostsDeleted', { n: posts.filter((p) => p.status === 'dropped').length })}</summary>
+              <p className="mt-1 text-xs text-slate-500">{t('phPostsDeletedHint')}</p>
+              <ul className="mt-3 divide-y divide-slate-100">
+                {posts.filter((p) => p.status === 'dropped').map((post) => (
+                  <li key={post.id} className="flex flex-wrap items-center gap-2 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-slate-700">{post.title || t('phPostRecap')}</div>
+                      <div className="truncate text-xs text-slate-500">{(post.caption || '').split('\n')[0]}</div>
+                    </div>
+                    <button className="btn-secondary !py-1 text-xs" onClick={() => patchPost(post, { status: 'draft', posted_at: null, posted_by: null })}><RotateCcw size={14} /> {t('phPostRestore')}</button>
+                    <button className="btn-ghost !py-1 text-xs text-red-600 hover:bg-red-50" onClick={() => deleteForGood(post)}><Trash2 size={14} /> {t('phPostForGood')}</button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       )}
 

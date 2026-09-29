@@ -295,8 +295,10 @@ export const db = {
   },
   eventPosts: {
     list: (eventId) => A.list(TABLES.eventPosts, eventId ? { event_id: eventId } : undefined),
+    save: (row) => A.upsert(TABLES.eventPosts, row),
     saveMany: (rows) => A.upsertMany(TABLES.eventPosts, rows),
     patch: (id, fields) => A.patch(TABLES.eventPosts, id, fields),
+    remove: (id) => A.removeStrict(TABLES.eventPosts, id),
   },
   async getFees() {
     const v = await A.getSetting('fees')

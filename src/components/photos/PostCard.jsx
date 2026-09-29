@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Eye, Lock, Undo2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Eye, Lock, Trash2, Undo2, X } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { useAuth } from '../../lib/AuthContext'
 import { useToast } from '../../lib/toast'
-import { Card, Chip, Field, NumberInput, Select, TextArea } from '../ui'
+import { Card, Chip, Field, NumberInput, Select, TextArea, TextInput } from '../ui'
 import { FACEBOOK_PAGE, SHAPES, cropBox, fileKey, fileUrl, postZip, saveBlob } from '../../lib/eventPhotos'
 
-const KIND = { recap: 'phPostRecap', spotlight: 'phPostSpotlight', thanks: 'phPostThanks' }
+const KIND = { recap: 'phPostRecap', spotlight: 'phPostSpotlight', thanks: 'phPostThanks', office: 'phPostOffice' }
 const STATUS = { draft: ['phPostDraft', 'slate'], posted: ['phPostPosted', 'green'], dropped: ['phPostDropped', 'amber'] }
 
 /** A thumbnail shown the way the post's shape will cut it. */
@@ -22,11 +22,12 @@ function Cut({ photo, shape }) {
 // One draft post: its text, its photos in order, and the two things the office
 // does with it, copy the text and download the photos. Nothing here posts to
 // Facebook; a person does that.
-export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, onRelist }) {
+export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, onRelist, onDelete }) {
   const { t } = useT()
   const toast = useToast()
   const { displayName } = useAuth()
   const [text, setText] = useState(post.caption || '')
+  const [name, setName] = useState(post.title || '')
   const [busy, setBusy] = useState(false)
 
   const byCode = new Map(photos.map((p) => [p.code, p]))
@@ -41,6 +42,7 @@ export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, on
   const [label, tone] = STATUS[post.status] || STATUS.draft
   const posted = post.status === 'posted'
 
+  const saveName = () => { if (name.trim() !== (post.title || '').trim()) onPatch({ title: name.trim() }) }
   const saveText = () => { if (text.trim() !== (post.caption || '').trim()) onPatch({ caption: text.trim() }) }
   const setCodes = (next) => onPatch({ photo_codes: next })
   const move = (i, by) => { const next = [...codes]; const [x] = next.splice(i, 1); next.splice(i + by, 0, x); setCodes(next) }
@@ -72,6 +74,7 @@ export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, on
           <button className="btn-primary" onClick={copy}><Copy size={16} /> {t('phCopy')}</button>
           <button className="btn-secondary" disabled={locked || busy} onClick={download}>{locked ? <Lock size={16} /> : <Download size={16} />} {busy ? t('phDownloading') : t('phDownload')}</button>
           <a className="btn-ghost" href={FACEBOOK_PAGE} target="_blank" rel="noreferrer"><ExternalLink size={16} /> {t('phOpenFacebook')}</a>
+          <button className="btn-ghost text-red-600 hover:bg-red-50" onClick={onDelete}><Trash2 size={16} /> {t('phPostDelete')}</button>
         </div>
       )}>
       {unchecked > 0 && <p className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"><Lock size={15} className="mt-0.5 flex-none" /> {t('phLocked', { n: unchecked })}</p>}
@@ -83,6 +86,7 @@ export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, on
       )}
       <div className="grid gap-5 lg:grid-cols-5">
         <div className="space-y-3 lg:col-span-2">
+          <Field label={t('phPostName')}><TextInput value={name} onChange={setName} onBlur={saveName} maxLength={80} /></Field>
           <Field label={t('phPostCaption')} right={t('phPostWords', { n: words })}>
             <TextArea rows={10} value={text} onChange={setText} onBlur={saveText} />
           </Field>
