@@ -17,6 +17,8 @@ import Teachers from './pages/reports/Teachers'
 import ReportSettings from './pages/reports/ReportSettings'
 import Attendance from './pages/Attendance'
 import Schedule from './pages/Schedule'
+import Photos from './pages/photos/Photos'
+import PhotoEvent from './pages/photos/PhotoEvent'
 import { DataProvider } from './lib/DataContext'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { Spinner } from './components/ui'
@@ -56,6 +58,8 @@ export default function App() {
           <Route path="/students" element={<Students />} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/schedule" element={<Schedule />} />
+          <Route path="/photos" element={<Office><Photos /></Office>} />
+          <Route path="/photos/:id" element={<Office><PhotoEvent /></Office>} />
           <Route path="/settings" element={<Office><SettingsPage /></Office>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

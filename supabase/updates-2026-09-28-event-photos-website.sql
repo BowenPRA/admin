@@ -1,0 +1,15 @@
+-- PRA Admin: event photos that go on the public website (28 September 2026).
+-- Run once in Supabase > SQL Editor, after updates-2026-09-28-event-photos.sql.
+-- Safe to run again.
+--
+-- A photo that has been checked against the no-photo list can be chosen for the
+-- website. Once the website has it, the tab shows it from there and its copy in
+-- Storage is deleted, so Storage only ever holds photos still under review.
+--
+--   website = {
+--     want: true,            chosen for the website, by an office account
+--     slug: 'mid-autumn-festival-2026-tying-the-lantern-ribbon',   its name on the website
+--     asked_by, asked_on,
+--     moved_on               set when the tab found it on the website and deleted the Storage copy
+--   }
+alter table adm_event_photos add column if not exists website jsonb default '{}'::jsonb;

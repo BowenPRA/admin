@@ -24,11 +24,15 @@ const TABLES = {
   sections: 'adm_report_sections',
   courseNotes: 'adm_course_notes',
   attendance: 'adm_attendance',
+  // Event photos (office only)
+  photoEvents: 'adm_photo_events',
+  eventPhotos: 'adm_event_photos',
+  eventPosts: 'adm_event_posts',
 }
 
 // Rows that come straight from form inputs may hold '' where Postgres wants
 // null (date / numeric columns). Applied to the report tables and students.
-const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes, TABLES.attendance])
+const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes, TABLES.attendance, TABLES.photoEvents, TABLES.eventPhotos, TABLES.eventPosts])
 const cleanRow = (table, row) => (CLEAN.has(table) ? Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v === '' ? null : v])) : row)
 const matches = (row, filter) => Object.entries(filter || {}).every(([k, v]) => (Array.isArray(v) ? v.includes(row[k]) : row[k] === v))
 
@@ -99,6 +103,7 @@ const localAdapter = {
     d[table] = (d[table] || []).filter((r) => r.id !== id)
     if (table === TABLES.invoices) d[TABLES.payments] = (d[TABLES.payments] || []).filter((p) => p.invoice_id !== id)
     if (table === TABLES.reports) d[TABLES.sections] = (d[TABLES.sections] || []).filter((p) => p.report_id !== id)
+    if (table === TABLES.photoEvents) for (const t of [TABLES.eventPhotos, TABLES.eventPosts]) d[t] = (d[t] || []).filter((p) => p.event_id !== id)
     lsWrite(d)
   },
   async removeStrict(table, id) { return this.remove(table, id) },
@@ -279,6 +284,19 @@ export const db = {
       await A.remove(TABLES.payments, id)
       await dropProofFiles(p ? [p] : [])
     },
+  },
+  // Event photos. Removing is strict: a refused delete must not look like a success.
+  photoEvents: { ...crud(TABLES.photoEvents), remove: (id) => A.removeStrict(TABLES.photoEvents, id) },
+  eventPhotos: {
+    list: (eventId) => A.list(TABLES.eventPhotos, eventId ? { event_id: eventId } : undefined),
+    saveMany: (rows) => A.upsertMany(TABLES.eventPhotos, rows),
+    patch: (id, fields) => A.patch(TABLES.eventPhotos, id, fields),
+    remove: (id) => A.removeStrict(TABLES.eventPhotos, id),
+  },
+  eventPosts: {
+    list: (eventId) => A.list(TABLES.eventPosts, eventId ? { event_id: eventId } : undefined),
+    saveMany: (rows) => A.upsertMany(TABLES.eventPosts, rows),
+    patch: (id, fields) => A.patch(TABLES.eventPosts, id, fields),
   },
   async getFees() {
     const v = await A.getSetting('fees')
