@@ -486,7 +486,7 @@ export default function InvoiceEditor() {
 
         {/* ---------- Preview ---------- */}
         <div className="min-w-0">
-          <div className="sticky top-20">
+          <div className="sticky top-[calc(var(--header-h,57px)+1.5rem)]">
             <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase text-slate-500"><span>{t('preview')} · PDF</span><span className="text-base normal-case text-slate-800">{t('total')}: {fmt(totals.total)}</span></div>
             {/* As wide as the column allows while the whole page stays on screen. */}
             <div className="mx-auto" style={{ maxWidth: 'calc((100vh - 10rem) * 210 / 297)' }}>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout } from 'lucide-react'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout, Briefcase, Megaphone } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -8,6 +8,34 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { ACCESS_ROLES } from '../data/staff'
 import { Avatar, Chip, Field, Modal, TextInput } from './ui'
+
+// The top row. Pages everyone uses day to day stand alone; the rest sit in
+// groups, and a group's pages show as a second row of tabs while you are in it.
+// A group with one page you can see is shown as that page. A new page (the
+// newsletter, say) goes into a group's `pages` and the top row stays as it is.
+const NAV = [
+  { to: '/', icon: Home, label: 'home', end: true },
+  { to: '/students', icon: Users, label: 'students' },
+  { to: '/reports', icon: ClipboardList, label: 'reportsNav' },
+  { to: '/attendance', icon: CalendarCheck, label: 'attendance' },
+  { to: '/schedule', icon: CalendarDays, label: 'schedule' },
+  { id: 'office', icon: Briefcase, label: 'navOffice', pages: [
+    { to: '/invoices', icon: FileText, label: 'invoices', who: 'office' },
+    { to: '/leads', icon: Sprout, label: 'leadsNav', who: 'office' },
+  ] },
+  { id: 'outreach', icon: Megaphone, label: 'navOutreach', pages: [
+    { to: '/photos', icon: Images, label: 'photos', who: 'office' },
+  ] },
+  { id: 'setup', icon: Settings, label: 'navSetup', iconOnly: true, pages: [
+    { to: '/settings', icon: Settings, label: 'settings', who: 'office' },
+    { to: '/teachers', icon: GraduationCap, label: 'teachers', who: 'head' },
+  ] },
+]
+const under = (pathname, to) => pathname === to || pathname.startsWith(`${to}/`)
+
+// A group opens on the page you last used in it.
+const LAST_KEY = 'pra-admin-nav-last'
+const readLast = () => { try { return JSON.parse(localStorage.getItem(LAST_KEY)) || {} } catch { return {} } }
 
 export default function Layout() {
   const { t, lang, setLang } = useT()
@@ -18,6 +46,27 @@ export default function Layout() {
   const [pwOpen, setPwOpen] = useState(false)
   const { pathname } = useLocation()
   const navRef = useRef(null)
+  const headerRef = useRef(null)
+
+  const can = { office: isOffice, head: isHead }
+  const nav = NAV.map((n) => (n.pages ? { ...n, pages: n.pages.filter((p) => can[p.who]) } : n)).filter((n) => !n.pages || n.pages.length)
+  const group = nav.find((n) => n.pages?.length > 1 && n.pages.some((p) => under(pathname, p.to)))
+  const last = readLast()
+
+  useEffect(() => {
+    const g = NAV.find((n) => n.pages?.some((p) => under(pathname, p.to)))
+    if (!g) return
+    try { localStorage.setItem(LAST_KEY, JSON.stringify({ ...readLast(), [g.id]: g.pages.find((p) => under(pathname, p.to)).to })) } catch { /* ignore */ }
+  }, [pathname])
+
+  // The header is taller inside a group; pages with their own sticky parts sit below it using --header-h.
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => document.documentElement.style.setProperty('--header-h', `${el.offsetHeight}px`))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // On phones the nav scrolls sideways; keep the current page's icon in view.
   // Re-checked when the nav narrows or role-only links and the account menu appear.
@@ -25,7 +74,7 @@ export default function Layout() {
     const nav = navRef.current
     if (!nav) return
     const reveal = () => {
-      const active = nav.querySelector('[aria-current="page"]')
+      const active = nav.querySelector('[aria-current]')
       if (!active) return
       const left = active.offsetLeft - nav.offsetLeft
       if (left < nav.scrollLeft || left + active.offsetWidth > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = left - 8
@@ -43,29 +92,24 @@ export default function Layout() {
     return () => window.removeEventListener('click', close)
   }, [menu])
 
-  const item = (to, Icon, label, end = false) => (
-    <NavLink to={to} end={end} title={label}
-      className={({ isActive }) => `flex flex-none items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-semibold transition-colors ${isActive ? 'bg-pra-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
-      <Icon size={18} /> <span className="hidden lg:inline">{label}</span>
-    </NavLink>
-  )
+  const tab = (on, iconOnly) => `flex flex-none items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-semibold transition-colors ${iconOnly ? 'ml-auto' : ''} ${on ? 'bg-pra-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`
+  const inner = (Icon, label, iconOnly) => <><Icon size={18} /> <span className={iconOnly ? 'sr-only' : 'hidden lg:inline'}>{label}</span></>
+  const item = (n) => {
+    if (!n.pages || n.pages.length === 1) {
+      const p = n.pages ? n.pages[0] : n
+      return <NavLink key={p.to} to={p.to} end={p.end} title={t(p.label)} className={({ isActive }) => tab(isActive, n.iconOnly)}>{inner(p.icon, t(p.label), n.iconOnly)}</NavLink>
+    }
+    const to = (n.pages.find((p) => under(pathname, p.to)) || n.pages.find((p) => p.to === last[n.id]) || n.pages[0]).to
+    return <Link key={n.id} to={to} title={t(n.label)} aria-current={group === n ? 'true' : undefined} className={tab(group === n, n.iconOnly)}>{inner(n.icon, t(n.label), n.iconOnly)}</Link>
+  }
   const role = ACCESS_ROLES[me?.access] || ACCESS_ROLES.viewer
 
   return (
     <div className="min-h-screen">
-      <header className="no-print sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
+      <header ref={headerRef} className="no-print sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2">
-          <nav ref={navRef} className="-mx-1 no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1">
-            {item('/', Home, t('home'), true)}
-            {isOffice && item('/invoices', FileText, t('invoices'))}
-            {item('/students', Users, t('students'))}
-            {isOffice && item('/leads', Sprout, t('leadsNav'))}
-            {item('/reports', ClipboardList, t('reportsNav'))}
-            {item('/attendance', CalendarCheck, t('attendance'))}
-            {item('/schedule', CalendarDays, t('schedule'))}
-            {isOffice && item('/photos', Images, t('photos'))}
-            {isHead && item('/teachers', GraduationCap, t('teachers'))}
-            {isOffice && item('/settings', Settings, t('settings'))}
+          <nav ref={navRef} className="-mx-1 no-scrollbar flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1 sm:gap-1">
+            {nav.map(item)}
           </nav>
           <div className="hidden flex-none overflow-hidden rounded-lg border border-slate-300 text-xs font-bold sm:flex">
             <button className={`px-2 py-1.5 ${lang === 'en' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'}`} onClick={() => setLang('en')}>EN</button>
@@ -79,7 +123,7 @@ export default function Layout() {
                   <span className="block font-semibold text-slate-700">{displayName}</span>
                   <span className="block text-slate-400">{lang === 'vi' ? role.label_vi : role.label}</span>
                 </span>
-                <ChevronDown size={14} className="text-slate-400" />
+                <ChevronDown size={14} className="hidden text-slate-400 sm:block" />
               </button>
               {menu && (
                 <div className="modal-in absolute right-0 mt-1 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" onClick={(e) => e.stopPropagation()}>
@@ -101,6 +145,19 @@ export default function Layout() {
             </div>
           )}
         </div>
+        {group && (
+          <div className="border-t border-slate-100">
+            <nav aria-label={t(group.label)} className="no-scrollbar mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4">
+              <span className="mr-2 flex-none text-[11px] font-bold uppercase tracking-wider text-slate-400">{t(group.label)}</span>
+              {group.pages.map((p) => (
+                <NavLink key={p.to} to={p.to}
+                  className={({ isActive }) => `-mb-px flex flex-none items-center gap-1.5 border-b-2 px-2.5 py-2 text-sm font-semibold transition-colors ${isActive ? 'border-pra-blue text-pra-blue' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                  <p.icon size={15} /> {t(p.label)}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+        )}
         {dbMode === 'local' && (
           <div className="bg-amber-50 px-4 py-1 text-center text-xs font-semibold text-amber-800">
             <Database size={12} className="mr-1 inline" />{t('localMode')}

@@ -476,7 +476,7 @@ export default function InvoiceBuilder() {
       </div>
 
       {/* Live summary */}
-      <aside className="lg:sticky lg:top-20 self-start">
+      <aside className="lg:sticky lg:top-[calc(var(--header-h,57px)+1.5rem)] self-start">
         <Card title={t('total')}>
           {totals && (
             <div className="space-y-1 text-sm">
