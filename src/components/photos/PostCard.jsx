@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Eye, Lock, Trash2, Undo2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarClock, Check, Copy, Download, ExternalLink, Eye, Lock, Send, Trash2, Undo2, X } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { useAuth } from '../../lib/AuthContext'
 import { useToast } from '../../lib/toast'
 import { Card, Chip, Field, NumberInput, Select, TextArea, TextInput } from '../ui'
 import { FACEBOOK_PAGE, SHAPES, cropBox, fileKey, fileUrl, postZip, saveBlob } from '../../lib/eventPhotos'
+import { cancelScheduled, isScheduled } from '../../lib/facebook'
+import FacebookPost from './FacebookPost'
 
 const KIND = { recap: 'phPostRecap', spotlight: 'phPostSpotlight', thanks: 'phPostThanks', office: 'phPostOffice' }
 const STATUS = { draft: ['phPostDraft', 'slate'], posted: ['phPostPosted', 'green'], dropped: ['phPostDropped', 'amber'] }
@@ -19,16 +21,18 @@ function Cut({ photo, shape }) {
   return <div className="relative overflow-hidden rounded-lg bg-slate-100" style={{ aspectRatio: `${rw} / ${rh}` }}>{src && <img src={src} alt={photo.caption || ''} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `${x}% ${y}%` }} />}</div>
 }
 
-// One draft post: its text, its photos in order, and the two things the office
-// does with it, copy the text and download the photos. Nothing here posts to
-// Facebook; a person does that.
-export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, onRelist, onDelete }) {
+// One draft post: its text, its photos in order, and what the office does with
+// it: post it to the Page (or schedule it) from here, or copy the text and
+// download the photos to post by hand.
+export default function PostCard({ event, post, photos, onPatch, onChanged, onOpenPhoto, onRelist, onDelete }) {
   const { t } = useT()
   const toast = useToast()
   const { displayName } = useAuth()
   const [text, setText] = useState(post.caption || '')
   const [name, setName] = useState(post.title || '')
   const [busy, setBusy] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   const byCode = new Map(photos.map((p) => [p.code, p]))
   const codes = post.photo_codes || []
@@ -41,6 +45,8 @@ export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, on
   const spare = photos.filter((p) => p.listed !== false && !codes.includes(p.code)).sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))
   const [label, tone] = STATUS[post.status] || STATUS.draft
   const posted = post.status === 'posted'
+  const fb = post.facebook?.post_id ? post.facebook : null
+  const scheduled = isScheduled(post)
 
   const saveName = () => { if (name.trim() !== (post.title || '').trim()) onPatch({ title: name.trim() }) }
   const saveText = () => { if (text.trim() !== (post.caption || '').trim()) onPatch({ caption: text.trim() }) }
@@ -64,6 +70,29 @@ export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, on
       toast(t('phDownloaded', { n: used.length }))
     } catch (e) { toast.error(e.message) } finally { setBusy(false) }
   }
+  // The function posts the caption saved in the database, so the box is saved first.
+  const saveBeforeSend = async () => { if (text.trim() !== (post.caption || '').trim()) await onPatch({ caption: text.trim() }) }
+  const onSent = async (row) => {
+    const { saved, save_error: saveError, ...fields } = row
+    setSending(false)
+    if (saved) onChanged(fields)
+    else await onPatch(fields) // on Facebook, but the function could not write the record
+    toast(fields.facebook?.scheduled_for ? t('fbScheduledToast', { date: when(fields.facebook.scheduled_for) }) : t('fbPostedToast'))
+    if (saveError && !saved) console.warn('facebook-post could not save the record:', saveError)
+  }
+  const cancel = async () => {
+    if (!window.confirm(t('fbCancelConfirm', { date: when(fb.scheduled_for) }))) return
+    setCancelling(true)
+    try {
+      const { saved, ...fields } = await cancelScheduled(post)
+      if (saved) onChanged(fields); else await onPatch(fields)
+      toast(t('fbCancelled'))
+    } catch (e) { toast.error(e.message) } finally { setCancelling(false) }
+  }
+  const backToDraft = () => {
+    if (fb && !window.confirm(t('fbBackToDraftConfirm'))) return
+    onPatch({ status: 'draft', posted_at: null, posted_by: null, ...(post.facebook ? { facebook: null } : {}) })
+  }
   const setResult = (key, value) => onPatch({ results: { ...(post.results || {}), [key]: value === '' ? null : value } })
 
   return (
@@ -71,7 +100,8 @@ export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, on
       subtitle={`${t(KIND[post.kind] || 'phPostRecap')}${post.suggested_time ? ` · ${t('phPostTime')}: ${post.suggested_time}` : ''}`}
       actions={(
         <div className="flex flex-wrap justify-end gap-2">
-          <button className="btn-primary" onClick={copy}><Copy size={16} /> {t('phCopy')}</button>
+          {!posted && <button className="btn-primary" disabled={locked || !text.trim()} title={locked ? t('fbLockedHint') : ''} onClick={() => setSending(true)}>{locked ? <Lock size={16} /> : <Send size={16} />} {t('fbButton')}</button>}
+          <button className={posted ? 'btn-primary' : 'btn-secondary'} onClick={copy}><Copy size={16} /> {t('phCopy')}</button>
           <button className="btn-secondary" disabled={locked || busy} onClick={download}>{locked ? <Lock size={16} /> : <Download size={16} />} {busy ? t('phDownloading') : t('phDownload')}</button>
           <a className="btn-ghost" href={FACEBOOK_PAGE} target="_blank" rel="noreferrer"><ExternalLink size={16} /> {t('phOpenFacebook')}</a>
           <button className="btn-ghost text-red-600 hover:bg-red-50" onClick={onDelete}><Trash2 size={16} /> {t('phPostDelete')}</button>
@@ -153,10 +183,14 @@ export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, on
             </div>
           )}
           <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
-            {posted
-              ? <><span className="text-sm text-slate-600"><Check size={15} className="mr-1 inline text-green-600" />{t('phPostedBy', { name: post.posted_by || '—', date: String(post.posted_at || '').slice(0, 10) })}</span>
-                <button className="btn-ghost text-xs" onClick={() => onPatch({ status: 'draft', posted_at: null, posted_by: null })}><Undo2 size={14} /> {t('phMarkDraft')}</button></>
-              : <button className="btn-green" disabled={locked} onClick={() => onPatch({ status: 'posted', posted_at: new Date().toISOString(), posted_by: displayName || '' })}><Check size={16} /> {t('phMarkPosted')}</button>}
+            {scheduled
+              ? <><span className="text-sm text-slate-600"><CalendarClock size={15} className="mr-1 inline text-pra-blue" />{t('fbScheduledBy', { name: fb.by || post.posted_by || '—', date: when(fb.scheduled_for) })}</span>
+                <button className="btn-ghost text-xs text-red-600 hover:bg-red-50" disabled={cancelling} onClick={cancel}><X size={14} /> {cancelling ? t('fbCancelling') : t('fbCancel')}</button></>
+              : posted
+                ? <><span className="text-sm text-slate-600"><Check size={15} className="mr-1 inline text-green-600" />{t(fb ? 'fbPostedBy' : 'phPostedBy', { name: post.posted_by || '—', date: String(post.posted_at || '').slice(0, 10) })}</span>
+                  {fb?.link && <a className="btn-ghost text-xs" href={fb.link} target="_blank" rel="noreferrer"><ExternalLink size={14} /> {t('fbView')}</a>}
+                  <button className="btn-ghost text-xs" onClick={backToDraft}><Undo2 size={14} /> {t('phMarkDraft')}</button></>
+                : <button className="btn-ghost text-sm" disabled={locked} title={t('phMarkPostedHint')} onClick={() => onPatch({ status: 'posted', posted_at: new Date().toISOString(), posted_by: displayName || '' })}><Check size={16} /> {t('phMarkPosted')}</button>}
           </div>
           {posted && (
             <div>
@@ -170,6 +204,9 @@ export default function PostCard({ event, post, photos, onPatch, onOpenPhoto, on
           )}
         </div>
       </div>
+      {sending && <FacebookPost post={post} caption={text.trim()} photos={used} by={displayName || ''} onBeforeSend={saveBeforeSend} onPosted={onSent} onClose={() => setSending(false)} />}
     </Card>
   )
 }
+
+const when = (iso) => new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })

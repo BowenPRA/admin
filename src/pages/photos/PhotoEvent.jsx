@@ -271,7 +271,7 @@ export default function PhotoEvent() {
           {!posts.some((p) => p.status !== 'dropped') && <Empty text={t('phNoPosts')} />}
           {posts.filter((p) => p.status !== 'dropped').map((post) => (
             <div key={post.id} id={`post-${post.id}`} className="scroll-mt-4">
-              <PostCard event={event} post={post} photos={photos} onPatch={(fields) => patchPost(post, fields)} onOpenPhoto={(pid) => { setView('photos'); openPhoto(pid, 'edit') }}
+              <PostCard event={event} post={post} photos={photos} onPatch={(fields) => patchPost(post, fields)} onChanged={(fields) => setPosts((ps) => ps.map((p) => (p.id === post.id ? { ...p, ...fields } : p)))} onOpenPhoto={(pid) => { setView('photos'); openPhoto(pid, 'edit') }}
                 onRelist={(p) => setListed(p, true)} onDelete={() => deletePost(post)} />
             </div>
           ))}
