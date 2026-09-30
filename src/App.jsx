@@ -19,6 +19,7 @@ import Attendance from './pages/Attendance'
 import Schedule from './pages/Schedule'
 import Photos from './pages/photos/Photos'
 import Leads from './pages/Leads'
+import Enrollments from './pages/Enrollments'
 import PhotoEvent from './pages/photos/PhotoEvent'
 import { DataProvider } from './lib/DataContext'
 import { AuthProvider, useAuth } from './lib/AuthContext'
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/teachers" element={<Teachers />} />
           <Route path="/students" element={<Students />} />
           <Route path="/leads" element={<Office><Leads /></Office>} />
+          <Route path="/enrollments" element={<Office><Enrollments /></Office>} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/photos" element={<Office><Photos /></Office>} />

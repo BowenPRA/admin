@@ -32,6 +32,9 @@ const TABLES = {
   leads: 'adm_leads',
   // What families send from the form on pra.edu.vn (office only)
   webMessages: 'adm_web_messages',
+  // Enrollment forms from the website (office); the private part is for the super admin only
+  enrollments: 'adm_enrollments',
+  enrollmentPrivate: 'adm_enrollment_private',
 }
 
 // Rows that come straight from form inputs may hold '' where Postgres wants
@@ -111,6 +114,8 @@ const localAdapter = {
     lsWrite(d)
   },
   async removeStrict(table, id) { return this.remove(table, id) },
+  // Database functions only exist in Supabase.
+  async rpc() { throw new Error('This only works when connected to the shared database.') },
   async getSetting(key) {
     const d = lsRead()
     return d.settings?.[key] ?? null
@@ -191,6 +196,11 @@ const supaAdapter = {
     throwIf(error)
     if (!data?.length) throw new Error('This could not be removed: your account is not allowed to, or it was already removed.')
   },
+  async rpc(name, args) {
+    const { data, error } = await supabase.rpc(name, args)
+    throwIf(error)
+    return data
+  },
   async getSetting(key) {
     const { data, error } = await supabase.from(TABLES.settings).select('value').eq('key', key).maybeSingle()
     throwIf(error)
@@ -239,6 +249,10 @@ const saveStudents = async (rows) => {
     return A.upsertMany(TABLES.students, rs.map(dropStatus))
   }
 }
+
+// Documents parents attach to the enrollment form (supabase/updates-2026-09-30-enrollments.sql).
+const ENROLLMENT_BUCKET = 'adm-enrollment'
+const enrollmentPrivate = (id) => A.list(TABLES.enrollmentPrivate, { enrollment_id: id }).then((rows) => rows[0] || null)
 
 // The record is already gone, so a file that will not delete is only logged.
 const dropProofFiles = (payments) => removeProofs(payments.flatMap((p) => p.proof || [])).catch((e) => console.warn('Proof files not removed:', e.message))
@@ -310,6 +324,30 @@ export const db = {
     list: () => A.list(TABLES.webMessages),
     patch: (id, fields) => A.patch(TABLES.webMessages, id, fields),
     remove: (id) => A.removeStrict(TABLES.webMessages, id),
+  },
+  // Enrollment forms. The form on pra.edu.vn writes them itself (adm_enroll_submit); here they
+  // are read, marked checked, and (super admin) deleted.
+  enrollments: {
+    list: () => A.list(TABLES.enrollments),
+    patch: (id, fields) => A.patch(TABLES.enrollments, id, fields),
+    /** Deletes a form and its documents. The documents go first: once the form is gone, nothing lists them. */
+    async remove(id) {
+      const priv = await enrollmentPrivate(id)
+      const paths = (priv?.files || []).map((f) => f?.path).filter(Boolean)
+      if (hasSupabase && paths.length) throwIf((await supabase.storage.from(ENROLLMENT_BUCKET).remove(paths)).error)
+      await A.removeStrict(TABLES.enrollments, id)
+    },
+    /** ID numbers, the documents and the signature: a row for the super admin, nothing for anyone else. */
+    private: (id) => enrollmentPrivate(id),
+    /** Links to a form's documents that work for an hour, by path. The folder is private: nothing in it has a lasting link. */
+    async fileUrls(paths) {
+      if (!hasSupabase || !paths.length) return {}
+      const { data, error } = await supabase.storage.from(ENROLLMENT_BUCKET).createSignedUrls(paths, 3600)
+      throwIf(error)
+      return Object.fromEntries((data || []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]))
+    },
+    /** Adds the pending student for a form that came in without one; returns the student's id. */
+    makeStudent: (id) => A.rpc('adm_enrollment_make_student', { p_id: id }),
   },
   async getFees() {
     const v = await A.getSetting('fees')

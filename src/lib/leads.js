@@ -58,6 +58,7 @@ export function personName(email, lang = 'en') {
   if (!e) return ''
   if (e === TRIAGE_EMAIL) return lang === 'vi' ? 'Phân loại hộp thư' : 'Inbox triage'
   if (e === WEBSITE_SENDER) return lang === 'vi' ? 'Form trên trang web' : 'Website form'
+  if (e === 'enrollment form') return lang === 'vi' ? 'Đơn đăng ký học' : 'Enrollment form'
   return OFFICE_ACCOUNTS.find((a) => a.email === e)?.name || e.split('@')[0]
 }
 

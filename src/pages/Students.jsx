@@ -55,6 +55,12 @@ export default function Students() {
   const [busy, setBusy] = useState(false)
   const rosterInput = useRef(null)
 
+  // A link from another page (an enrollment form) opens one student: /students?student=<id>.
+  const wanted = params.get('student')
+  const linked = useMemo(() => { const s = wanted ? students.find((x) => x.id === wanted) : null; return s ? { ...blankStudent(), ...s } : null }, [wanted, students])
+  const shown = editing || linked
+  const closeStudent = () => { setEditing(null); if (wanted) setParams({}, { replace: true }) }
+
   const famById = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families])
   const kidsByFamily = useMemo(() => {
     const m = {}
@@ -127,13 +133,13 @@ export default function Students() {
       }
       await db.students.save({ ...s, family_id: familyId, dob: s.dob || null })
       await refresh()
-      setEditing(null)
+      closeStudent()
       toast(t('studentSaved', { name: s.nickname || s.full_name }))
     } catch (e) { toast.error(/partial_from/.test(e.message || '') ? t('partialDaySetup') : e.message) }
   }
   const removeStudent = async (s) => {
     if (!confirm(t('confirmDeleteStudent', { name: s.full_name }))) return
-    await run(async () => { await db.students.remove(s.id); await refresh(); setEditing(null); toast(t('deletedName', { name: s.full_name })) })
+    await run(async () => { await db.students.remove(s.id); await refresh(); closeStudent(); toast(t('deletedName', { name: s.full_name })) })
   }
   const assignFamily = (s, familyId) => run(async () => {
     let fid = familyId || null
@@ -424,8 +430,8 @@ export default function Students() {
 
       {!canEdit && <p className="flex items-center gap-1.5 text-xs text-slate-400"><BadgeCheck size={14} /> {t('viewOnly')}</p>}
 
-      {editing && (
-        <StudentModal key={editing.id || 'new'} value={editing} onClose={() => setEditing(null)} onSave={saveStudent} onDelete={removeStudent}
+      {shown && (
+        <StudentModal key={shown.id || 'new'} value={shown} onClose={closeStudent} onSave={saveStudent} onDelete={removeStudent}
           students={students} families={families} canEdit={canEdit} t={t} lang={lang} />
       )}
       {editingFam && (

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout, Briefcase, Megaphone } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout, Briefcase, Megaphone, FileSignature } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -22,6 +22,7 @@ const NAV = [
   { id: 'office', icon: Briefcase, label: 'navOffice', pages: [
     { to: '/invoices', icon: FileText, label: 'invoices', who: 'office' },
     { to: '/leads', icon: Sprout, label: 'leadsNav', who: 'office' },
+    { to: '/enrollments', icon: FileSignature, label: 'enrollNav', who: 'office' },
   ] },
   { id: 'outreach', icon: Megaphone, label: 'navOutreach', pages: [
     { to: '/photos', icon: Images, label: 'photos', who: 'office' },

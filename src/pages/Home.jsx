@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PlusCircle, Users, CalendarCheck, CalendarDays, ClipboardList, ArrowRight, Check, Sun, Sprout } from 'lucide-react'
+import { PlusCircle, Users, CalendarCheck, CalendarDays, ClipboardList, ArrowRight, Check, Sun, Sprout, FileSignature } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
@@ -341,6 +341,7 @@ function OfficeHome() {
   const [invoices, setInvoices] = useState(null)
   const [leads, setLeads] = useState(null)
   const [webWaiting, setWebWaiting] = useState(0)
+  const [formsToCheck, setFormsToCheck] = useState(0)
   const today = useTodayAttendance(data.students)
   const reports = useReportWork()
   const lessons = useTodayLessons()
@@ -350,6 +351,8 @@ function OfficeHome() {
   useEffect(() => { db.leads.list().then((ls) => setLeads(summarize(ls))).catch(() => setLeads(null)) }, [])
   // The same goes for messages from the website (updates-2026-09-30-website-forms.sql).
   useEffect(() => { db.webMessages.list().then((ms) => setWebWaiting(ms.filter((m) => !m.done_at).length)).catch(() => setWebWaiting(0)) }, [])
+  // And for enrollment forms from the website (updates-2026-09-30-enrollments.sql).
+  useEffect(() => { db.enrollments.list().then((fs) => setFormsToCheck(fs.filter((f) => !f.checked_at).length)).catch(() => setFormsToCheck(0)) }, [])
 
   if (!invoices || data.loading) return <Spinner />
 
@@ -374,6 +377,7 @@ function OfficeHome() {
           att[0]?.loaded && { icon: CalendarCheck, text: toRegister ? t(toRegister === 1 ? 'classToRegister' : 'classesToRegister', { n: toRegister }) : t('allRegistered') },
           !reports.hidden && reports.work && !reports.work.error && reports.work.total > 0 && { icon: ClipboardList, text: `${reports.period.label}: ${reports.work.total - reports.work.done ? t('nLeft', { n: reports.work.total - reports.work.done }) : t('reportsAllDone')}` },
           leads && (leads.new || leads.due || webWaiting) && { icon: Sprout, to: '/leads', text: `${t('leadsNav')}: ${[leads.new && t('ldNewShort', { n: leads.new }), leads.due && t('ldDueShort', { n: leads.due }), webWaiting && t('ldWebShort', { n: webWaiting })].filter(Boolean).join(' · ')}` },
+          formsToCheck > 0 && { icon: FileSignature, to: '/enrollments', text: t('enHomeShort', { n: formsToCheck }) },
         ]} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
