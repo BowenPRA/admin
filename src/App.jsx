@@ -18,6 +18,7 @@ import ReportSettings from './pages/reports/ReportSettings'
 import Attendance from './pages/Attendance'
 import Schedule from './pages/Schedule'
 import Photos from './pages/photos/Photos'
+import Leads from './pages/Leads'
 import PhotoEvent from './pages/photos/PhotoEvent'
 import { DataProvider } from './lib/DataContext'
 import { AuthProvider, useAuth } from './lib/AuthContext'
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/reports/:id" element={<ReportEditor />} />
           <Route path="/teachers" element={<Teachers />} />
           <Route path="/students" element={<Students />} />
+          <Route path="/leads" element={<Office><Leads /></Office>} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/photos" element={<Office><Photos /></Office>} />

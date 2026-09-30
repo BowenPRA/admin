@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -59,6 +59,7 @@ export default function Layout() {
             {item('/', Home, t('home'), true)}
             {isOffice && item('/invoices', FileText, t('invoices'))}
             {item('/students', Users, t('students'))}
+            {isOffice && item('/leads', Sprout, t('leadsNav'))}
             {item('/reports', ClipboardList, t('reportsNav'))}
             {item('/attendance', CalendarCheck, t('attendance'))}
             {item('/schedule', CalendarDays, t('schedule'))}

@@ -28,11 +28,13 @@ const TABLES = {
   photoEvents: 'adm_photo_events',
   eventPhotos: 'adm_event_photos',
   eventPosts: 'adm_event_posts',
+  // Families who have asked about joining (office only)
+  leads: 'adm_leads',
 }
 
 // Rows that come straight from form inputs may hold '' where Postgres wants
 // null (date / numeric columns). Applied to the report tables and students.
-const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes, TABLES.attendance, TABLES.photoEvents, TABLES.eventPhotos, TABLES.eventPosts])
+const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes, TABLES.attendance, TABLES.photoEvents, TABLES.eventPhotos, TABLES.eventPosts, TABLES.leads])
 const cleanRow = (table, row) => (CLEAN.has(table) ? Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v === '' ? null : v])) : row)
 const matches = (row, filter) => Object.entries(filter || {}).every(([k, v]) => (Array.isArray(v) ? v.includes(row[k]) : row[k] === v))
 
@@ -300,6 +302,7 @@ export const db = {
     patch: (id, fields) => A.patch(TABLES.eventPosts, id, fields),
     remove: (id) => A.removeStrict(TABLES.eventPosts, id),
   },
+  leads: { ...crud(TABLES.leads), remove: (id) => A.removeStrict(TABLES.leads, id) },
   async getFees() {
     const v = await A.getSetting('fees')
     // `school` is merged key by key so fields added later (e.g. the center name) reach older saved settings.

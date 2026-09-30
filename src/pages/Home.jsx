@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PlusCircle, Users, CalendarCheck, CalendarDays, ClipboardList, ArrowRight, Check, Sun } from 'lucide-react'
+import { PlusCircle, Users, CalendarCheck, CalendarDays, ClipboardList, ArrowRight, Check, Sun, Sprout } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
@@ -9,6 +9,7 @@ import { fmt, fmtDate } from '../lib/money'
 import { LEVELS } from '../lib/fees'
 import { splitSubjectKey } from '../data/staff'
 import { isEnrolled, activeFamilies } from '../lib/studentRecords'
+import { summarize } from '../lib/leads'
 import { teacherDay, todayIndex, isNow, subjectTone } from '../lib/schedule'
 import { currentPeriod, reportWork, studentSections, HOMEROOM_PART, WRITING } from '../lib/report/utils'
 import { Card, StatusChip, Empty, Spinner } from '../components/ui'
@@ -102,11 +103,12 @@ function Hero({ name, subtitle, facts = [] }) {
         {subtitle && <p className="mt-1 text-sm text-white/80">{subtitle}</p>}
         {facts.filter(Boolean).length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
-            {facts.filter(Boolean).map((f, i) => (
-              <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur-sm ring-1 ring-white/20">
-                {f.icon && <f.icon size={13} />} {f.text}
-              </span>
-            ))}
+            {facts.filter(Boolean).map((f, i) => {
+              const cls = 'inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur-sm ring-1 ring-white/20'
+              return f.to
+                ? <Link key={i} to={f.to} className={`${cls} hover:bg-white/25`}>{f.icon && <f.icon size={13} />} {f.text}</Link>
+                : <span key={i} className={cls}>{f.icon && <f.icon size={13} />} {f.text}</span>
+            })}
           </div>
         )}
       </div>
@@ -337,11 +339,14 @@ function OfficeHome() {
   const data = useData()
   const { me } = useAuth()
   const [invoices, setInvoices] = useState(null)
+  const [leads, setLeads] = useState(null)
   const today = useTodayAttendance(data.students)
   const reports = useReportWork()
   const lessons = useTodayLessons()
 
   useEffect(() => { db.invoices.list().then(setInvoices).catch(() => setInvoices([])) }, [])
+  // Until supabase/updates-2026-09-30-leads.sql has run there is no leads table; the line is then left out.
+  useEffect(() => { db.leads.list().then((ls) => setLeads(summarize(ls))).catch(() => setLeads(null)) }, [])
 
   if (!invoices || data.loading) return <Spinner />
 
@@ -365,6 +370,7 @@ function OfficeHome() {
         facts={[
           att[0]?.loaded && { icon: CalendarCheck, text: toRegister ? t(toRegister === 1 ? 'classToRegister' : 'classesToRegister', { n: toRegister }) : t('allRegistered') },
           !reports.hidden && reports.work && !reports.work.error && reports.work.total > 0 && { icon: ClipboardList, text: `${reports.period.label}: ${reports.work.total - reports.work.done ? t('nLeft', { n: reports.work.total - reports.work.done }) : t('reportsAllDone')}` },
+          leads && (leads.new || leads.due) && { icon: Sprout, to: '/leads', text: `${t('leadsNav')}: ${[leads.new && t('ldNewShort', { n: leads.new }), leads.due && t('ldDueShort', { n: leads.due })].filter(Boolean).join(' · ')}` },
         ]} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
