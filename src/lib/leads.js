@@ -7,6 +7,8 @@ import { OFFICE_ACCOUNTS } from '../data/staff'
 // triage adds and updates rows through its own account (TRIAGE_EMAIL).
 
 export const TRIAGE_EMAIL = 'triage@pra.edu.vn'
+// What the database records as the account when the form on pra.edu.vn adds a family (adm_web_submit).
+export const WEBSITE_SENDER = 'website'
 
 export const STAGES = [
   { id: 'new', en: 'New', vi: 'Mới', tone: 'bg-amber-100 text-amber-800', dot: 'bg-amber-500',
@@ -55,11 +57,13 @@ export function personName(email, lang = 'en') {
   const e = String(email || '').toLowerCase()
   if (!e) return ''
   if (e === TRIAGE_EMAIL) return lang === 'vi' ? 'Phân loại hộp thư' : 'Inbox triage'
+  if (e === WEBSITE_SENDER) return lang === 'vi' ? 'Form trên trang web' : 'Website form'
   return OFFICE_ACCOUNTS.find((a) => a.email === e)?.name || e.split('@')[0]
 }
 
 const pad = (n) => String(n).padStart(2, '0')
-export const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
+const fmtIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+export const todayIso = () => fmtIso(new Date())
 
 const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 /** '29 Sep' this year, '29 Sep 2025' otherwise (29/09 in Vietnamese). Takes a date or a timestamp. */
@@ -99,6 +103,64 @@ export function summarize(leads, today = todayIso()) {
     trialOrEnrolled: n('trial') + n('enrolled'),
     due: active.filter((l) => isDue(l, today)).length,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Messages from the form on pra.edu.vn (supabase/updates-2026-09-30-website-forms.sql).
+// The website saves them itself; here they are read and marked done.
+
+export const WEB_WANTS = [
+  { id: 'tour', en: 'Campus tour', vi: 'Tham quan trung tâm', tone: 'green' },
+  { id: 'call', en: 'Video call', vi: 'Gọi video', tone: 'sky' },
+  { id: 'global', en: 'Global Program information', vi: 'Thông tin Global Program', tone: 'amber' },
+  { id: 'question', en: 'Question', vi: 'Câu hỏi', tone: 'slate' },
+]
+export const wantOf = (id) => WEB_WANTS.find((w) => w.id === id) || WEB_WANTS[3]
+
+const DAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DAYS_VI = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+const WEB_TIMES = { morning: ['morning', 'buổi sáng'], afternoon: ['afternoon', 'buổi chiều'] }
+
+/** The day and time of day a family asked for: 'Tue 6 Oct, morning'. Empty when they named neither. */
+export function askedFor(m, lang = 'en') {
+  const vi = lang === 'vi'
+  let day = ''
+  if (m.visit_date) {
+    const [y, mo, d] = String(m.visit_date).split('-').map(Number)
+    const wd = new Date(y, mo - 1, d).getDay()
+    day = vi ? `${DAYS_VI[wd]}, ${fmtDay(m.visit_date, lang)}` : `${DAYS_EN[wd]} ${fmtDay(m.visit_date, lang)}`
+  }
+  const time = WEB_TIMES[m.visit_time]?.[vi ? 1 : 0] || ''
+  return [day, time].filter(Boolean).join(', ')
+}
+
+/** '30 Sep, 14:05': when a message arrived, in the reader's own time. */
+export function fmtMoment(v, lang = 'en') {
+  if (!v) return ''
+  const d = new Date(v)
+  return `${fmtDay(v, lang)}, ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** The family a message belongs to: the one the database linked, or one with the same email address. */
+export function leadForMessage(m, leads) {
+  const email = String(m.email || '').toLowerCase()
+  return leads.find((l) => l.id === m.lead_id) || leads.find((l) => emailsOf(l.email).includes(email)) || null
+}
+
+/** A message whose family is no longer on the list, as a new family ready to save. */
+export const leadFromMessage = (m, owner = '') => ({
+  ...blankLead(owner),
+  family: m.name || '', email: m.email || '', phone: m.phone || '',
+  children: m.child_age ? `Age ${String(m.child_age).toLowerCase()}` : '',
+  kids: '', program: m.want === 'global' ? 'global' : '', source: 'website',
+  first_contact: m.created_at ? fmtIso(new Date(m.created_at)) : todayIso(), notes: m.message || '',
+})
+
+/** Waiting messages first (oldest at the top: it has waited longest), then the ones already dealt with, newest first. */
+export function byWaiting(a, b) {
+  if (!a.done_at !== !b.done_at) return a.done_at ? 1 : -1
+  const order = String(a.created_at || '').localeCompare(String(b.created_at || ''))
+  return a.done_at ? -order : order
 }
 
 /** A message someone in the office can act on. */

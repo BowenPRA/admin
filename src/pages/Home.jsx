@@ -340,6 +340,7 @@ function OfficeHome() {
   const { me } = useAuth()
   const [invoices, setInvoices] = useState(null)
   const [leads, setLeads] = useState(null)
+  const [webWaiting, setWebWaiting] = useState(0)
   const today = useTodayAttendance(data.students)
   const reports = useReportWork()
   const lessons = useTodayLessons()
@@ -347,6 +348,8 @@ function OfficeHome() {
   useEffect(() => { db.invoices.list().then(setInvoices).catch(() => setInvoices([])) }, [])
   // Until supabase/updates-2026-09-30-leads.sql has run there is no leads table; the line is then left out.
   useEffect(() => { db.leads.list().then((ls) => setLeads(summarize(ls))).catch(() => setLeads(null)) }, [])
+  // The same goes for messages from the website (updates-2026-09-30-website-forms.sql).
+  useEffect(() => { db.webMessages.list().then((ms) => setWebWaiting(ms.filter((m) => !m.done_at).length)).catch(() => setWebWaiting(0)) }, [])
 
   if (!invoices || data.loading) return <Spinner />
 
@@ -370,7 +373,7 @@ function OfficeHome() {
         facts={[
           att[0]?.loaded && { icon: CalendarCheck, text: toRegister ? t(toRegister === 1 ? 'classToRegister' : 'classesToRegister', { n: toRegister }) : t('allRegistered') },
           !reports.hidden && reports.work && !reports.work.error && reports.work.total > 0 && { icon: ClipboardList, text: `${reports.period.label}: ${reports.work.total - reports.work.done ? t('nLeft', { n: reports.work.total - reports.work.done }) : t('reportsAllDone')}` },
-          leads && (leads.new || leads.due) && { icon: Sprout, to: '/leads', text: `${t('leadsNav')}: ${[leads.new && t('ldNewShort', { n: leads.new }), leads.due && t('ldDueShort', { n: leads.due })].filter(Boolean).join(' · ')}` },
+          leads && (leads.new || leads.due || webWaiting) && { icon: Sprout, to: '/leads', text: `${t('leadsNav')}: ${[leads.new && t('ldNewShort', { n: leads.new }), leads.due && t('ldDueShort', { n: leads.due }), webWaiting && t('ldWebShort', { n: webWaiting })].filter(Boolean).join(' · ')}` },
         ]} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -7,15 +7,18 @@ import { useToast } from '../lib/toast'
 import { OFFICE_ACCOUNTS } from '../data/staff'
 import {
   STAGES, LEAD_PROGRAMS, SOURCES, labelOf, stageOf, summarize, isDue, byFirstContact, blankLead,
-  parseTracker, planImport, exportLeads, leadsError, personName, todayIso, fmtDay,
+  parseTracker, planImport, exportLeads, leadsError, personName, todayIso, fmtDay, leadForMessage, leadFromMessage,
 } from '../lib/leads'
 import { Card, Checkbox, Empty, Menu, PageHeader, SearchInput, Segmented, Spinner } from '../components/ui'
 import LeadModal from '../components/leads/LeadModal'
+import WebMessages from '../components/leads/WebMessages'
 
 const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
 
+// `messages` is null until supabase/updates-2026-09-30-website-forms.sql has run; the website panel is then left out.
 async function fetchLeads() {
-  try { return { leads: await db.leads.list(), error: '' } } catch (e) { return { leads: [], error: leadsError(e) } }
+  const messages = await db.webMessages.list().catch(() => null)
+  try { return { leads: await db.leads.list(), messages, error: '' } } catch (e) { return { leads: [], messages, error: leadsError(e) } }
 }
 
 /** A figure at the top; clicking it filters the list to those families. */
@@ -69,11 +72,13 @@ export default function Leads() {
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState('')
+  const [marking, setMarking] = useState('')
   const fileInput = useRef(null)
 
   useEffect(() => { let on = true; fetchLeads().then((s) => on && setState(s)); return () => { on = false } }, [])
   const reload = () => fetchLeads().then(setState)
   const leads = state?.leads
+  const messages = state?.messages
   const put = (row) => setState((st) => ({ ...st, leads: st.leads.some((l) => l.id === row.id) ? st.leads.map((l) => (l.id === row.id ? row : l)) : [...st.leads, row] }))
   const myEmail = me?.email || null
 
@@ -125,6 +130,18 @@ export default function Leads() {
     } catch (e) { toast.error(leadsError(e)) }
   }
 
+  // A message from the website: open its family (or start one from it), and mark it dealt with.
+  const officeOwner = OFFICE_ACCOUNTS.some((a) => a.email === myEmail) ? myEmail : ''
+  const openMessage = (m) => setEditing(leadForMessage(m, leads) || leadFromMessage(m, officeOwner))
+  const markMessage = async (m, done) => {
+    setMarking(m.id)
+    try {
+      const saved = await db.webMessages.patch(m.id, { done_at: done ? new Date().toISOString() : null, done_by: done ? myEmail : null })
+      setState((st) => ({ ...st, messages: st.messages.map((x) => (x.id === saved.id ? saved : x)) }))
+      toast(t(done ? 'ldWebMarked' : 'ldWebUnmarked', { name: m.name }))
+    } catch (e) { toast.error(leadsError(e)) } finally { setMarking('') }
+  }
+
   // Moving over from the spreadsheet: adds only the families that are not here yet.
   const importFile = async (file) => {
     let parsed
@@ -154,10 +171,12 @@ export default function Leads() {
         ]} />
         <input ref={fileInput} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) importFile(f) }} />
-        <button className="btn-primary" disabled={!!error} onClick={() => setEditing(blankLead(OFFICE_ACCOUNTS.some((a) => a.email === myEmail) ? myEmail : ''))}><UserPlus size={16} /> {t('ldAdd')}</button>
+        <button className="btn-primary" disabled={!!error} onClick={() => setEditing(blankLead(officeOwner))}><UserPlus size={16} /> {t('ldAdd')}</button>
       </PageHeader>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+      {messages && !error && <WebMessages messages={messages} leads={leads} busyId={marking} onOpen={openMessage} onDone={markMessage} t={t} lang={lang} />}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Stat label={t('ldStatActive')} value={sum.active} sub={t(sum.children === 1 ? 'ldChild' : 'ldChildren', { n: sum.children })}
@@ -270,7 +289,7 @@ export default function Leads() {
       </Card>
 
       {editing && (
-        <LeadModal value={editing} leads={leads} onClose={() => setEditing(null)} onSave={save} onArchive={toggleArchive} onDelete={remove} t={t} lang={lang} />
+        <LeadModal value={editing} leads={leads} messages={editing.id ? (messages || []).filter((m) => leadForMessage(m, leads)?.id === editing.id) : []} onClose={() => setEditing(null)} onSave={save} onArchive={toggleArchive} onDelete={remove} t={t} lang={lang} />
       )}
     </div>
   )

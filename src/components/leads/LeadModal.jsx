@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Archive, ArchiveRestore, Mail, Trash2 } from 'lucide-react'
 import { OFFICE_ACCOUNTS } from '../../data/staff'
-import { STAGES, LEAD_PROGRAMS, SOURCES, stageOf, personName, fmtDay, emailsOf } from '../../lib/leads'
+import { STAGES, LEAD_PROGRAMS, SOURCES, stageOf, personName, fmtDay, emailsOf, byWaiting } from '../../lib/leads'
 import { Field, TextInput, NumberInput, Select, TextArea, Modal } from '../ui'
+import { WebMessage } from './WebMessages'
 
 function Section({ title, children }) {
   return (
@@ -18,7 +19,7 @@ function Section({ title, children }) {
  * only the changed fields (plus id) for an existing one, so two people editing
  * different things do not undo each other. All handlers return promises.
  */
-export default function LeadModal({ value, leads, onClose, onSave, onArchive, onDelete, t, lang }) {
+export default function LeadModal({ value, leads, messages = [], onClose, onSave, onArchive, onDelete, t, lang }) {
   const [s, setS] = useState(value)
   const [busy, setBusy] = useState(false)
   const set = (k) => (v) => setS((cur) => ({ ...cur, [k]: v }))
@@ -106,6 +107,14 @@ export default function LeadModal({ value, leads, onClose, onSave, onArchive, on
         <Section title={t('notes')}>
           <Field hint={t('ldNotesHint')}><TextArea rows={3} value={s.notes} onChange={set('notes')} /></Field>
         </Section>
+
+        {messages.length > 0 && (
+          <Section title={t('ldSecWeb')}>
+            <ul className="space-y-3">
+              {[...messages].sort(byWaiting).map((m) => <li key={m.id}><WebMessage m={m} t={t} lang={lang} /></li>)}
+            </ul>
+          </Section>
+        )}
       </form>
     </Modal>
   )

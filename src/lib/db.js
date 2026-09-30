@@ -30,6 +30,8 @@ const TABLES = {
   eventPosts: 'adm_event_posts',
   // Families who have asked about joining (office only)
   leads: 'adm_leads',
+  // What families send from the form on pra.edu.vn (office only)
+  webMessages: 'adm_web_messages',
 }
 
 // Rows that come straight from form inputs may hold '' where Postgres wants
@@ -303,6 +305,12 @@ export const db = {
     remove: (id) => A.removeStrict(TABLES.eventPosts, id),
   },
   leads: { ...crud(TABLES.leads), remove: (id) => A.removeStrict(TABLES.leads, id) },
+  // The website writes these itself (adm_web_submit); the office only reads them and marks them done.
+  webMessages: {
+    list: () => A.list(TABLES.webMessages),
+    patch: (id, fields) => A.patch(TABLES.webMessages, id, fields),
+    remove: (id) => A.removeStrict(TABLES.webMessages, id),
+  },
   async getFees() {
     const v = await A.getSetting('fees')
     // `school` is merged key by key so fields added later (e.g. the center name) reach older saved settings.
