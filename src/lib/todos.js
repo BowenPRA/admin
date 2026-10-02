@@ -1,4 +1,4 @@
-import { OFFICE_ACCOUNTS } from '../data/staff'
+import { OFFICE_ACCOUNTS, hasLogin } from '../data/staff'
 import { fmtDay, personName, todayIso } from './leads'
 
 // To-Do: one row per task, for the office. This took over from the "Team To-Do
@@ -87,12 +87,12 @@ export function canDeleteTodo(x, me) {
   return !!asker && asker === email.split('@')[0].split('.')[0]
 }
 
-/** Everyone a task can be given to: the office, then the teachers, then Claude. */
+/** Everyone a task can be given to: the office, then the teachers who sign in, then Claude. */
 export function assignable(teachers = []) {
   const office = OFFICE_ACCOUNTS.map((a) => ({ email: a.email, name: a.name }))
   const seen = new Set(office.map((a) => a.email))
   const rest = teachers
-    .filter((tr) => tr.email && tr.active !== false && !seen.has(tr.email.toLowerCase()))
+    .filter((tr) => hasLogin(tr) && tr.active !== false && !seen.has(tr.email.toLowerCase()))
     .map((tr) => ({ email: tr.email.toLowerCase(), name: tr.name }))
     .sort((a, b) => a.name.localeCompare(b.name))
   return [...office, ...rest, { email: CLAUDE, name: 'Claude' }]

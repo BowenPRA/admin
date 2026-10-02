@@ -77,6 +77,7 @@ export const SUBJECTS = [
   { key: 'art_craft', kind: 'specialist', name: 'Art & Crafts', name_vi: 'Mỹ thuật & Thủ công', icon: 'brush', scored: false, yearGroups: PRIMARY_YEARS },
   { key: 'cooking', kind: 'specialist', name: 'Cooking', name_vi: 'Nấu ăn', icon: 'chef', scored: false, yearGroups: PRIMARY_YEARS },
   { key: 'movement', kind: 'specialist', name: 'Movement', name_vi: 'Vận động', icon: 'movement', scored: false, yearGroups: [...PRIMARY_YEARS, 'Year 7'] },
+  { key: 'master_minds', kind: 'specialist', name: 'Master Minds', name_vi: 'Tư duy & Giải đố', icon: 'puzzle', scored: false, yearGroups: ['Year 1'] },
   { key: 'executive_function', kind: 'vocational', name: 'Executive Function', name_vi: 'Kỹ năng điều hành', icon: 'brain', scored: false },
   { key: 'technology', kind: 'vocational', name: 'Technology', name_vi: 'Công nghệ', icon: 'monitor', scored: false },
   { key: 'wellbeing', kind: 'vocational', name: 'Wellbeing', name_vi: 'Sức khỏe tinh thần', icon: 'heart', scored: false, yearGroups: [...YEARS_2_TO_6, ...LOWER_SECONDARY_YEARS] },
@@ -91,7 +92,8 @@ export const SUBJECTS = [
 // applies to each language. With every box at its limit, the PDF
 // (reportPdfLayout.js) still fits without cutting anything: see the measured
 // sizes in the header of reportPdfLayout.js (checked with 3 academic, 3
-// specialist and 3 vocational areas, in both languages). Longer text is set
+// specialist and 3 vocational areas, in both languages, and with Year 1's four
+// specialist areas). Longer text is set
 // smaller, then cut. Bowen does not want these limits lowered. A template can
 // raise a limit with its own `limits` (and `minimums`): Early Years has one
 // full-width Applied English card, which holds a longer comment.
@@ -177,7 +179,7 @@ export const TEMPLATES = {
   primary: {
     key: 'primary', name: 'Primary', program: 'Primary Program', program_vi: 'Chương trình Tiểu học',
     yearGroups: PRIMARY_YEARS, scoreYearGroups: ['Year 4', 'Year 5', 'Year 6'],
-    areas: ['math', 'science', 'english', 'art_craft', 'cooking', 'movement', 'technology', 'wellbeing', 'everyday_experts', 'presentation_play'],
+    areas: ['math', 'science', 'english', 'art_craft', 'cooking', 'movement', 'master_minds', 'technology', 'wellbeing', 'everyday_experts', 'presentation_play'],
   },
   lower_secondary: {
     key: 'lower_secondary', name: 'Lower Secondary', program: 'Lower Secondary Program', program_vi: 'Chương trình Trung học cơ sở',
@@ -193,7 +195,7 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
-const SETTINGS_VERSION = 7
+const SETTINGS_VERSION = 8
 
 export const DEFAULT_REPORT_SETTINGS = {
   version: SETTINGS_VERSION,
@@ -231,6 +233,9 @@ export const DEFAULT_REPORT_SETTINGS = {
  * added between Confident and Moving Beyond. Before version 7 the standard
  * scale (four or five levels) becomes Emerging, Practicing, On Target,
  * Confident, Moving Beyond, with a description of each level for the key.
+ * Before version 8 Master Minds (Year 1, a specialist area with a comment) is
+ * added after Movement, in the area list and in the template that covers
+ * Year 1; nothing else in the saved settings changes.
  * Saving in Report settings then stores the upgraded version.
  */
 export function normalizeReportSettings(stored) {
@@ -285,6 +290,27 @@ export function normalizeReportSettings(stored) {
         subjects.splice(at, 0, fresh)
       }
       templates = { early_years: JSON.parse(JSON.stringify(TEMPLATES.early_years)), ...templates }
+    }
+  }
+  if ((Number(v.version) || 1) < 8 && (v.subjects || v.templates)) {
+    const afterMovement = (keys, isSpecialist) => {
+      const at = keys.indexOf('movement')
+      if (at >= 0) return at + 1
+      const last = keys.map(isSpecialist).lastIndexOf(true)
+      return last < 0 ? keys.length : last + 1
+    }
+    if (!subjects.some((sub) => sub.key === 'master_minds')) {
+      const keys = subjects.map((sub) => sub.key)
+      subjects.splice(afterMovement(keys, (k) => subjects.find((sub) => sub.key === k)?.kind === 'specialist'), 0, { ...SUBJECTS.find((sub) => sub.key === 'master_minds') })
+    }
+    const key = Object.keys(templates).find((k) => (templates[k].yearGroups || []).includes('Year 1'))
+    if (key) {
+      const t = templates[key]
+      const areas = t.areas ? [...t.areas] : [...(t.academic || []), ...(t.specialist || []), ...(t.vocational || [])]
+      if (!areas.includes('master_minds')) {
+        areas.splice(afterMovement(areas, (k) => subjects.find((sub) => sub.key === k)?.kind === 'specialist'), 0, 'master_minds')
+        templates[key] = { ...t, areas }
+      }
     }
   }
   let levels = s.levels

@@ -27,6 +27,9 @@ const STAFF = [
   { email: 'tham.n@pra.edu.vn', name: 'Tham N', role: 'teacher' },
   { email: 'tham.v@pra.edu.vn', name: 'Thắm V', role: 'teacher' },
   // Thao and Tan: add once their @pra.edu.vn addresses are confirmed.
+  // Mr. Chiến (Movement, Years 1 to 6) has no login on purpose: he is on the
+  // Teachers page as "no-login:chien" and Mr. Seth writes his comments. Do not
+  // add him here.
 ]
 
 const dryRun = process.argv.includes('--dry-run')
@@ -71,7 +74,8 @@ for (let page = 1; ; page++) {
 }
 
 const created = []
-for (const s of STAFF) {
+// Only real addresses get a login (a Teachers-page stand-in such as "no-login:chien" never does).
+for (const s of STAFF.filter((x) => x.email.includes('@'))) {
   const u = existing.get(s.email)
   const label = `${s.name.padEnd(8)} ${s.email.padEnd(22)} ${s.role.padEnd(12)}`
   try {

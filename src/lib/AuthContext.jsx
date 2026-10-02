@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { auth, db, dbMode } from './db'
-import { splitSubjectKey } from '../data/staff'
+import { splitSubjectKey, hasLogin } from '../data/staff'
 
 // Who is signed in and what they may do. The same rules are enforced in the
 // database (supabase/updates-2026-09-15.sql); this only decides what to show.
@@ -34,7 +34,8 @@ export function AuthProvider({ children }) {
     let row = null
     try {
       const rows = await db.teachers.list()
-      row = rows.find((t) => (t.email || '').toLowerCase() === email && t.active !== false) || null
+      // A row with no login ("no-login:chien") is never anyone's own row.
+      row = rows.find((t) => hasLogin(t) && (t.email || '').toLowerCase() === email && t.active !== false) || null
       lastRow.current = { email, row }
     } catch {
       // The table may not exist yet. A lookup that fails later on (this runs each time the tab is

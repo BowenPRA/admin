@@ -6,7 +6,7 @@ import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { ACCESS_ROLES } from '../data/staff'
+import { ACCESS_ROLES, hasLogin } from '../data/staff'
 import { Avatar, Chip, Field, Modal, TextInput } from './ui'
 
 // The top row. Home, Students, Attendance and To-Do (office accounts) stand alone;
@@ -187,7 +187,7 @@ function ViewAsPicker({ teachers, viewAs, setViewAs }) {
       <div className="mb-1 text-xs font-semibold text-slate-500">Preview as (offline only)</div>
       <select className="input !py-1 text-xs" value={viewAs} onChange={(e) => setViewAs(e.target.value)}>
         <option value="">Offline admin (everything)</option>
-        {teachers.map((tr) => <option key={tr.id} value={tr.email}>{tr.name} · {tr.email}</option>)}
+        {teachers.filter(hasLogin).map((tr) => <option key={tr.id} value={tr.email}>{tr.name} · {tr.email}</option>)}
       </select>
     </div>
   )

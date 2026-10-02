@@ -8,7 +8,7 @@ import { db, dbMode } from '../../lib/db'
 import { hasSupabase } from '../../lib/supabaseClient'
 import { LEVELS } from '../../lib/fees'
 import { isEnrolled } from '../../lib/studentRecords'
-import { TEACHER_SCHEDULE, OFFICE_ACCOUNTS, ACCESS_ROLES, splitSubjectKey } from '../../data/staff'
+import { TEACHER_SCHEDULE, OFFICE_ACCOUNTS, ACCESS_ROLES, splitSubjectKey, hasLogin, isNoLogin, noLoginId } from '../../data/staff'
 import { sameTeacher } from '../../lib/schedule'
 import { scheduledHomeroom, templateForYearGroup, areasFor, writingFor } from '../../lib/report/utils'
 import { Card, Field, TextInput, Select, Checkbox, Modal, Empty, Spinner, Chip, PageHeader, Avatar } from '../../components/ui'
@@ -41,11 +41,13 @@ export default function Teachers() {
   const subjects = useMemo(() => settings?.subjects || [], [settings])
   const subjName = (k) => (subjects.find((s) => s.key === k) || { name: k }).name
   const activeTeachers = useMemo(() => teachers.filter((t) => t.active !== false).sort((a, b) => (a.role === 'head' ? 0 : 1) - (b.role === 'head' ? 0 : 1) || a.name.localeCompare(b.name)), [teachers])
-  const missingFromSchedule = TEACHER_SCHEDULE.filter((s) => !teachers.some((t) => (t.email || '').toLowerCase() === s.email))
+  // A schedule entry's row on this page: the same sign-in email or, for a teacher with no login, the same name.
+  const rowOf = (s) => teachers.find((t) => (t.email || '').toLowerCase() === s.email || (isNoLogin(s) && isNoLogin(t) && sameTeacher(t.name, s.name)))
+  const missingFromSchedule = TEACHER_SCHEDULE.filter((s) => !rowOf(s))
 
   // Classes on the 2026-27 schedule that a listed teacher does not have yet (e.g. the Primary areas added later).
   const newClasses = TEACHER_SCHEDULE.map((s) => {
-    const row = teachers.find((t) => (t.email || '').toLowerCase() === s.email)
+    const row = rowOf(s)
     return row ? { row, add: s.subjects.filter((k) => !(row.subjects || []).includes(k)) } : null
   }).filter((x) => x?.add.length)
 
@@ -82,10 +84,21 @@ export default function Teachers() {
   if (!isHead) return <Empty text="Only the head teacher can manage teachers." />
   if (loading || !settings) return <Spinner />
 
+  // A teacher with no login gets a stand-in for the email ("no-login:chien"), unique on this page and kept once given.
+  const noLoginEmail = (t) => {
+    const before = teachers.find((x) => x.id === t.id)
+    if (t.id && isNoLogin(before)) return before.email
+    const taken = new Set(teachers.filter((x) => x.id !== t.id).map((x) => (x.email || '').toLowerCase()))
+    const base = noLoginId(t.name)
+    let id = base
+    for (let n = 2; taken.has(id); n++) id = `${base}-${n}`
+    return id
+  }
   const save = async (t) => {
     setBusy(true)
     try {
-      await db.teachers.save({ ...t, email: t.email.trim().toLowerCase(), subjects: [...new Set(t.subjects)].sort() })
+      const noLogin = isNoLogin(t)
+      await db.teachers.save({ ...t, email: noLogin ? noLoginEmail(t) : t.email.trim().toLowerCase(), role: noLogin ? 'teacher' : t.role, subjects: [...new Set(t.subjects)].sort() })
       await refresh(); await refreshMe(); setEditing(null)
       toast(`Saved ${t.name}`)
     } catch (e) { toast.error(e.message) } finally { setBusy(false) }
@@ -170,7 +183,9 @@ export default function Teachers() {
                         <Avatar name={t.name} size={32} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 whitespace-nowrap font-semibold text-slate-800">{t.title} {t.name}{t.role === 'head' && <Chip tone="navy">Head</Chip>}</div>
-                          <div className="truncate font-mono text-xs text-slate-500">{t.email}</div>
+                          {hasLogin(t)
+                            ? <div className="truncate font-mono text-xs text-slate-500">{t.email}</div>
+                            : <div className="text-xs text-slate-500" title="Named on reports for the classes ticked here. Nobody signs in as this teacher: a head teacher writes these parts.">No login · a head teacher writes these parts</div>}
                         </div>
                       </div>
                     </td>
@@ -192,7 +207,7 @@ export default function Teachers() {
                     </td>
                     <td className="td whitespace-nowrap">{(t.homeroom_groups || []).length ? <span className="text-xs font-semibold text-amber-800">{t.homeroom_groups.map((g) => (g === '*' ? 'All' : g)).join(', ')}</span> : <span className="text-xs text-slate-300">—</span>}</td>
                     <td className="td whitespace-nowrap pr-4 text-right">
-                      {dbMode === 'local' && <button className="btn-ghost px-2" title={`Preview the app as ${t.name}`} onClick={() => setViewAs(t.email)}><Eye size={16} /></button>}
+                      {dbMode === 'local' && hasLogin(t) && <button className="btn-ghost px-2" title={`Preview the app as ${t.name}`} onClick={() => setViewAs(t.email)}><Eye size={16} /></button>}
                       <button className="btn-ghost px-2" aria-label={`Edit ${t.name}`} onClick={() => setEditing({ ...blank(), ...t })}><Pencil size={16} /></button>
                     </td>
                   </tr>
@@ -234,7 +249,7 @@ export default function Teachers() {
       )}
 
       {editing && (
-        <Modal open onClose={() => setEditing(null)} title={editing.id ? `${editing.title} ${editing.name}` : 'Add teacher'} subtitle={editing.email} wide
+        <Modal open onClose={() => setEditing(null)} title={editing.id ? `${editing.title} ${editing.name}` : 'Add teacher'} subtitle={isNoLogin(editing) ? 'No login' : editing.email} wide
           footer={(<>
             {editing.id && <button type="button" className="btn-ghost mr-auto text-red-600 hover:bg-red-50" onClick={() => remove(editing)}><Trash2 size={16} /> Remove</button>}
             <button type="button" className="btn-secondary" onClick={() => setEditing(null)}>Cancel</button>
@@ -262,6 +277,9 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
   const assigned = new Set((t.subjects || []).map((k) => splitSubjectKey(k)[1]).concat(t.homeroom_groups || []))
   const groups = LEVELS.filter((g) => allGroups || enrolled.has(g) || assigned.has(g))
   const legacyKeys = (t.subjects || []).filter((k) => !k.includes(':'))
+  // No login: named on reports, but nobody signs in as them (Mr. Chiến). The email becomes a stand-in when saved.
+  const noLogin = isNoLogin(t)
+  const setNoLogin = (on) => onChange({ ...t, email: on ? noLoginId(t.name) : '', role: on ? 'teacher' : t.role })
 
   const createLogin = async () => {
     const client = signupClient()
@@ -284,12 +302,18 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
       <div className="grid gap-3 sm:grid-cols-6">
         <Field label="Title"><Select value={t.title} onChange={set('title')} options={['Mr.', 'Ms.', 'Mrs.', 'Dr.', ''].map((x) => ({ value: x, label: x || '—' }))} /></Field>
         <Field label="Name" className="sm:col-span-2"><TextInput value={t.name} onChange={set('name')} required placeholder="Alex" /></Field>
-        <Field label="Sign-in email" className="sm:col-span-3"><TextInput type="email" value={t.email} onChange={set('email')} required placeholder="name@pra.edu.vn" /></Field>
+        {noLogin ? (
+          <Field label="Sign-in email" className="sm:col-span-3">
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600">No login. A head teacher writes these parts.</div>
+          </Field>
+        ) : <Field label="Sign-in email" className="sm:col-span-3"><TextInput type="email" value={t.email} onChange={set('email')} required placeholder="name@pra.edu.vn" /></Field>}
       </div>
       <div className="flex flex-wrap items-center gap-4">
-        <Checkbox checked={t.role === 'head'} onChange={(on) => set('role')(on ? 'head' : 'teacher')} label="Head teacher (can edit every report)" />
+        {!noLogin && <Checkbox checked={t.role === 'head'} onChange={(on) => set('role')(on ? 'head' : 'teacher')} label="Head teacher (can edit every report)" />}
         <Checkbox checked={t.active !== false} onChange={set('active')} label="Active" />
+        <Checkbox checked={noLogin} onChange={setNoLogin} label="No login (named on reports only)" />
       </div>
+      {noLogin && <p className="-mt-3 text-xs text-slate-500">For a teacher who does not use The Current. Their name prints on reports for the classes ticked below, and a head teacher writes those comments for them. Nobody can sign in as this teacher.</p>}
 
       <>
         <div>
@@ -299,7 +323,9 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
               <p className="text-xs text-slate-500">
                 {t.role === 'head'
                   ? 'Head teachers can edit every report anyway. Tick the classes they actually teach so they are named as the teacher on new reports and appear in "Who teaches what".'
-                  : 'Tick each learning area in each year group. Only those sections of a report open for editing.'}
+                  : noLogin
+                    ? 'Tick each learning area in each year group they teach. They are named as the teacher on those parts of the reports.'
+                    : 'Tick each learning area in each year group. Only those sections of a report open for editing.'}
               </p>
             </div>
             <Checkbox checked={allGroups} onChange={setAllGroups} label="Show every year group" className="text-xs" />
@@ -350,7 +376,7 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
         </div>
       </>
 
-      <details className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      {!noLogin && <details className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <summary className="flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700"><KeyRound size={16} /> Create a login for this teacher</summary>
         <p className="mb-2 mt-2 text-xs text-slate-500">Only needed for someone not in <code>scripts/create-staff-accounts.mjs</code>. {dbMode === 'local' && 'Not available in offline mode.'}</p>
         <div className="flex flex-wrap items-end gap-2">
@@ -358,7 +384,7 @@ function TeacherForm({ value: t, onChange, settings, students, onSave }) {
           <button type="button" className="btn-secondary" disabled={signupBusy || dbMode === 'local'} onClick={createLogin}>Create login</button>
         </div>
         {msg && <p className="mt-2 text-xs text-slate-700">{msg}</p>}
-      </details>
+      </details>}
     </form>
   )
 }

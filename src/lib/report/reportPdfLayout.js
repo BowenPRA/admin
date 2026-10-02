@@ -17,6 +17,10 @@
 // TEXT_LIMITS length, for Nursery, Years 1, 3, 4, 7 and 8 and two partial-day
 // pages: nothing cut, comments at 8pt (Years 1 to 7) or the usual 8.25pt
 // (Nursery, Year 8, partial day), and 8.25pt everywhere with boxes 85% full.
+// Measured again 2 October 2026, when Year 1 gained Master Minds (four
+// specialist cards, so the level pill moves to the teacher's line): Year 1 at
+// every limit 7.75pt in both languages, nothing cut, and 8.25pt with boxes 85%
+// full. Every other year group's page came out exactly as before.
 
 import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor } from './utils'
 import { reportStrings, reportTitle, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
@@ -552,13 +556,17 @@ function buildPage(item, M, { proof, icons = {} }) {
   const cardW = Object.fromEntries(cardTiers.map((k) => [k, W / tiers[k].length]))
   // Card header: the icon badge, area name and level pill on one line under the
   // band. The teacher's name joins that line when it fits on every card of the
-  // tier, else each card gives it a line of its own, so the cards of a tier
-  // look alike and their text boxes line up.
+  // tier ('one'), else each card gives it a line of its own ('two'), so the
+  // cards of a tier look alike and their text boxes line up. In narrow cards
+  // (four in a tier, as Year 1's specialists) the area name would be cut
+  // beside the pill, so the pill moves down to the teacher's line ('stacked').
   const CARD_HEAD = 3.5
   const CARD_PAD = 4
   const HEAD_ONE = CARD_HEAD + PILL_H + 4 // text top when the teacher shares the title line
   const TEACHER_Y = CARD_HEAD + PILL_H + 0.5 // the teacher's own line, when needed
   const HEAD_TWO = TEACHER_Y + F.teacher * LINE + 1
+  const STACK_PILL_Y = CARD_HEAD + PILL_H // the pill's top when it shares the teacher's line
+  const TITLE_STYLE = { bold: true, color: C.navy }
   const cards = Object.fromEntries(cardTiers.map((tier) => [tier, tiers[tier].map((s) => {
     const sub = subjectByKey(settings, s.subject_key)
     const note = noteFor(s.subject_key)
@@ -567,18 +575,23 @@ function buildPage(item, M, { proof, icons = {} }) {
     const teacher = teacherOf(s)
     const titleW = M.width({ text: nameIn(sub), ...T(F.cardTitle, { bold: true, pitch: 1 }) })
     const teacherW = teacher ? M.width({ text: teacher, ...T(F.teacher, { pitch: 1 }) }) : 0
-    const roomForTeacher = cw - 27 - 8 - pillFit(s.level, cw * 0.55).w - 5 - titleW - 6
-    const oneLine = !teacher || teacherW <= roomForTeacher
+    const pillBox = pillFit(s.level, cw * 0.55)
+    const roomForTeacher = cw - 27 - 8 - pillBox.w - 5 - titleW - 6
+    const teacherBeside = !teacher || teacherW <= roomForTeacher
+    // Beside the pill the name may be set a little smaller (as putLine does), but not cut.
+    const titleBeside = oneLine(nameIn(sub), F.cardTitle, cw - 27 - 8 - pillBox.w - 5, TITLE_STYLE).node.text === nameIn(sub)
     // Specialist cards hold the individual comment (the shared body size); vocational cards the course description.
     return {
-      ...(voc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, teacher, titleW, oneLine,
+      ...(voc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, teacher, titleW, teacherBeside, titleBeside, pillH: pillBox.h,
       name: `${sub.name} ${voc ? 'course description' : 'comment'}`, w: cw - 16,
       label: voc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
       ...(voc ? picked(note?.description, note?.description_vi) : picked(s.comment, s.comment_vi)),
     }
   })]))
-  const tierOneLine = Object.fromEntries(cardTiers.map((k) => [k, cards[k].every((c) => c.oneLine)]))
-  const cardTop = Object.fromEntries(cardTiers.map((k) => [k, tierOneLine[k] ? HEAD_ONE : HEAD_TWO]))
+  const tierLayout = Object.fromEntries(cardTiers.map((k) => [k,
+    !cards[k].every((c) => c.titleBeside) ? 'stacked' : cards[k].every((c) => c.teacherBeside) ? 'one' : 'two']))
+  const cardTop = Object.fromEntries(cardTiers.map((k) => [k,
+    tierLayout[k] === 'stacked' ? STACK_PILL_Y + Math.max(...cards[k].map((c) => c.pillH)) + 2.5 : tierLayout[k] === 'one' ? HEAD_ONE : HEAD_TWO]))
   // A card's text height at comment size `s` (vocational cards keep their own size).
   const cardText = (c, s) => M.height(boxNode(c, c.body ? s : c.base), c.w)
 
@@ -794,16 +807,18 @@ function buildPage(item, M, { proof, icons = {} }) {
     const cw = cardW[tier]
     frame(X, y, W, h, theme, title(tier), title(tier === 'specialist' ? 'specialistNote' : 'vocationalNote'))
     const top = cardTop[tier]
+    const layout = tierLayout[tier]
     const boxes = cards[tier].map((c, i) => {
       const cx = X + i * cw
       const cy = y + BAR
       if (i > 0) dotted(cx, cy + 6, cx, y + h - 6, theme.edge)
-      const p = pill(c.s.level, cx + cw - 8, cy + CARD_HEAD, cw * 0.55, 'right')
+      const p = pill(c.s.level, cx + cw - 8, cy + (layout === 'stacked' ? STACK_PILL_Y : CARD_HEAD), cw * 0.55, 'right')
       const mid = cy + CARD_HEAD + PILL_H / 2
       badge(c.sub.icon, cx + 8 + 7.5, mid, 15, theme.tint, theme.accent)
-      const titleMax = cw - 27 - 8 - p.w - 5
-      const tw = putLine(cx + 27, midTop(mid, F.cardTitle, true), titleMax, nameIn(c.sub), F.cardTitle, { bold: true, color: C.navy })
-      if (c.teacher && tierOneLine[tier]) putLine(cx + 27 + tw + 6, midTop(mid, F.teacher), titleMax - tw - 6, c.teacher, F.teacher, { color: C.muted })
+      const titleMax = cw - 27 - 8 - (layout === 'stacked' ? 0 : p.w + 5)
+      const tw = putLine(cx + 27, midTop(mid, F.cardTitle, true), titleMax, nameIn(c.sub), F.cardTitle, TITLE_STYLE)
+      if (c.teacher && layout === 'one') putLine(cx + 27 + tw + 6, midTop(mid, F.teacher), titleMax - tw - 6, c.teacher, F.teacher, { color: C.muted })
+      else if (c.teacher && layout === 'stacked') putLine(cx + 27, midTop(cy + STACK_PILL_Y + PILL_H / 2, F.teacher), cw - 35 - p.w - 5, c.teacher, F.teacher, { color: C.muted })
       else if (c.teacher) putLine(cx + 27, cy + TEACHER_Y, cw - 35, c.teacher, F.teacher, { color: C.muted })
       return { ...c, base: c.body ? body : c.base, x: cx + 8, y: cy + top, h: y + h - CARD_PAD - (cy + top) }
     })
