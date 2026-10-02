@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet, Printer } from 'lucide-react'
+import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet, Printer, Copy } from 'lucide-react'
 import { db } from '../lib/db'
 import { exportStudentList } from '../lib/exportExcel'
 import { useT } from '../lib/i18n'
@@ -17,6 +17,9 @@ import FamilyModal from '../components/students/FamilyModal'
 import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact, isEnrolled, isPending, isPast, statusOf, familyStatus, partialFrom, endDateOf, startsLater } from '../lib/studentRecords'
 import { finishingThisQuarter, dayText } from '../lib/studentDates'
 import { todayIso } from '../lib/attendanceSummary'
+import { withOpenSteps, startedBy, parentEmails } from '../lib/onboarding'
+import { emailIssues } from '../lib/emailCheck'
+import { useOnboardingSources } from '../lib/useOnboardingSources'
 
 const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
 const levelIndex = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
@@ -38,15 +41,19 @@ function SortTh({ col, sort, onSort, children, className = '' }) {
 export default function Students() {
   const { t, lang } = useT()
   const toast = useToast()
-  const { loading, students, families, fees, calendar, refresh } = useData()
-  const { isOffice } = useAuth()
+  const { loading, students, families, fees, calendar, teachers, refresh } = useData()
+  const { isOffice, me } = useAuth()
   const canEdit = isOffice
   const [params, setParams] = useSearchParams()
   const tab = params.get('tab') === 'families' ? 'families' : 'students'
   const setTab = (v) => setParams(v === 'families' ? { tab: v } : {}, { replace: true })
+  // Invoices, enrollment forms and leads, for the new-student checklist (office accounts).
+  const sources = useOnboardingSources(canEdit)
 
   const [q, setQ] = useState('')
-  const [status, setStatus] = useState('active')
+  // Home's "new students with steps to finish" opens this page as /students?steps=1: pending and enrolled together.
+  const [steps, setSteps] = useState(() => params.get('steps') === '1')
+  const [status, setStatus] = useState(() => (params.get('steps') === '1' ? 'all' : 'active'))
   const [level, setLevel] = useState('')
   const [program, setProgram] = useState('')
   const [noFamily, setNoFamily] = useState(false)
@@ -88,6 +95,16 @@ export default function Students() {
   const finishing = useMemo(() => finishingThisQuarter(students, calendar), [students, calendar])
   const finishingIds = useMemo(() => new Set(finishing.students.map((s) => s.id)), [finishing])
   const toggleEnding = (on) => { setEnding(on); if (!on && params.get('ending')) setParams(Object.fromEntries([...params].filter(([k]) => k !== 'ending')), { replace: true }) }
+  // New students with steps still open on their checklist (lib/onboarding.js).
+  const checklistCtx = useMemo(() => ({ students, families, invoices: sources.invoices, enrollments: sources.enrollments, leads: sources.leads, teachers, schoolYear: fees?.schoolYear }),
+    [students, families, sources.invoices, sources.enrollments, sources.leads, teachers, fees?.schoolYear])
+  const openSteps = useMemo(() => (canEdit ? new Map(withOpenSteps(students, checklistCtx).map((x) => [x.s.id, x.r.open])) : new Map()), [canEdit, students, checklistCtx])
+  const toggleSteps = (on) => {
+    setSteps(on)
+    if (on) setStatus('all')
+    if (!on && params.get('steps')) setParams(Object.fromEntries([...params].filter(([k]) => k !== 'steps')), { replace: true })
+  }
+  const reloadAll = async () => { await refresh(); await sources.reload() }
   const toConvert = useMemo(() => students.filter(needsCodeUpdate), [students])
   const withoutId = useMemo(() => students.filter((s) => !isPast(s) && !s.student_code), [students])
 
@@ -101,6 +118,7 @@ export default function Students() {
       .filter((s) => !program || s.program === program)
       .filter((s) => !noFamily || !s.family_id)
       .filter((s) => !ending || finishingIds.has(s.id))
+      .filter((s) => !steps || openSteps.has(s.id))
       .filter((s) => !needle || norm(`${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''} ${s.level} ${s.student_code} ${normalizeCode(s.student_code)} ${s.class_group}`).includes(needle))
     const dir = sort.dir === 'asc' ? 1 : -1
     const byName = (a, b) => (a.full_name || '').localeCompare(b.full_name || '')
@@ -113,7 +131,7 @@ export default function Students() {
       family: (a, b) => (famById[a.family_id]?.name || '~').localeCompare(famById[b.family_id]?.name || '~') || byName(a, b),
     }[sort.col] || byName
     return [...list].sort((a, b) => cmp(a, b) * dir)
-  }, [students, q, status, level, program, noFamily, ending, finishingIds, famById, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [students, q, status, level, program, noFamily, ending, finishingIds, steps, openSteps, famById, sort]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const famRows = useMemo(() => {
     const needle = norm(q)
@@ -124,8 +142,8 @@ export default function Students() {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [families, kidsByFamily, q, status, missingContact])
 
-  const filtersOn = !!(q || level || program || noFamily || ending || missingContact)
-  const clearFilters = () => { setQ(''); setLevel(''); setProgram(''); setNoFamily(false); toggleEnding(false); setMissingContact(false) }
+  const filtersOn = !!(q || level || program || noFamily || ending || steps || missingContact)
+  const clearFilters = () => { setQ(''); setLevel(''); setProgram(''); setNoFamily(false); toggleEnding(false); toggleSteps(false); setMissingContact(false) }
   const onSort = (col) => setSort((s) => (s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' }))
 
   const run = async (fn) => {
@@ -149,10 +167,16 @@ export default function Students() {
       }
       const row = { ...s, family_id: familyId, dob: s.dob || null }
       const orig = s.id ? students.find((x) => x.id === s.id) : null
+      // A student added here starts the new-student checklist (lib/onboarding.js).
+      if (!orig && !row.onboarding) row.onboarding = startedBy(me?.email)
       if (!orig) await db.students.save(row)
       else { const fields = changedFields(row, orig); if (Object.keys(fields).length) await db.students.patch(orig.id, fields) }
+      // The lead follows the student: once they are enrolled, so is the family on the Leads list.
+      const lead = row.lead_id && statusOf(row) === 'active' ? (sources.leads || []).find((l) => l.id === row.lead_id) : null
+      if (lead && (lead.stage !== 'enrolled' || lead.archived)) await db.leads.patch(lead.id, { stage: 'enrolled', archived: false, updated_by: me?.email || null }).catch(() => {})
       newFamily.current = null
       await refresh()
+      if (canEdit) sources.reload()
       closeStudent()
       toast(t('studentSaved', { name: s.nickname || s.full_name }))
     } catch (e) { toast.error(/partial_from/.test(e.message || '') ? t('partialDaySetup') : /end_date/.test(e.message || '') ? t('endDateSetup') : e.message) }
@@ -245,6 +269,24 @@ export default function Students() {
     toast(t('exportStudentListDone', { n: rows.length }))
   })
 
+  // The parent addresses of the students listed now, for a class email or a mailing list, taken
+  // from the records rather than from memory. Past students are left out unless the Past tab is open.
+  const copyParentEmails = async () => {
+    const kids = rows.filter((s) => status === 'past' || !isPast(s))
+    const list = [...new Set(kids.flatMap((s) => parentEmails(s, famById[s.family_id], students)))]
+    if (!list.length) { toast.info(t('copyEmailsNone')); return }
+    const text = list.join(', ')
+    try { await navigator.clipboard.writeText(text) } catch {
+      const area = Object.assign(document.createElement('textarea'), { value: text })
+      area.style.position = 'fixed'; area.style.opacity = '0'
+      document.body.appendChild(area); area.select()
+      try { document.execCommand('copy') } finally { area.remove() }
+    }
+    const slips = emailIssues(text).slips
+    toast(t('copyEmailsDone', { n: list.length, kids: kids.length }))
+    if (slips.length) toast.error(t('copyEmailsSlips', { list: slips.map((x) => `${x.email} → ${x.suggestion}`).join(', ') }))
+  }
+
   // ---- families ----
   const saveFamily = async (f) => {
     try { await db.families.save(f); await refresh(); setEditingFam(null); toast(t('familySaved', { name: f.name })) } catch (e) { toast.error(e.message) }
@@ -276,7 +318,7 @@ export default function Students() {
         <Link className="btn-secondary" to={`/print/class-lists${level ? `?group=${encodeURIComponent(level)}` : ''}`} title={t('classListsHint')}><Printer size={16} /> {t('classLists')}</Link>
         {canEdit && (
           <Menu label={t('more')} icon={MoreHorizontal} items={[
-            { label: t('loadRoster'), icon: ClipboardList, onClick: () => rosterInput.current?.click(), disabled: busy, hint: lang === 'vi' ? 'Chọn private/roster.json để thêm học sinh còn thiếu' : 'Pick private/roster.json to add anyone missing' },
+            { label: t('loadRoster'), icon: ClipboardList, onClick: () => rosterInput.current?.click(), disabled: busy, hint: lang === 'vi' ? 'Chọn private/roster.json để thêm học viên còn thiếu' : 'Pick private/roster.json to add anyone missing' },
             { label: t('buildFamilies'), icon: Users, onClick: buildFamilies, disabled: busy, hint: lang === 'vi' ? 'Theo email / điện thoại phụ huynh chung' : 'Match siblings by shared parent email or phone' },
             { label: t('addFamily'), icon: Users, onClick: () => setEditingFam(blankFamily()) },
             { label: t('exportStudentList'), icon: FileSpreadsheet, onClick: exportList, disabled: busy || !rows.length, hint: t('exportStudentListHint', { n: rows.length }) },
@@ -327,11 +369,17 @@ export default function Students() {
             </select>
             {canEdit && <Checkbox checked={noFamily} onChange={setNoFamily} label={t('withoutFamily')} className="px-1" />}
             {(finishing.students.length > 0 || ending) && <Checkbox checked={ending} onChange={toggleEnding} label={`${t('endingFilter')} (${finishing.students.length})`} className="px-1" />}
+            {canEdit && (openSteps.size > 0 || steps) && <Checkbox checked={steps} onChange={toggleSteps} label={`${t('stepsFilter')} (${openSteps.size})`} className="px-1" />}
           </>) : (
             <Checkbox checked={missingContact} onChange={setMissingContact} label={t('missingContact')} className="px-1" />
           )}
           {filtersOn && <button className="btn-ghost text-xs" onClick={clearFilters}>{t('clearFilters')}</button>}
-          <span className="ml-auto text-xs text-slate-400">{tab === 'students' ? t('studentsCount', { n: rows.length }) : t('familiesCount', { n: famRows.length })}</span>
+          <span className="ml-auto flex items-center gap-2 text-xs text-slate-400">
+            {tab === 'students' && canEdit && rows.length > 0 && (
+              <button type="button" className="btn-ghost px-2 py-1 text-xs text-pra-blue" onClick={copyParentEmails} title={t('copyEmailsHint')}><Copy size={13} /> {t('copyEmails')}</button>
+            )}
+            {tab === 'students' ? t('studentsCount', { n: rows.length }) : t('familiesCount', { n: famRows.length })}
+          </span>
         </div>
 
         {tab === 'students' ? (
@@ -395,6 +443,7 @@ export default function Students() {
                           ) : <span className="text-slate-600">{famById[s.family_id]?.name || '—'}</span>}
                         </td>
                         <td className="td hidden whitespace-nowrap pr-4 text-right text-xs sm:table-cell">
+                          {openSteps.has(s.id) && <span className="chip mr-1 bg-sky-100 text-sky-800" title={t('obTitle')}>{t(openSteps.get(s.id) === 1 ? 'stepsOpenOne' : 'stepsOpen', { n: openSteps.get(s.id) })}</span>}
                           {isPending(s) && <span className="chip mr-1 bg-amber-100 text-amber-700">{t('pending').toLowerCase()}</span>}
                           {s.is_new && <span className="chip mr-1 bg-green-100 text-green-800">{lang === 'vi' ? 'mới' : 'new'}</span>}
                           {s.legacy && <span className="chip mr-1 bg-purple-100 text-purple-800">legacy</span>}
@@ -459,7 +508,8 @@ export default function Students() {
 
       {shown && (
         <StudentModal key={shown.id || 'new'} value={shown} onClose={closeStudent} onSave={saveStudent} onDelete={removeStudent}
-          students={students} families={families} schoolYear={fees?.schoolYear} calendar={calendar} canEdit={canEdit} t={t} lang={lang} />
+          students={students} families={families} schoolYear={fees?.schoolYear} calendar={calendar} canEdit={canEdit} t={t} lang={lang}
+          checklist={canEdit ? { ctx: checklistCtx, me, onChanged: reloadAll } : null} onError={(m) => toast.error(m)} />
       )}
       {editingFam && (
         <FamilyModal key={editingFam.id || 'new-family'} value={editingFam} onClose={() => setEditingFam(null)} onSave={saveFamily} onDelete={removeFamily}

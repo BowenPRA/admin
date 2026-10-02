@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronDown, FileSpreadsheet, MoreHorizontal, Printer, Upload, UserPlus } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/AuthContext'
+import { useData } from '../lib/DataContext'
 import { useToast } from '../lib/toast'
 import { OFFICE_ACCOUNTS } from '../data/staff'
 import {
   STAGES, LEAD_PROGRAMS, SOURCES, labelOf, stageOf, summarize, isDue, byFirstContact, blankLead,
-  parseTracker, planImport, exportLeads, leadsError, personName, todayIso, fmtDay, leadForMessage, leadFromMessage,
+  parseTracker, planImport, exportLeads, leadsError, personName, todayIso, fmtDay, leadForMessage, leadFromMessage, studentsOfLead,
 } from '../lib/leads'
+import { ChecklistSetupError } from '../lib/onboarding'
 import { Card, Checkbox, Empty, Menu, PageHeader, SearchInput, Segmented, Spinner } from '../components/ui'
 import LeadModal from '../components/leads/LeadModal'
+import MakeStudentsModal from '../components/leads/MakeStudentsModal'
 import WebMessages from '../components/leads/WebMessages'
 
 const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
@@ -66,6 +69,9 @@ export default function Leads() {
   const { t, lang } = useT()
   const toast = useToast()
   const { me } = useAuth()
+  const { students, families, fees, refresh } = useData()
+  const [params, setParams] = useSearchParams()
+  const [making, setMaking] = useState(null) // the lead whose student records are being made
   const [state, setState] = useState(null)
   const [view, setView] = useState('active')
   const [stage, setStage] = useState('')
@@ -79,9 +85,22 @@ export default function Leads() {
   const [marking, setMarking] = useState('')
   const fileInput = useRef(null)
 
-  useEffect(() => { let on = true; fetchLeads().then((s) => on && setState(s)); return () => { on = false } }, [])
+  // A link from a student's checklist opens their family once the list is in: /leads?lead=<id>.
+  useEffect(() => {
+    let on = true
+    const wanted = params.get('lead')
+    fetchLeads().then((s) => {
+      if (!on) return
+      setState(s)
+      const l = wanted ? s.leads.find((x) => x.id === wanted) : null
+      if (l) { setEditing(l); setView(l.archived ? 'archive' : 'active') }
+      if (wanted) setParams({}, { replace: true })
+    })
+    return () => { on = false }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const reload = () => fetchLeads().then(setState)
   const leads = state?.leads
+  const studentsOf = (l) => studentsOfLead(l, students || [], families || [])
   const messages = state?.messages
   const put = (row) => setState((st) => ({ ...st, leads: st.leads.some((l) => l.id === row.id) ? st.leads.map((l) => (l.id === row.id ? row : l)) : [...st.leads, row] }))
   const myEmail = me?.email || null
@@ -133,6 +152,30 @@ export default function Leads() {
       await db.leads.remove(l.id)
       setState((st) => ({ ...st, leads: st.leads.filter((x) => x.id !== l.id) })); setEditing(null); toast(t('deletedName', { name: l.family }))
     } catch (e) { toast.error(leadsError(e)) }
+  }
+
+  // Making the student records for a family: what was typed in its window is saved first.
+  const startMaking = async (l, changed = {}) => {
+    try {
+      const saved = Object.keys(changed).length ? await db.leads.patch(l.id, { ...changed, updated_by: myEmail }) : l
+      put(saved); setEditing(null); setMaking(saved)
+    } catch (e) { toast.error(leadsError(e)) }
+  }
+  const madeStudents = async (made, { stage: next }) => {
+    const l = making
+    setMaking(null)
+    await refresh()
+    if (next !== l.stage || l.archived) put({ ...l, stage: next, archived: false })
+    toast(t('mkDone', { n: made.length, name: l.family }))
+    setEditing({ ...l, stage: next, archived: false })
+  }
+  const linkStudent = async (st) => {
+    try {
+      const row = await db.students.patch(st.id, { lead_id: editing.id })
+      if (!('lead_id' in row)) throw new ChecklistSetupError('lead_id')
+      await refresh()
+      toast(t('ldLinked', { name: st.full_name }))
+    } catch (e) { toast.error(e instanceof ChecklistSetupError ? t('checklistSetup') : e.message) }
   }
 
   // A message from the website: open its family (or start one from it), and mark it dealt with.
@@ -279,6 +322,9 @@ export default function Leads() {
                       </td>
                       <td className="td">
                         <StageSelect value={l.stage} lang={lang} disabled={saving === l.id} onChange={(v) => changeStage(l, v)} />
+                        {['trial', 'enrolled'].includes(l.stage) && (() => { const x = studentsOf(l); return !x.linked.length && !x.matched.length })() && (
+                          <div className="mt-1"><span className="chip bg-amber-100 text-amber-800" title={t('ldNoStudentWarnShort')}>{t('ldNoStudentChip')}</span></div>
+                        )}
                         {l.tour_date && ['tour_booked', 'tour_done', 'trial'].includes(l.stage) && <div className="mt-1 text-xs text-slate-500">{t('ldTour')}: {fmtDay(l.tour_date, lang)}</div>}
                       </td>
                       <td className="td hidden max-w-[20rem] md:table-cell">
@@ -297,7 +343,13 @@ export default function Leads() {
       </Card>
 
       {editing && (
-        <LeadModal value={editing} leads={leads} messages={editing.id ? (messages || []).filter((m) => leadForMessage(m, leads)?.id === editing.id) : []} onClose={() => setEditing(null)} onSave={save} onArchive={toggleArchive} onDelete={remove} t={t} lang={lang} />
+        <LeadModal value={editing} leads={leads} messages={editing.id ? (messages || []).filter((m) => leadForMessage(m, leads)?.id === editing.id) : []}
+          {...(editing.id ? studentsOf(editing) : {})} onMakeStudents={startMaking} onLinkStudent={linkStudent}
+          onClose={() => setEditing(null)} onSave={save} onArchive={toggleArchive} onDelete={remove} t={t} lang={lang} />
+      )}
+      {making && (
+        <MakeStudentsModal lead={making} students={students || []} families={families || []} schoolYear={fees?.schoolYear} me={me}
+          onClose={() => setMaking(null)} onDone={madeStudents} t={t} lang={lang} />
       )}
     </div>
   )

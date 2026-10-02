@@ -1,7 +1,9 @@
-// Student IDs. PRA students are S0001, S0002…; the older PAL0115-style codes
-// become S0115 (same number). BLE codes from the Global program are kept as
-// they are. The database assigns the next S number too (see
-// supabase/updates-2026-09-15.sql); doing it here lets the form show it.
+// Student IDs. Every new student gets the next S number (S0001, S0002…); nothing
+// here or in the database makes any other kind. The older PAL0115-style codes
+// become S0115 (same number). A student who already has an older code from
+// before (BLE…) keeps it: it is on invoices and receipts already sent. The
+// database assigns the next S number too (see supabase/updates-2026-09-15.sql);
+// doing it here lets the form show it.
 
 export const normalizeCode = (code) => {
   const c = String(code || '').replace(/\s+/g, '').toUpperCase()

@@ -157,6 +157,71 @@ export const leadFromMessage = (m, owner = '') => ({
   first_contact: m.created_at ? fmtIso(new Date(m.created_at)) : todayIso(), notes: m.message || '',
 })
 
+// ---------------------------------------------------------------------------
+// From a lead to the student list (To-Do #38). The office makes the pending student(s)
+// and the family from a family on the list, and each student keeps the lead's id
+// (adm_students.lead_id), so the lead and the students cannot drift apart.
+
+const MONTH_INDEX = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 }
+const validDay = (y, m, d) => { const t = new Date(Date.UTC(y, m - 1, d)); return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d }
+/** A date of birth as people write it on a lead: "3 Feb 2022", "3/2/2022" (day first), "2022-02-03". */
+function birthdayIn(text) {
+  const s = String(text || '')
+  let m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (m && validDay(+m[1], +m[2], +m[3])) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`
+  m = s.match(/(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{4})/i)
+  if (m && validDay(+m[3], MONTH_INDEX[m[2].toLowerCase()], +m[1])) return `${m[3]}-${pad(MONTH_INDEX[m[2].toLowerCase()])}-${pad(m[1])}`
+  m = s.match(/(\d{1,2})[/.](\d{1,2})[/.](\d{4})/)
+  if (m && validDay(+m[3], +m[2], +m[1])) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`
+  return ''
+}
+
+/**
+ * The children a lead names, as rows to fill in: [{ name, dob, note }]. The Children box
+ * is one line, e.g. "Maia (b. 3 Feb 2022), Leo (b. 9 Jun 2019)" or "Age 5"; what cannot be
+ * read is kept as a note. There are at least as many rows as the lead's number of kids.
+ */
+export function childrenFromLead(lead) {
+  const text = clean(lead?.children)
+  const parts = []
+  let depth = 0
+  let cur = ''
+  for (const ch of text) {
+    if (ch === '(') depth++
+    if (ch === ')') depth = Math.max(0, depth - 1)
+    if (depth === 0 && /[,;]/.test(ch)) { parts.push(cur); cur = ''; continue }
+    cur += ch
+  }
+  parts.push(cur)
+  const rows = parts.flatMap((p) => p.split(/\s+(?:and|&|và)\s+(?![^(]*\))/i)).map((p) => p.trim()).filter(Boolean).map((p) => {
+    const dob = birthdayIn(p)
+    const name = p.replace(/\(.*?\)/g, '').replace(/\b(b\.|born|sinh|age|tuổi)\b.*$/i, '').replace(/\d.*$/, '').trim()
+    return { name, dob, note: name === p ? '' : p }
+  }).reduce((out, r) => {
+    // "Mia, 4 years": a piece with no name and no date belongs to the child before it.
+    if (!r.name && !r.dob && out.length) { const prev = out[out.length - 1]; prev.note = [prev.note || prev.name, r.note].filter(Boolean).join(', '); return out }
+    return [...out, r]
+  }, [])
+  const kids = Math.max(Number(lead?.kids) || 0, 1)
+  while (rows.length < kids) rows.push({ name: '', dob: '', note: '' })
+  return rows
+}
+
+/**
+ * The students a lead belongs to: `linked` carry its id; `matched` have a parent address
+ * the lead has but are not linked yet (offered for linking).
+ */
+export function studentsOfLead(lead, students = [], families = []) {
+  if (!lead?.id) return { linked: [], matched: [] }
+  const linked = students.filter((s) => s.lead_id === lead.id)
+  const mine = emailsOf(lead.email)
+  if (!mine.length) return { linked, matched: [] }
+  const famEmails = (f) => [...emailsOf(f.email), ...(Array.isArray(f.contacts) ? f.contacts.map((c) => String(c.email || '').toLowerCase()) : [])]
+  const fams = new Set(families.filter((f) => famEmails(f).some((e) => mine.includes(e))).map((f) => f.id))
+  const matched = students.filter((s) => !s.lead_id && (fams.has(s.family_id) || emailsOf(s.parents_email).some((e) => mine.includes(e))))
+  return { linked, matched }
+}
+
 /** Waiting messages first (oldest at the top: it has waited longest), then the ones already dealt with, newest first. */
 export function byWaiting(a, b) {
   if (!a.done_at !== !b.done_at) return a.done_at ? 1 : -1

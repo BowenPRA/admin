@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/AuthContext'
@@ -6,6 +7,7 @@ import { useData } from '../lib/DataContext'
 import { useToast } from '../lib/toast'
 import { fmtMoment } from '../lib/leads'
 import { placeOf, byReceived, birthdayLine, flagsOf, enrollmentError } from '../lib/enrollment'
+import { useOnboardingSources } from '../lib/useOnboardingSources'
 import { Card, Checkbox, Chip, Empty, PageHeader, SearchInput, Spinner } from '../components/ui'
 import EnrollmentModal from '../components/enrollments/EnrollmentModal'
 
@@ -21,15 +23,25 @@ async function fetchForms() {
 export default function Enrollments() {
   const { t, lang } = useT()
   const toast = useToast()
-  const { isSuper } = useAuth()
-  const { students, refresh } = useData()
+  const { isSuper, me } = useAuth()
+  const { students, families, teachers, fees, refresh } = useData()
+  // Invoices and leads for the new-student checklist; the forms themselves come from this page.
+  const sources = useOnboardingSources(true)
+  const [params, setParams] = useSearchParams()
   const [state, setState] = useState(null)
   const [q, setQ] = useState('')
   const [toCheck, setToCheck] = useState(false)
-  const [openId, setOpenId] = useState(null)
+  // A link from a student's checklist opens their form: /enrollments?form=<id>.
+  const [openId, setOpenId] = useState(() => params.get('form'))
 
   useEffect(() => { let on = true; fetchForms().then((s) => on && setState(s)); return () => { on = false } }, [])
   const forms = state?.forms
+  const checklist = {
+    ctx: { students, families, invoices: sources.invoices, enrollments: forms || null, leads: sources.leads, teachers, schoolYear: fees?.schoolYear },
+    me,
+    onChanged: async () => { await refresh?.(); await sources.reload(); setState(await fetchForms()) },
+  }
+  const closeForm = () => { setOpenId(null); if (params.get('form')) setParams({}, { replace: true }) }
   const studentById = useMemo(() => Object.fromEntries((students || []).map((s) => [s.id, s])), [students])
   const put = (row) => setState((st) => ({ ...st, forms: st.forms.map((f) => (f.id === row.id ? row : f)) }))
 
@@ -44,7 +56,7 @@ export default function Enrollments() {
   const check = async (f, checked) => {
     try {
       put(await db.enrollments.patch(f.id, { checked_at: checked ? new Date().toISOString() : null }))
-      if (checked) setOpenId(null)
+      if (checked) closeForm()
     } catch (e) { toast.error(enrollmentError(e)) }
   }
   const makeStudent = async (f) => {
@@ -59,7 +71,7 @@ export default function Enrollments() {
     if (!confirm(t('enDeleteConfirm', { name: f.student_name }))) return
     try {
       await db.enrollments.remove(f.id)
-      setState((st) => ({ ...st, forms: st.forms.filter((x) => x.id !== f.id) })); setOpenId(null); toast(t('deletedName', { name: f.student_name }))
+      setState((st) => ({ ...st, forms: st.forms.filter((x) => x.id !== f.id) })); closeForm(); toast(t('deletedName', { name: f.student_name }))
     } catch (e) { toast.error(enrollmentError(e)) }
   }
 
@@ -134,8 +146,8 @@ export default function Enrollments() {
       </Card>
 
       {open && (
-        <EnrollmentModal value={open} student={studentById[open.student_id]} isSuper={isSuper} onClose={() => setOpenId(null)}
-          onCheck={check} onMakeStudent={makeStudent} onDelete={remove} t={t} lang={lang} />
+        <EnrollmentModal value={open} student={studentById[open.student_id]} isSuper={isSuper} onClose={closeForm}
+          onCheck={check} onMakeStudent={makeStudent} onDelete={remove} checklist={checklist} t={t} lang={lang} />
       )}
     </div>
   )

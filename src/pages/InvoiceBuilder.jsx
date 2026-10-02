@@ -9,7 +9,9 @@ import { LEVELS, PROGRAMS, hasProgram, periodInfo, mealRateFor, nextLevel } from
 import { buildDocument, defaultStudentOptions, docTotals, PERIOD_OPTIONS, PLAN_OPTIONS, studentDisplayName, quarterDays, billedDays, withStudentChoice, onRoster, defaultQ4Full, orderedStudents, smartDueDate } from '../lib/pricing'
 import { fmt, fmtDate, todayISO } from '../lib/money'
 import { suggestClass } from '../lib/placement'
-import { ageOf, isBillable, isPast, isPending } from '../lib/studentRecords'
+import { ageOf, isBillable, isPast, isPending, endDateOf } from '../lib/studentRecords'
+import { startedBy } from '../lib/onboarding'
+import { useAuth } from '../lib/AuthContext'
 import { invoiceQuarters, endOnInvoice, dayText } from '../lib/studentDates'
 import { Card, Field, TextInput, NumberInput, MoneyInput, Select, Checkbox, Spinner } from '../components/ui'
 
@@ -31,6 +33,7 @@ export default function InvoiceBuilder() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const { loading, students, families, fees, calendar, refresh } = useData()
+  const { me } = useAuth()
   const toast = useToast()
   const [inputs, setInputs] = useState(() => blankInputs(uiLang))
   const [q, setQ] = useState('')
@@ -109,9 +112,18 @@ export default function InvoiceBuilder() {
       return { level: g.level, why: t(g.combined ? 'placeCombined' : 'placeByAge', { dob: s.dob, age: age ?? '?', group: g.yearGroup }) }
     })
     // Returning students come back pending: billable now, on the register once
-    // the office marks them active.
-    const reactivated = kids.map((s, i) => ({ ...s, status: 'pending', active: false, q4_full: true, level: placed[i].level }))
-    const moves = reactivated.map((s, i) => `• ${s.nickname || s.full_name}: ${kids[i].level}${kids[i].level !== s.level ? ` → ${s.level}` : ''}${placed[i].why ? ` (${placed[i].why})` : ''}`).join('\n')
+    // the office marks them active. An expected end date that has gone by is cleared
+    // (it would leave them off this invoice and the register); one still to come is kept
+    // and named in the question. Their new-student checklist starts again (lib/onboarding.js).
+    const today = todayISO()
+    const reactivated = kids.map((s, i) => ({
+      ...s, status: 'pending', active: false, q4_full: true, level: placed[i].level,
+      ...(endDateOf(s) && endDateOf(s) < today ? { end_date: '' } : {}),
+      onboarding: startedBy(me?.email, { returning: true }),
+    }))
+    const moves = reactivated.map((s, i) => `• ${s.nickname || s.full_name}: ${kids[i].level}${kids[i].level !== s.level ? ` → ${s.level}` : ''}${placed[i].why ? ` (${placed[i].why})` : ''}`
+      + (endDateOf(kids[i]) && !endDateOf(s) ? `\n   ${t('returnEndClearedShort', { date: dayText(endDateOf(kids[i]), uiLang) })}` : '')
+      + (endDateOf(s) ? `\n   ${t('returnEndKeptShort', { date: dayText(endDateOf(s), uiLang) })}` : '')).join('\n')
     if (!confirm(`${t('reactivateConfirm')}\n\n${moves}\n\n${t('placeCanChange')}`)) return
     setBusy(true)
     try {

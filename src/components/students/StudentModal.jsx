@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Camera, RotateCcw, Trash2, AlertTriangle, Mail, Phone } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Camera, RotateCcw, Trash2, AlertTriangle, Mail, Phone, ClipboardCheck, Sprout, History } from 'lucide-react'
 import { LEVELS, PROGRAMS } from '../../lib/fees'
 import { suggestClass } from '../../lib/placement'
 import { guessFirstName } from '../../lib/names'
@@ -7,8 +8,13 @@ import { resizeImage, photoSrc } from '../../lib/report/photo'
 import { nextStudentCode, codeTakenBy, normalizeCode } from '../../lib/studentIds'
 import { ageOf, STATUSES, statusOf, withStatus, partialFrom, DEFAULT_PARTIAL_FROM, endDateOf, startsLater } from '../../lib/studentRecords'
 import { quartersOf, currentQuarter, dayText } from '../../lib/studentDates'
+import { onChecklist, onboardingOf, startedBy, startChecklist, ChecklistSetupError } from '../../lib/onboarding'
+import { todayIso } from '../../lib/leads'
+import { db } from '../../lib/db'
 import { Field, TextInput, Select, Checkbox, Modal, Avatar } from '../ui'
 import { StudentTrips } from '../attendance/Trips'
+import EmailSlip from '../EmailSlip'
+import NewStudentChecklist from './NewStudentChecklist'
 
 function Section({ title, children }) {
   return (
@@ -22,12 +28,36 @@ function Section({ title, children }) {
 /**
  * Add / edit a student (office accounts), or a read-only summary for teachers.
  * `onSave(row)` and `onDelete(row)` return promises; the modal stays open on error.
+ * `checklist` = { ctx, me, onChanged } shows the new-student checklist (office accounts).
  */
-export default function StudentModal({ value, onClose, onSave, onDelete, students, families, schoolYear, calendar, canEdit, t, lang }) {
+export default function StudentModal({ value, onClose, onSave, onDelete, students, families, schoolYear, calendar, canEdit, checklist, onError, t, lang }) {
   const [s, setS] = useState(value)
+  // The row as saved: ticks on the checklist are written straight away, apart from Save.
+  const [saved, setSaved] = useState(value)
   const [busy, setBusy] = useState(false)
   const set = (k) => (v) => setS((cur) => ({ ...cur, [k]: v }))
   const isNew = !s.id
+  const me = checklist?.me
+  // After a write from the checklist: keep what it changed, and the rest of the form as typed.
+  const onChecklistSaved = (row) => {
+    if (!row) return
+    setSaved((cur) => ({ ...cur, ...row }))
+    setS((cur) => ({ ...cur, onboarding: row.onboarding, ...('lead_id' in row ? { lead_id: row.lead_id } : {}) }))
+  }
+  // A past student brought back (To-Do #38): an expected end date that has gone by is cleared,
+  // or it would keep them off the register and the invoices; one still to come is kept, and the
+  // window asks. Their checklist starts again: ticks from an earlier time do not count.
+  const wasPast = statusOf(value) === 'inactive'
+  const changeStatus = (v) => setS((cur) => {
+    const next = withStatus(cur, v)
+    if (!wasPast) return next
+    if (v === 'inactive') return { ...next, end_date: value.end_date ?? '', onboarding: value.onboarding ?? null }
+    const oldEnd = endDateOf(value)
+    return { ...next, ...(oldEnd && oldEnd < todayIso() ? { end_date: '' } : {}), onboarding: startedBy(me?.email, { returning: true }) }
+  })
+  const startTracking = async () => {
+    try { onChecklistSaved(await startChecklist(db, saved, me?.email)); await checklist?.onChanged?.() } catch (e) { onError?.(e instanceof ChecklistSetupError ? t('checklistSetup') : e.message) }
+  }
   // New students: the class follows the birthday until someone picks a class by hand.
   const [levelTouched, setLevelTouched] = useState(false)
   const [levelAuto, setLevelAuto] = useState(false)
@@ -46,6 +76,13 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
   const thisQuarter = currentQuarter(calendar)
   const endsThisQuarter = !!end && status === 'active' && !!thisQuarter && end <= thisQuarter.end
   const endBeforeStart = !!end && !!s.start_date && end < String(s.start_date).slice(0, 10)
+  // Coming back from Past, not saved yet: say what happened to the end date.
+  const backFromPast = wasPast && status !== 'inactive'
+  const oldEnd = endDateOf(value)
+  // New students get an S number; one typed by hand in another form is pointed out.
+  const codeNotS = !!s.student_code && !/^S\d+$/.test(normalizeCode(s.student_code)) && (isNew || (status === 'pending' && !onboardingOf(s)?.returning))
+  const showChecklist = canEdit && !isNew && !!checklist && onChecklist(s)
+  const lead = s.lead_id ? (checklist?.ctx?.leads || []).find((l) => l.id === s.lead_id) : null
 
   const save = async (e) => {
     e?.preventDefault()
@@ -103,6 +140,12 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
         <button type="submit" form="student-form" className="btn-primary" disabled={busy || !s.full_name.trim() || !!taken}>{busy ? t('saving') : t('save')}</button>
       </>)}>
       <form id="student-form" onSubmit={save} className="space-y-5">
+        {showChecklist && (
+          <NewStudentChecklist student={s} record={saved} ctx={checklist.ctx} me={me} t={t} lang={lang}
+            locked={statusOf(s) !== statusOf(saved)}
+            onSaved={onChecklistSaved} onChanged={checklist.onChanged}
+            onTickFee={() => set('is_new')(true)} />
+        )}
         <Section title={t('student')}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="flex flex-col items-center gap-1">
@@ -126,12 +169,24 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
                   <button type="button" className="btn-secondary flex-none px-2.5" title={t('nextFreeId')} onClick={() => set('student_code')(nextStudentCode(students.filter((x) => x.id !== s.id)))}><RotateCcw size={15} /></button>
                 </div>
                 {taken ? <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-red-600"><AlertTriangle size={13} /> {t('idTaken', { name: taken.full_name })}</span>
+                  : codeNotS ? <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-amber-700"><AlertTriangle size={13} /> {t('idNotS', { next: nextStudentCode(students.filter((x) => x.id !== s.id)) })}</span>
                   : isNew && <span className="mt-1 block text-xs text-slate-400">{t('idAutoHint')}</span>}
               </div>
               <Field label={t('status')} className="sm:col-span-3" hint={status === 'pending' ? t('pendingHint') : undefined}>
-                <Select value={status} onChange={(v) => setS((cur) => withStatus(cur, v))}
+                <Select value={status} onChange={changeStatus}
                   options={STATUSES.map((v) => ({ value: v, label: t(v === 'active' ? 'enrolled' : v === 'pending' ? 'pending' : 'past') }))} />
               </Field>
+              {backFromPast && (
+                <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 sm:col-span-6">
+                  <History size={16} className="mt-0.5 flex-none text-sky-600" />
+                  <div className="space-y-1">
+                    {oldEnd && !end && <div>{t('returnEndCleared', { date: dayText(oldEnd, lang) })} <button type="button" className="font-semibold text-pra-blue underline" onClick={() => set('end_date')(oldEnd)}>{t('returnKeepEnd')}</button></div>}
+                    {end && end >= todayIso() && <div>{t('returnEndAsk', { date: dayText(end, lang) })} <button type="button" className="font-semibold text-pra-blue underline" onClick={() => set('end_date')('')}>{t('returnClearEnd')}</button></div>}
+                    {end && end < todayIso() && <div className="font-semibold text-amber-800">{t('returnEndPast', { date: dayText(end, lang) })} <button type="button" className="font-semibold text-pra-blue underline" onClick={() => set('end_date')('')}>{t('returnClearEnd')}</button></div>}
+                    <div className="text-xs text-sky-800">{t('returnChecklist')}</div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </Section>
@@ -182,6 +237,13 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
               </div>
               {!!partialFrom(s) && <p className="mt-1 text-xs text-slate-500">{t('partialDayHint')}</p>}
             </div>
+            {/* An enrolled student added before the checklist existed (an August starter, say) can be given one. */}
+            {!isNew && checklist && status === 'active' && statusOf(saved) === 'active' && !onboardingOf(saved) && (
+              <div className="flex flex-wrap items-center gap-x-2 sm:col-span-4">
+                <button type="button" className="btn-ghost px-2 text-xs text-pra-blue" onClick={startTracking}><ClipboardCheck size={14} /> {t('obStartTracking')}</button>
+                <span className="text-xs text-slate-400">{t('obStartTrackingHint')}</span>
+              </div>
+            )}
           </div>
         </Section>
 
@@ -217,11 +279,21 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
                     {c.phone && <span className="inline-flex items-center gap-1"><Phone size={12} />{c.phone}</span>}
                   </div>
                 ))}
+                {/* A slip in a parent's address is put right on the family (Students > Families). */}
+                <EmailSlip value={(fam.contacts || []).map((c) => c.email).filter(Boolean).join(', ')} t={t} bad={false} className="mt-1" />
               </div>
             ) : (<>
-              <Field label={t('parentsEmail')}><TextInput value={s.parents_email} onChange={set('parents_email')} /></Field>
+              <div>
+                <Field label={t('parentsEmail')}><TextInput value={s.parents_email} onChange={set('parents_email')} /></Field>
+                <EmailSlip value={s.parents_email} onFix={set('parents_email')} t={t} className="mt-1" />
+              </div>
               <Field label={t('parentPhone')}><TextInput value={s.parent_phone} onChange={set('parent_phone')} /></Field>
             </>)}
+            {lead && (
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 sm:col-span-2">
+                <Sprout size={13} className="text-pra-green" /> {t('obFromLead')} <Link to={`/leads?lead=${lead.id}`} className="font-semibold text-pra-blue hover:underline">{lead.family}</Link>
+              </div>
+            )}
           </div>
         </Section>
 

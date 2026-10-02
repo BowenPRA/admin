@@ -8,6 +8,8 @@ import {
   showValue, birthdayLine, yesNo, isYes, placeOf,
 } from '../../lib/enrollment'
 import { Chip, Modal } from '../ui'
+import { onChecklist } from '../../lib/onboarding'
+import NewStudentChecklist from '../students/NewStudentChecklist'
 
 function Section({ title, icon: Icon, children }) {
   return (
@@ -138,7 +140,7 @@ function PrivatePart({ id, studentName, t, lang }) {
  * parent sent. `onCheck(e, checked)`, `onMakeStudent(e)` and `onDelete(e)`
  * return promises.
  */
-export default function EnrollmentModal({ value: e, student, isSuper, onClose, onCheck, onMakeStudent, onDelete, t, lang }) {
+export default function EnrollmentModal({ value: e, student, isSuper, onClose, onCheck, onMakeStudent, onDelete, checklist, t, lang }) {
   const [busy, setBusy] = useState(false)
   const run = async (fn) => { setBusy(true); try { await fn() } finally { setBusy(false) } }
   const d = e.data || {}
@@ -162,6 +164,11 @@ export default function EnrollmentModal({ value: e, student, isSuper, onClose, o
           : <button type="button" className="btn-primary" disabled={busy} onClick={() => run(() => onCheck(e, true))}><Check size={16} /> {t('enMarkChecked')}</button>}
       </>}>
       <div className="space-y-5">
+        {/* The form's student on the new-student checklist; with no student yet, the one step is to add them. */}
+        {checklist && (place === 'none' || (student && onChecklist(student))) && (
+          <NewStudentChecklist student={place === 'none' ? {} : student} ctx={checklist.ctx} me={checklist.me} t={t} lang={lang}
+            onChanged={checklist.onChanged} onMakeStudent={() => run(() => onMakeStudent(e))} />
+        )}
         <Section title={t('enSecStudent')}>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <Chip tone={place === 'added' ? 'green' : place === 'linked' ? 'sky' : 'slate'}>{t(place === 'added' ? 'enAdded' : place === 'linked' ? 'enLinked' : 'enNoStudent')}</Chip>

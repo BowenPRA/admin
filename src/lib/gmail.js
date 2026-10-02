@@ -1,5 +1,6 @@
-// Save invoice emails as drafts (with the PDF attached) in the academy's Gmail
-// account from the browser. Nothing is ever sent from the app.
+// Save emails as drafts in the academy's Gmail account from the browser: invoice
+// emails with the PDF attached, and the supply check for a new student (lib/supplyCheck.js).
+// Nothing is ever sent from the app.
 //
 // Uses Google Identity Services: the first use in a session pops up Google's
 // sign-in for admin@palmriveracademy.edu.vn and asks permission to manage
@@ -62,21 +63,14 @@ function b64url(bytes) {
 }
 
 /**
- * MIME message with one PDF attachment, base64url-encoded for the Gmail API.
- * @param {{to:string, cc?:string, subject:string, text:string, html?:string, attachment:{filename:string, base64:string}}} m
+ * MIME message, with one PDF attachment when there is one (an invoice), base64url-encoded
+ * for the Gmail API. A message without one (the supply check) is the text parts alone.
+ * @param {{to:string, cc?:string, subject:string, text:string, html?:string, attachment?:{filename:string, base64:string}}} m
  */
-function buildRaw(m) {
+export function buildRaw(m) {
   const boundary = `pra${Date.now().toString(36)}`
   const alt = `alt${Date.now().toString(36)}`
-  const lines = [
-    `From: Palm River Academy <${SENDER}>`,
-    `To: ${m.to}`,
-    ...(m.cc ? [`Cc: ${m.cc}`] : []),
-    `Subject: ${encHeader(m.subject)}`,
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
+  const body = [
     `Content-Type: multipart/alternative; boundary="${alt}"`,
     '',
     `--${alt}`,
@@ -88,15 +82,28 @@ function buildRaw(m) {
     ...(m.html ? [`--${alt}`, 'Content-Type: text/html; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', btoa(unescape(encodeURIComponent(m.html))), ''] : []),
     `--${alt}--`,
     '',
-    `--${boundary}`,
-    `Content-Type: application/pdf; name="${encHeader(m.attachment.filename)}"`,
-    `Content-Disposition: attachment; filename="${encHeader(m.attachment.filename)}"`,
-    'Content-Transfer-Encoding: base64',
-    '',
-    m.attachment.base64.replace(/(.{76})/g, '$1\r\n'),
-    '',
-    `--${boundary}--`,
-    '',
+  ]
+  const lines = [
+    `From: Palm River Academy <${SENDER}>`,
+    `To: ${m.to}`,
+    ...(m.cc ? [`Cc: ${m.cc}`] : []),
+    `Subject: ${encHeader(m.subject)}`,
+    'MIME-Version: 1.0',
+    ...(m.attachment ? [
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      ...body,
+      `--${boundary}`,
+      `Content-Type: application/pdf; name="${encHeader(m.attachment.filename)}"`,
+      `Content-Disposition: attachment; filename="${encHeader(m.attachment.filename)}"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      m.attachment.base64.replace(/(.{76})/g, '$1\r\n'),
+      '',
+      `--${boundary}--`,
+      '',
+    ] : body),
   ]
   return b64url(new TextEncoder().encode(lines.join('\r\n')))
 }

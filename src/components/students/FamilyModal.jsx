@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import { Field, TextInput, Select, Modal } from '../ui'
 import { blankFamily, contactsOf } from '../../lib/studentRecords'
+import EmailSlip from '../EmailSlip'
 
 const blankContact = () => ({ name: '', relation: '', email: '', phone: '' })
 
@@ -43,12 +44,16 @@ export default function FamilyModal({ value, onClose, onSave, onDelete, kids = [
           <div className="label">{t('contacts')}</div>
           <div className="space-y-2">
             {f.contacts.map((c, i) => (
-              <div key={i} className="grid gap-2 rounded-xl border border-slate-200 p-2.5 sm:grid-cols-[1.3fr_0.8fr_1.5fr_1.2fr_auto]">
-                <TextInput value={c.name} onChange={setContact(i, 'name')} placeholder={t('fullName')} aria-label={t('fullName')} />
-                <Select value={c.relation || ''} onChange={setContact(i, 'relation')} options={relationOptions(c.relation)} aria-label={t('relation')} />
-                <TextInput type="email" value={c.email} onChange={setContact(i, 'email')} placeholder={t('email')} aria-label={t('email')} />
-                <TextInput value={c.phone} onChange={setContact(i, 'phone')} placeholder={t('phone')} aria-label={t('phone')} />
-                <button type="button" className="btn-ghost justify-center px-2 text-slate-400 hover:text-red-600" onClick={() => setF((cur) => ({ ...cur, contacts: cur.contacts.filter((_, j) => j !== i) }))} aria-label={t('delete')}><X size={16} /></button>
+              <div key={i} className="rounded-xl border border-slate-200 p-2.5">
+                <div className="grid gap-2 sm:grid-cols-[1.3fr_0.8fr_1.5fr_1.2fr_auto]">
+                  <TextInput value={c.name} onChange={setContact(i, 'name')} placeholder={t('fullName')} aria-label={t('fullName')} />
+                  <Select value={c.relation || ''} onChange={setContact(i, 'relation')} options={relationOptions(c.relation)} aria-label={t('relation')} />
+                  <TextInput type="email" value={c.email} onChange={setContact(i, 'email')} placeholder={t('email')} aria-label={t('email')} />
+                  <TextInput value={c.phone} onChange={setContact(i, 'phone')} placeholder={t('phone')} aria-label={t('phone')} />
+                  <button type="button" className="btn-ghost justify-center px-2 text-slate-400 hover:text-red-600" onClick={() => setF((cur) => ({ ...cur, contacts: cur.contacts.filter((_, j) => j !== i) }))} aria-label={t('delete')}><X size={16} /></button>
+                </div>
+                {/* The browser already refuses an address with no @ in this box; only a slip after the @ is said here. */}
+                <EmailSlip value={c.email} onFix={setContact(i, 'email')} t={t} bad={false} className="mt-1.5" />
               </div>
             ))}
           </div>

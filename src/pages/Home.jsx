@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PlusCircle, Users, CalendarCheck, CalendarDays, CalendarX, ClipboardList, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane } from 'lucide-react'
+import { PlusCircle, Users, CalendarCheck, CalendarDays, CalendarX, ClipboardList, ClipboardCheck, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
@@ -10,6 +10,7 @@ import { LEVELS } from '../lib/fees'
 import { splitSubjectKey } from '../data/staff'
 import { isEnrolled, activeFamilies, afterEnd } from '../lib/studentRecords'
 import { finishingThisQuarter } from '../lib/studentDates'
+import { withOpenSteps } from '../lib/onboarding'
 import { summarize } from '../lib/leads'
 import { summarizeTodos } from '../lib/todos'
 import { tripOn, statusOn, travelingOn, tripLine, TRAVEL } from '../lib/travel'
@@ -353,9 +354,9 @@ function OfficeHome() {
   const data = useData()
   const { me } = useAuth()
   const [invoices, setInvoices] = useState(null)
-  const [leads, setLeads] = useState(null)
+  const [leadRows, setLeadRows] = useState(null)
   const [webWaiting, setWebWaiting] = useState(0)
-  const [formsToCheck, setFormsToCheck] = useState(0)
+  const [forms, setForms] = useState(null)
   const [todos, setTodos] = useState(null)
   const today = useTodayAttendance(data.students, data.travel)
   const reports = useReportWork()
@@ -363,11 +364,13 @@ function OfficeHome() {
 
   useEffect(() => { db.invoices.list().then(setInvoices).catch(() => setInvoices([])) }, [])
   // Until supabase/updates-2026-09-30-leads.sql has run there is no leads table; the line is then left out.
-  useEffect(() => { db.leads.list().then((ls) => setLeads(summarize(ls))).catch(() => setLeads(null)) }, [])
+  useEffect(() => { db.leads.list().then(setLeadRows).catch(() => setLeadRows(null)) }, [])
   // The same goes for messages from the website (updates-2026-09-30-website-forms.sql).
   useEffect(() => { db.webMessages.list().then((ms) => setWebWaiting(ms.filter((m) => !m.done_at).length)).catch(() => setWebWaiting(0)) }, [])
   // And for enrollment forms from the website (updates-2026-09-30-enrollments.sql).
-  useEffect(() => { db.enrollments.list().then((fs) => setFormsToCheck(fs.filter((f) => !f.checked_at).length)).catch(() => setFormsToCheck(0)) }, [])
+  useEffect(() => { db.enrollments.list().then(setForms).catch(() => setForms(null)) }, [])
+  const leads = leadRows ? summarize(leadRows) : null
+  const formsToCheck = (forms || []).filter((f) => !f.checked_at).length
 
   // And for the To-Do tab (updates-2026-10-01-todos.sql).
   useEffect(() => { db.todos.list().then((ts) => setTodos(summarizeTodos(ts, me?.email || ''))).catch(() => setTodos(null)) }, [me?.email])
@@ -385,6 +388,8 @@ function OfficeHome() {
   const toRegister = att.filter((x) => x.total && x.marked < x.total).length
   // Enrolled students expected to finish by the end of this quarter: the chip opens them on the Students page.
   const finishing = finishingThisQuarter(data.students, data.calendar).students.length
+  // New students with steps still open on their checklist: the chip opens them on the Students page.
+  const newSteps = withOpenSteps(data.students, { families: data.families, invoices, enrollments: forms, leads: leadRows, schoolYear: data.fees?.schoolYear }).length
 
   const stat = (label, value, cls = '') => (
     <div className="card p-5"><div className="label">{label}</div><div className={`text-2xl font-black tabular-nums ${cls}`}>{fmt(value)} <span className="text-sm font-semibold text-slate-400">VND</span></div></div>
@@ -399,6 +404,7 @@ function OfficeHome() {
           leads && (leads.new || leads.due || webWaiting) && { icon: Sprout, to: '/leads', text: `${t('leadsNav')}: ${[leads.new && t('ldNewShort', { n: leads.new }), leads.due && t('ldDueShort', { n: leads.due }), webWaiting && t('ldWebShort', { n: webWaiting })].filter(Boolean).join(' · ')}` },
           travelFact(data.travel, data.students, t, lang),
           finishing > 0 && { icon: CalendarX, to: '/students?ending=1', text: t('endingHome', { n: finishing }) },
+          newSteps > 0 && { icon: ClipboardCheck, to: '/students?steps=1', text: t(newSteps === 1 ? 'stepsHomeOne' : 'stepsHome', { n: newSteps }) },
           formsToCheck > 0 && { icon: FileSignature, to: '/enrollments', text: t('enHomeShort', { n: formsToCheck }) },
           todos && (todos.mine || todos.late || todos.check) > 0 && { icon: ListTodo, to: '/todo', text: `${t('todoNav')}: ${[todos.mine && t('tdHomeMine', { n: todos.mine }), todos.late && t('tdHomeLate', { n: todos.late }), todos.check && t('tdHomeCheck', { n: todos.check })].filter(Boolean).join(' · ')}` },
         ]} />

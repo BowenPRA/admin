@@ -264,7 +264,12 @@ const dropStatus = (row) => { const r = { ...row }; delete r.status; return r }
 // Until then a write that leaves the column empty goes through without it; one that fills it
 // in fails, and the page says which file to run.
 //   end_date: supabase/updates-2026-10-02-student-dates-onboarding.sql (expected end date)
-const LATER_COLUMNS = ['end_date']
+// SOFT_LATER columns are left out even when filled: the student still saves, and only that
+// value waits for the file. The new-student checklist notices (the row comes back without the
+// column) and says which file to run.
+//   lead_id, onboarding: the same file, Part 2 (the lead a student came from; the checklist's ticks)
+const LATER_COLUMNS = ['end_date', 'lead_id', 'onboarding']
+const SOFT_LATER = ['lead_id', 'onboarding']
 const missingLaterColumn = (e) => (/(does not exist|schema cache)/i.test(e?.message || '') && LATER_COLUMNS.find((c) => new RegExp(`['"]${c}['"]`).test(e.message))) || null
 const isBlank = (v) => v == null || v === ''
 const dropKey = (row, key) => { const r = { ...row }; delete r[key]; return r }
@@ -275,7 +280,7 @@ async function writeStudents(rows, write) {
     try { return await write(rs) } catch (e) {
       if (noStatusColumn(e) && rs.some((r) => 'status' in r)) { rs = rs.map(dropStatus); continue }
       const col = missingLaterColumn(e)
-      if (col && rs.some((r) => col in r) && rs.every((r) => isBlank(r[col]))) { rs = rs.map((r) => dropKey(r, col)); continue }
+      if (col && rs.some((r) => col in r) && (SOFT_LATER.includes(col) || rs.every((r) => isBlank(r[col])))) { rs = rs.map((r) => dropKey(r, col)); continue }
       throw e
     }
   }

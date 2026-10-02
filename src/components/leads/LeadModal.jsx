@@ -1,9 +1,45 @@
 import { useState } from 'react'
-import { Archive, ArchiveRestore, Mail, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Archive, ArchiveRestore, Mail, Trash2, UserPlus, AlertTriangle, Link2 } from 'lucide-react'
 import { OFFICE_ACCOUNTS } from '../../data/staff'
 import { STAGES, LEAD_PROGRAMS, SOURCES, stageOf, personName, fmtDay, emailsOf, byWaiting } from '../../lib/leads'
+import { statusOf } from '../../lib/studentRecords'
 import { Field, TextInput, NumberInput, Select, TextArea, Modal } from '../ui'
 import { WebMessage } from './WebMessages'
+import EmailSlip from '../EmailSlip'
+
+const STATUS_CHIP = { active: 'bg-green-100 text-green-800', pending: 'bg-amber-100 text-amber-700', inactive: 'bg-slate-100 text-slate-500' }
+
+/** The students a family on the list became: linked ones, and ones with the same address to link. */
+function LeadStudents({ lead, linked, matched, onMake, onLink, busy, t, lang }) {
+  const none = !linked.length && !matched.length
+  const row = (s, action) => (
+    <li key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
+      <Link to={`/students?student=${s.id}`} className="font-semibold text-pra-blue hover:underline">{s.full_name}</Link>
+      <span className="text-xs text-slate-500">{[s.student_code, s.level].filter(Boolean).join(' · ')}</span>
+      <span className={`chip ${STATUS_CHIP[statusOf(s)]}`}>{t(statusOf(s) === 'active' ? 'enrolled' : statusOf(s) === 'pending' ? 'pending' : 'past')}</span>
+      {action}
+    </li>
+  )
+  return (
+    <div className="space-y-2">
+      {none && ['trial', 'enrolled'].includes(lead.stage) && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <AlertTriangle size={16} className="mt-0.5 flex-none text-amber-600" /><span>{t('ldNoStudentWarn', { stage: lang === 'vi' ? stageOf(lead.stage).vi : stageOf(lead.stage).en })}</span>
+        </div>
+      )}
+      {none && !['trial', 'enrolled'].includes(lead.stage) && <p className="text-sm text-slate-500">{t('ldNoStudentYet')}</p>}
+      {linked.length > 0 && <ul className="space-y-1">{linked.map((s) => row(s))}</ul>}
+      {matched.length > 0 && (
+        <>
+          <p className="text-xs text-slate-500">{t('ldMatchedHint')}</p>
+          <ul className="space-y-1">{matched.map((s) => row(s, <button type="button" className="btn-ghost px-1.5 py-0.5 text-xs text-pra-blue" disabled={busy} onClick={() => onLink(s)}><Link2 size={13} /> {t('ldLinkStudent')}</button>))}</ul>
+        </>
+      )}
+      <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={onMake}><UserPlus size={14} /> {t(none ? 'ldMakeStudents' : 'ldMakeMore')}</button>
+    </div>
+  )
+}
 
 function Section({ title, children }) {
   return (
@@ -21,7 +57,7 @@ function Section({ title, children }) {
  * row as it was opened and the fields changed in the form, so archiving keeps
  * what was just typed. All handlers return promises.
  */
-export default function LeadModal({ value, leads, messages = [], onClose, onSave, onArchive, onDelete, t, lang }) {
+export default function LeadModal({ value, leads, messages = [], linked = [], matched = [], onMakeStudents, onLinkStudent, onClose, onSave, onArchive, onDelete, t, lang }) {
   const [s, setS] = useState(value)
   const [busy, setBusy] = useState(false)
   const set = (k) => (v) => setS((cur) => ({ ...cur, [k]: v }))
@@ -68,10 +104,14 @@ export default function LeadModal({ value, leads, messages = [], onClose, onSave
         <Section>
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label={t('ldFamilyName')} hint={t('ldFamilyHint')}><TextInput value={s.family} onChange={set('family')} autoFocus={isNew} required /></Field>
-            <Field label={t('email')} hint={emailHint ? <span className="text-red-600">{emailHint}</span> : null}
-              right={email && !emailHint ? <a href={`mailto:${emails.join(',')}`} className="inline-flex items-center gap-1 text-pra-blue hover:underline"><Mail size={12} /> {t('email')}</a> : null}>
-              <TextInput inputMode="email" autoComplete="off" value={s.email} onChange={set('email')} />
-            </Field>
+            <div>
+              <Field label={t('email')} hint={emailHint ? <span className="text-red-600">{emailHint}</span> : null}
+                right={email && !emailHint ? <a href={`mailto:${emails.join(',')}`} className="inline-flex items-center gap-1 text-pra-blue hover:underline"><Mail size={12} /> {t('email')}</a> : null}>
+                <TextInput inputMode="email" autoComplete="off" value={s.email} onChange={set('email')} />
+              </Field>
+              {/* A slip after the @ is a warning only; an address with no @ is refused above. */}
+              <EmailSlip value={s.email} onFix={set('email')} t={t} bad={false} className="mt-1" />
+            </div>
             <Field label={t('phone')}><TextInput type="tel" value={s.phone} onChange={set('phone')} /></Field>
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_7rem]">
@@ -106,6 +146,13 @@ export default function LeadModal({ value, leads, messages = [], onClose, onSave
           </div>
           <Field label={t('ldColNext')} hint={t('ldNextHint')} className="mt-3"><TextInput value={s.next_step} onChange={set('next_step')} /></Field>
         </Section>
+
+        {!isNew && onMakeStudents && (
+          <Section title={t('ldSecStudents')}>
+            <LeadStudents lead={value} linked={linked} matched={matched} busy={busy} t={t} lang={lang}
+              onMake={() => onMakeStudents(value, changed)} onLink={(st) => run(() => onLinkStudent(st, value))} />
+          </Section>
+        )}
 
         <Section title={t('notes')}>
           <Field hint={t('ldNotesHint')}><TextArea rows={3} value={s.notes} onChange={set('notes')} /></Field>
