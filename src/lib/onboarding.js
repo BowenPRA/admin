@@ -58,6 +58,13 @@ export function firstInvoice(s, invoices) {
     .sort((a, b) => String(a.issue_date || a.created_at || '').localeCompare(String(b.issue_date || b.created_at || '')))[0] || null
 }
 
+/** An invoice in The Current (not void) that already carries this student's admission-fee row. */
+export function feeInvoice(s, invoices) {
+  if (!invoices || !s?.id) return null
+  const feeRow = (r) => r.meta?.studentId === s.id && /admission fee|phí nhập học/i.test(String(r.cells?.desc || ''))
+  return invoices.find((i) => i.status !== 'void' && (i.doc?.sections || []).some((sec) => sec.kind === 'fees' && (sec.rows || []).some(feeRow))) || null
+}
+
 /** The newest enrollment form linked to this student. */
 export function formFor(s, enrollments) {
   if (!enrollments || !s?.id) return null
@@ -158,7 +165,9 @@ export function checklistFor(s, ctx = {}, lang = 'en', today = todayIso()) {
   const issues = emailIssues(emails.join(', '))
   if (!emails.length) add({ id: 'email', state: 'open', label: 'obEmail', detail: [fam ? 'obEmailNone' : 'obEmailNoneStudent', {}] })
   else if (issues.slips.length || issues.bad.length) {
-    add({ id: 'email', state: 'open', label: 'obEmail', detail: ['obEmailValue', { emails: emails.join(', ') }],
+    // A likely slip ("gmai.com") is a warning: the address may be right, and it must not hold the
+    // checklist open for ever. Something that is not an address at all is still a step to do.
+    add({ id: 'email', state: issues.bad.length ? 'open' : 'warn', label: 'obEmail', detail: ['obEmailValue', { emails: emails.join(', ') }],
       notes: [...issues.slips.map((x) => ['emailSlip', { typed: x.domain, suggestion: x.suggestion }]), ...issues.bad.map((e) => ['emailNotAddress', { email: e }])], actions: fam ? ['editFamily'] : [] })
   } else add({ id: 'email', state: 'done', label: 'obEmail', detail: ['obEmailValue', { emails: emails.join(', ') }] })
 
@@ -171,8 +180,12 @@ export function checklistFor(s, ctx = {}, lang = 'en', today = todayIso()) {
   }
 
   // The admission fee: the "New student" box decides whether the invoice builder adds it.
+  // Once an invoice carries the fee, the box is usually unticked and the line is done: ticking
+  // it again would put the fee on the next invoice too.
   const noFee = stepOf(s, 'no_fee')
+  const feeOn = feeInvoice(s, invoices)
   if (s.is_new) add({ id: 'fee', state: 'done', label: 'obFee', detail: ['obFeeTicked', {}] })
+  else if (feeOn) add({ id: 'fee', state: 'done', label: 'obFee', detail: ['obFeeOnInvoice', { number: feeOn.number || '—' }], actions: ['openInvoice'], invoice: feeOn })
   else if (noFee) add({ id: 'fee', state: 'done', label: 'obFee', detail: ['obFeeNone', {}], record: noFee, actions: ['undoNoFee'] })
   else add({ id: 'fee', state: 'open', label: 'obFee', detail: ['obFeeOpen', {}], actions: ['tickFee', 'noFee'] })
 

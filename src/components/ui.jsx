@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { Lock, Search, X, CloudCheck } from 'lucide-react'
 import { fmt, parseMoney } from '../lib/money'
 
@@ -115,15 +115,26 @@ export function StatusSelect({ status, statuses, onChange, t, disabled }) {
   )
 }
 
+// The windows open now, oldest first. Escape closes only the newest (a supply check
+// opened from a student window closes, and the student window stays).
+const openModals = []
+
 export function Modal({ open, onClose, title, subtitle, children, wide = false, footer }) {
+  const close = useEffectEvent(() => onClose?.())
   useEffect(() => {
     if (!open) return
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
+    const me = {}
+    openModals.push(me)
+    const onKey = (e) => { if (e.key === 'Escape' && openModals[openModals.length - 1] === me) close() }
     window.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
-  }, [open, onClose])
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      openModals.splice(openModals.indexOf(me), 1)
+      document.body.style.overflow = prev
+    }
+  }, [open])
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-3 sm:p-8" onMouseDown={onClose}>

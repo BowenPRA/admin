@@ -296,8 +296,9 @@ function DayCell({ T, day, x, zebra, week, missed }) {
   if (day.state === 'none') return <div className={`${cls} att-none`} />
   if (day.state === 'future') return <div className={cls} />
   const m = x.marks[day.date]
-  // A mark made after an expected end date shows: that date is only expected.
-  if (!x.expected(day.date) && !(m && x.until && day.date > x.until)) return <div className={`${cls} att-out`} />
+  // A mark always shows, and counts in the totals, even before the start date or after the
+  // expected end date. Only an unmarked day outside the student's dates is hatched.
+  if (!m && !x.expected(day.date)) return <div className={`${cls} att-out`} />
   const noted = m && (m.note || '').trim()
   const glyph = !m ? <span className="att-u">–</span>
     : m.status === 'present' ? <span className="att-p" />

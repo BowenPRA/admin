@@ -33,13 +33,16 @@ grant select, insert, update, delete on adm_students to authenticated;
 -- Quarter 1 (Bowen, 2 October 2026). Matched by student code, and only where no
 -- end date is set yet, so a date the office has typed since is kept. The date
 -- is Quarter 1's last day in the calendar the app uses (Settings), or 8 October
--- 2026 as in the app's built-in calendar when none is saved.
+-- 2026 as in the app's built-in calendar when none is saved or the saved one is
+-- not a real day (adm_try_date, from updates-2026-09-30-enrollments.sql, gives
+-- no date for something like 2026-02-30 instead of stopping the file).
 update adm_students
 set end_date = coalesce(
-      (select (q ->> 'end')::date
+      (select adm_try_date(q ->> 'end')
        from adm_settings,
             jsonb_array_elements(case when key = 'calendar' and jsonb_typeof(value -> 'quarters') = 'array' then value -> 'quarters' end) q
        where key = 'calendar' and q ->> 'id' = 'q1' and q ->> 'end' ~ '^\d{4}-\d{2}-\d{2}$'
+         and adm_try_date(q ->> 'end') is not null
        limit 1),
       date '2026-10-08'),
     updated_at = now()
@@ -75,7 +78,10 @@ select 'Expected end dates are set up. ' || coalesce(
 --   - gives a student it adds the lead it found, and starts their checklist;
 --   - finds a pending student already made from the same lead (same first name;
 --     the birthday when both have one), so a form sent after the office made the
---     record early links to it instead of adding the child twice;
+--     record early links to it instead of adding the child twice. Only when exactly
+--     one of the lead's pending students fits: with two (siblings sharing a name
+--     word, no birthdays yet) the form adds a new pending student, as before, and
+--     the office merges;
 --   - links an existing student to the lead (and the form to the student's lead)
 --     where one of them has it;
 --   - fills in what a pending student's record leaves blank (birthday, gender,
@@ -109,6 +115,9 @@ declare
   v_student uuid;
   v_family uuid;
   v_lead uuid;
+  v_pick uuid;
+  v_pick_family uuid;
+  v_matches int;
   v_found_lead boolean := false;
   v_made boolean := false;
   v_start int;
@@ -154,16 +163,24 @@ begin
 
   -- Part 2: or a pending student made from the same lead, with every word of the
   -- first name in their name, whose birthday is not on record or is the same.
+  -- Only when exactly one of the lead's pending students fits: siblings made
+  -- together can share a name word (An, Thiên An) and have no birthday yet, and
+  -- the form must not land on the wrong child. On a tie, or none, the form adds
+  -- a new pending student linked to the lead, as before, and the office merges.
   if v_student is null and v_lead is not null then
-    select st.id, st.family_id into v_student, v_family from adm_students st
-     where st.lead_id = v_lead and coalesce(st.status, 'active') = 'pending'
-       and (st.dob is null or r.dob is null or st.dob = r.dob)
-       and not exists (
-         select 1 from regexp_split_to_table(v_first, ' ') tok
-          where tok <> ''
-            and position(' ' || tok || ' ' in ' ' || adm_fold(st.full_name || ' ' || coalesce(st.first_name, '') || ' ' || coalesce(st.nickname, '')) || ' ') = 0)
-     order by st.created_at
-     limit 1;
+    select x.id, x.family_id, x.n into v_pick, v_pick_family, v_matches from (
+      select st.id, st.family_id, count(*) over () as n from adm_students st
+       where st.lead_id = v_lead and coalesce(st.status, 'active') = 'pending'
+         and (st.dob is null or r.dob is null or st.dob = r.dob)
+         and not exists (
+           select 1 from regexp_split_to_table(v_first, ' ') tok
+            where tok <> ''
+              and position(' ' || tok || ' ' in ' ' || adm_fold(st.full_name || ' ' || coalesce(st.first_name, '') || ' ' || coalesce(st.nickname, '')) || ' ') = 0)
+    ) x limit 1;
+    if v_matches = 1 then
+      v_student := v_pick;
+      v_family := v_pick_family;
+    end if;
   end if;
 
   if v_student is null and p_create then

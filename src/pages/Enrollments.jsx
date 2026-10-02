@@ -37,7 +37,7 @@ export default function Enrollments() {
   useEffect(() => { let on = true; fetchForms().then((s) => on && setState(s)); return () => { on = false } }, [])
   const forms = state?.forms
   const checklist = {
-    ctx: { students, families, invoices: sources.invoices, enrollments: forms || null, leads: sources.leads, teachers, schoolYear: fees?.schoolYear },
+    ctx: { students, families, invoices: sources.invoices, enrollments: forms || null, leads: sources.leads, loaded: sources.loaded && !!forms, teachers, schoolYear: fees?.schoolYear },
     me,
     onChanged: async () => { await refresh?.(); await sources.reload(); setState(await fetchForms()) },
   }

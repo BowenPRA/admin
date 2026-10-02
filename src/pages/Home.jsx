@@ -49,7 +49,9 @@ function useTodayAttendance(students, trips) {
 
 /** 'Traveling: Helios (Australia · until Fri 30 Oct)' for the greeting band, or nothing when nobody is away today. */
 function travelFact(trips, students, t, lang) {
-  const away = travelingOn(trips, students.filter(isEnrolled), todayIso())
+  // After an expected end date a student is not expected, so a trip then is not listed (as on the register).
+  const day = todayIso()
+  const away = travelingOn(trips, students.filter((s) => isEnrolled(s) && !afterEnd(s, day)), day)
   if (!away.length) return null
   const names = away.slice(0, 4).map((x) => `${x.s.nickname || x.s.full_name} (${tripLine(x.trip, lang)})`).join(', ')
   return { icon: Plane, to: '/attendance', text: t('travelingNow', { names: away.length > 4 ? `${names} +${away.length - 4}` : names }) }

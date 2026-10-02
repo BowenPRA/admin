@@ -49,8 +49,11 @@ export default function NewStudentChecklist({ student, record = student, ctx, me
 
   // An enrolled student's checklist closes once everything is done, so it does not come
   // back later (when the New student box is unticked next year, say). Pending ones stay.
+  // Only once invoices, forms and leads have loaded: until then their lines are left out,
+  // and a checklist could look complete when it is not.
   const closing = useRef(false)
-  const savedDone = record?.id && isEnrolled(record) && onboardingOf(record) && !onboardingOf(record).closed_at && checklistFor(record, ctx, lang).complete
+  const sourcesIn = !!(ctx?.loaded && ctx.invoices && ctx.enrollments && ctx.leads)
+  const savedDone = sourcesIn && record?.id && isEnrolled(record) && onboardingOf(record) && !onboardingOf(record).closed_at && checklistFor(record, ctx, lang).complete
   useEffect(() => {
     if (!savedDone || closing.current) return
     closing.current = true

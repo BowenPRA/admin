@@ -161,12 +161,13 @@ export default function Leads() {
       put(saved); setEditing(null); setMaking(saved)
     } catch (e) { toast.error(leadsError(e)) }
   }
-  const madeStudents = async (made, { stage: next }) => {
+  const madeStudents = async (made, { stage: next, notLinked }) => {
     const l = making
     setMaking(null)
     await refresh()
     if (next !== l.stage || l.archived) put({ ...l, stage: next, archived: false })
     toast(t('mkDone', { n: made.length, name: l.family }))
+    if (notLinked) toast.error(t('mkLeadSetup'))
     setEditing({ ...l, stage: next, archived: false })
   }
   const linkStudent = async (st) => {

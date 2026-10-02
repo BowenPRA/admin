@@ -3,8 +3,8 @@
 // it is typed: "gmai.com: did you mean gmail.com?". Only a warning: the address is saved
 // as typed. The website has the same list (pra-website, src/assets/js/main.js); keep the two alike.
 
-// Domains PRA families and staff use. A typed domain one slip away from one of these
-// (and not itself on the list) is flagged.
+// Domains PRA families and staff use. These are never flagged; nor is any other domain
+// unless it is a slip in one of the big providers' names (SLIP_NAMES) or ".com" mistyped.
 export const KNOWN_DOMAINS = [
   'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.com.vn', 'yahoo.co.uk', 'yahoo.fr', 'yahoo.de',
   'hotmail.com', 'hotmail.co.uk', 'hotmail.fr', 'hotmail.de', 'hotmail.it', 'outlook.com', 'outlook.fr', 'outlook.de',
@@ -16,6 +16,13 @@ export const KNOWN_DOMAINS = [
 ]
 // These names use one domain only, so "gmail.co" or "gmail.vn" is a slip whatever the ending.
 const ONE_DOMAIN = { gmail: 'gmail.com', googlemail: 'googlemail.com', icloud: 'icloud.com' }
+// The names people mistype ("gmial", "hotmial", "yahooo"): a name one letter from one of these is a slip.
+const SLIP_NAMES = ['gmail', 'yahoo', 'hotmail', 'outlook', 'icloud']
+// Real names one letter from those, never "put right": ymail.com is Yahoo's own, mail.com and email.com are real.
+const REAL_NAMES = ['ymail', 'mail', 'email', 'cloud']
+// Endings that are ".com" mistyped. Not ".co", ".cm" or ".om": those are countries' endings.
+const COM_SLIPS = ['con', 'cpm', 'xom', 'vom', 'cim', 'comm', 'coom', 'cmo', 'ocm', 'c0m', 'ccom', 'come']
+const NAMES = new Set(KNOWN_DOMAINS.map((k) => k.split('.')[0]))
 
 /** Edits between two words, a swap of two letters counting as one ("gmial" / "gmail"). */
 function distance(a, b) {
@@ -31,22 +38,26 @@ function distance(a, b) {
   return d[a.length][b.length]
 }
 
-/** The domain a typed one was probably meant to be, or null when it looks right (or is unknown and not close to anything). */
+/**
+ * The domain a typed one was probably meant to be, or null when it looks right. Only real
+ * slips are flagged: "gmai.com", "gmial.com", "gmail.co", "yahooo.com", "hotmial.com",
+ * "outlook.con". A domain that exists is left alone, so yahoo., hotmail., outlook. and live.
+ * with a country's ending (yahoo.ca, hotmail.es, outlook.it) pass, as do ymail.com, mail.com,
+ * email.com, foxmail.com and any company's own domain.
+ */
 export function domainSlip(domain) {
   const d = String(domain || '').trim().toLowerCase().replace(/\.+$/, '')
-  if (!d || KNOWN_DOMAINS.includes(d)) return null
-  const name = d.split('.')[0]
+  if (!d || !d.includes('.') || KNOWN_DOMAINS.includes(d)) return null
+  const name = d.slice(0, d.indexOf('.'))
+  const ending = d.slice(d.indexOf('.') + 1)
+  const comSlip = COM_SLIPS.includes(ending)
   if (ONE_DOMAIN[name]) return ONE_DOMAIN[name]
-  let best = null
-  let bestD = 9
-  for (const k of KNOWN_DOMAINS) {
-    const n = distance(d, k)
-    if (n < bestD) { best = k; bestD = n }
-  }
-  // Short domains are left alone: a company's own "ma.com" is one letter from "me.com".
-  if (bestD === 1 && best.length >= 8) return best
-  if (bestD === 2 && best.length >= 9 && d.length >= 7) return best
-  return null
+  // The name is right: only ".con" and the like is a slip; a country's ending is not.
+  if (NAMES.has(name) || REAL_NAMES.includes(name)) return comSlip ? `${name}.com` : null
+  if (name.length < 4) return null
+  const meant = SLIP_NAMES.find((k) => distance(name, k) === 1)
+  if (!meant) return null
+  return ONE_DOMAIN[meant] || `${meant}.${comSlip ? 'com' : ending}`
 }
 
 const LOOKS_RIGHT = /^[^\s@,;<>()]+@[^\s@,;<>()]+\.[a-z]{2,}$/i

@@ -96,8 +96,8 @@ export default function Students() {
   const finishingIds = useMemo(() => new Set(finishing.students.map((s) => s.id)), [finishing])
   const toggleEnding = (on) => { setEnding(on); if (!on && params.get('ending')) setParams(Object.fromEntries([...params].filter(([k]) => k !== 'ending')), { replace: true }) }
   // New students with steps still open on their checklist (lib/onboarding.js).
-  const checklistCtx = useMemo(() => ({ students, families, invoices: sources.invoices, enrollments: sources.enrollments, leads: sources.leads, teachers, schoolYear: fees?.schoolYear }),
-    [students, families, sources.invoices, sources.enrollments, sources.leads, teachers, fees?.schoolYear])
+  const checklistCtx = useMemo(() => ({ students, families, invoices: sources.invoices, enrollments: sources.enrollments, leads: sources.leads, loaded: sources.loaded, teachers, schoolYear: fees?.schoolYear }),
+    [students, families, sources.invoices, sources.enrollments, sources.leads, sources.loaded, teachers, fees?.schoolYear])
   const openSteps = useMemo(() => (canEdit ? new Map(withOpenSteps(students, checklistCtx).map((x) => [x.s.id, x.r.open])) : new Map()), [canEdit, students, checklistCtx])
   const toggleSteps = (on) => {
     setSteps(on)
@@ -171,14 +171,21 @@ export default function Students() {
       if (!orig && !row.onboarding) row.onboarding = startedBy(me?.email)
       if (!orig) await db.students.save(row)
       else { const fields = changedFields(row, orig); if (Object.keys(fields).length) await db.students.patch(orig.id, fields) }
-      // The lead follows the student: once they are enrolled, so is the family on the Leads list.
-      const lead = row.lead_id && statusOf(row) === 'active' ? (sources.leads || []).find((l) => l.id === row.lead_id) : null
-      if (lead && (lead.stage !== 'enrolled' || lead.archived)) await db.leads.patch(lead.id, { stage: 'enrolled', archived: false, updated_by: me?.email || null }).catch(() => {})
+      // The lead follows the student: when this save makes them enrolled, the family on the Leads
+      // list becomes Enrolled too. Only then: a later save of an enrolled student leaves the lead
+      // as the office set it. The student is saved either way; a lead that would not change is said.
+      const becameActive = statusOf(row) === 'active' && (!orig || statusOf(orig) !== 'active')
+      const lead = becameActive && row.lead_id ? (sources.leads || []).find((l) => l.id === row.lead_id) : null
+      let leadError = null
+      if (lead && (lead.stage !== 'enrolled' || lead.archived)) {
+        try { await db.leads.patch(lead.id, { stage: 'enrolled', archived: false, updated_by: me?.email || null }) } catch (e) { leadError = e }
+      }
       newFamily.current = null
       await refresh()
       if (canEdit) sources.reload()
       closeStudent()
       toast(t('studentSaved', { name: s.nickname || s.full_name }))
+      if (leadError) toast.error(t('leadEnrolledFailed', { name: lead.family, error: leadError.message || String(leadError) }))
     } catch (e) { toast.error(/partial_from/.test(e.message || '') ? t('partialDaySetup') : /end_date/.test(e.message || '') ? t('endDateSetup') : e.message) }
   }
   const removeStudent = async (s) => {
@@ -284,7 +291,8 @@ export default function Students() {
     }
     const slips = emailIssues(text).slips
     toast(t('copyEmailsDone', { n: list.length, kids: kids.length }))
-    if (slips.length) toast.error(t('copyEmailsSlips', { list: slips.map((x) => `${x.email} → ${x.suggestion}`).join(', ') }))
+    // A likely slip, named so someone can look: not an error, the addresses were copied as they are.
+    if (slips.length) toast.info(t('copyEmailsSlips', { list: slips.map((x) => `${x.email} → ${x.suggestion}`).join(', ') }))
   }
 
   // ---- families ----

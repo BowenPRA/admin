@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Plus, X, UserPlus } from 'lucide-react'
-import { db } from '../../lib/db'
+import { db, dbMode } from '../../lib/db'
 import { LEVELS } from '../../lib/fees'
 import { suggestClass } from '../../lib/placement'
 import { blankStudent } from '../../lib/studentRecords'
@@ -34,6 +34,8 @@ export default function MakeStudentsModal({ lead, students, families, schoolYear
   const [stage, setStage] = useState(['trial', 'enrolled'].includes(lead.stage) ? lead.stage : 'enrolled')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // A family made on a try that then failed is used again on the next try, not made twice (as in Students.jsx).
+  const newFamily = useRef(null)
 
   const setRow = (i, k) => (v) => setRows((cur) => cur.map((r, j) => {
     if (j !== i) return r
@@ -56,17 +58,19 @@ export default function MakeStudentsModal({ lead, students, families, schoolYear
       if (fid === '__new') {
         const parent = notAName(lead.family) ? '' : lead.family
         const contacts = (addresses.length ? addresses : ['']).map((e, i) => ({ name: i === 0 ? parent : '', relation: '', email: e, phone: i === 0 ? lead.phone || '' : '' })).filter((c) => c.name || c.email || c.phone)
-        const fam = await db.families.save({
+        newFamily.current ||= (await db.families.save({
           name: famName.trim() || defaultFamName, email: addresses.join(', '), phone: lead.phone || '', language,
           notes: t('mkFamilyNote', { date: fmtDay(todayIso()) }), contacts,
-        })
-        fid = fam.id
+        })).id
+        fid = newFamily.current
       }
-      // Next free S numbers, one after another.
+      // S numbers: on the shared database each student is saved without one and the database
+      // gives the next free number (this page's list may be out of date). Offline, the next
+      // free numbers are worked out here, one after another.
       const pool = [...students]
       const made = named.map((r) => {
         const s = {
-          ...blankStudent(pool), full_name: r.name.trim(), dob: r.dob || null, level: r.level,
+          ...blankStudent(pool), ...(dbMode === 'local' ? {} : { student_code: '' }), full_name: r.name.trim(), dob: r.dob || null, level: r.level,
           program: lead.program === 'global' ? 'global' : 'regular', family_id: fid,
           start_date: r.start || '', parents_email: addresses.join(', '), parent_phone: lead.phone || '',
           lead_id: lead.id, onboarding: startedBy(me?.email, { from: 'lead' }),
@@ -76,8 +80,12 @@ export default function MakeStudentsModal({ lead, students, families, schoolYear
         return s
       })
       const saved = await db.students.saveMany(made)
+      newFamily.current = null
+      // Before the 2 October database file has run, db.js saves the students without the lead
+      // link and the checklist: they come back without lead_id, and the page says so.
+      const notLinked = saved.some((x) => !('lead_id' in x))
       if (stage !== lead.stage || lead.archived) await db.leads.patch(lead.id, { stage, archived: false, updated_by: me?.email || null })
-      await onDone(saved, { stage })
+      await onDone(saved, { stage, notLinked })
     } catch (e) { setErr(e.message || String(e)) } finally { setBusy(false) }
   }
 

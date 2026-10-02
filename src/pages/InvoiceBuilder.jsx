@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Trash2, Plus, ChevronRight, RotateCcw } from 'lucide-react'
 import { db, isDuplicate } from '../lib/db'
 import { useToast } from '../lib/toast'
@@ -28,7 +28,20 @@ function blankInputs(lang) {
   }
 }
 
+/**
+ * A new invoice, an invoice opened to change it (?edit=<id>) and a copy (?copy=<id>) share
+ * one page, so moving between them does not reload it. The builder therefore starts afresh
+ * on every arrival here (a link or button, the back or forward button, a changed address):
+ * nothing of an invoice opened before stays loaded, and a new invoice never saves over an
+ * old one. The address alone is not enough for this, since an address typed by hand can
+ * carry the same history key as the page first loaded; the builder never changes it itself.
+ */
 export default function InvoiceBuilder() {
+  const { key, search } = useLocation()
+  return <Builder key={`${key}${search}`} />
+}
+
+function Builder() {
   const { t, lang: uiLang } = useT()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -43,6 +56,7 @@ export default function InvoiceBuilder() {
   const [showInactive, setShowInactive] = useState(false)
   const [issueDate, setIssueDate] = useState(null) // of the invoice being rebuilt
   const [lastFamily, setLastFamily] = useState(null) // picked last: says why a child of theirs is not on the invoice
+  const [droppedFamilies, setDroppedFamilies] = useState([]) // had a child taken off by a change of quarters: the same note
   const levelPicked = useRef(new Set()) // students whose year was changed on this page
 
   // ?edit=<id> re-opens an existing invoice's options; ?copy=<id> duplicates.
@@ -56,6 +70,9 @@ export default function InvoiceBuilder() {
         // A due date set by hand on the invoice page is kept through a rebuild; a copy starts from the plan's date.
         if (!editing) next.dueDate = ''
         else if (!next.dueDate && inv.due_date && inv.due_date !== smartDueDate(next, fees, inv.issue_date)) next.dueDate = inv.due_date
+        // A student added by hand past their expected end date stays on when the same invoice is
+        // changed; a copy is a new invoice, so there they are left off again by a change of quarters.
+        if (!editing) next.students = (next.students || []).map((e) => { const c = { ...e }; delete c.byHand; return c })
         setInputs(next)
       }
       if (editing && inv) { setEditId(id); setIssueDate(inv.issue_date || null) }
@@ -78,8 +95,14 @@ export default function InvoiceBuilder() {
   const current = (s) => students.find((x) => x.id === s.id) || s
   const endNote = (s, qs = quarters) => endOnInvoice(current(s), qs)
   const leftOff = (s, qs = quarters) => !!endNote(s, qs)?.out
-  /** The students to keep when the quarters change to those of `next`. */
-  const keptFor = (next) => { const qs = invoiceQuarters(next, calendar); return inputs.students.filter((e) => e.byHand || !leftOff(e.student, qs)) }
+  /** The students to keep when the quarters change to those of `next`. Those taken off are named in the note above the list. */
+  const keptFor = (next) => {
+    const qs = invoiceQuarters(next, calendar)
+    const kept = inputs.students.filter((e) => e.byHand || !leftOff(e.student, qs))
+    const gone = inputs.students.filter((e) => !kept.includes(e)).map((e) => e.student.family_id).filter(Boolean)
+    if (gone.length) setDroppedFamilies((fs) => [...new Set([...fs, ...gone])])
+    return kept
+  }
 
   const toggleStudent = (s) => {
     if (selectedIds.includes(s.id)) set({ students: inputs.students.filter((e) => e.student.id !== s.id) })
@@ -97,6 +120,7 @@ export default function InvoiceBuilder() {
     const handPicked = inputs.students.filter((e) => e.byHand && e.student.family_id === f.id)
     const kids = familyKids(f)
     setLastFamily(f.id)
+    setDroppedFamilies([]) // the invoice is now this family's
     set({ students: [...kids.map((s) => kept[s.id] || { student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) }), ...handPicked.filter((e) => !kids.some((s) => s.id === e.student.id))], lang: f.language || inputs.lang })
   }
   const pickInactiveFamily = async (f) => {
@@ -129,6 +153,7 @@ export default function InvoiceBuilder() {
     try {
       await db.students.saveMany(reactivated)
       await refresh()
+      setDroppedFamilies([]) // the invoice is now this family's
       set({ students: reactivated.map((s) => ({ student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) })), lang: f.language || inputs.lang })
     } catch (e) { toast.error(e.message || String(e)) } finally { setBusy(false) }
   }
@@ -250,8 +275,10 @@ export default function InvoiceBuilder() {
               .filter((f) => students.some((s) => s.family_id === f.id))
               .filter((f) => !needle || f.name.toLowerCase().includes(needle) || students.some((s) => s.family_id === f.id && `${s.full_name} ${s.nickname}`.toLowerCase().includes(needle)))
               .sort((a, b) => a.name.localeCompare(b.name)) : []
-            // Children of the families being invoiced who finish before this invoice's quarters, and so are not on it.
-            const shownFamilies = new Set([lastFamily, ...inputs.students.map((e) => e.student.family_id)].filter(Boolean))
+            // Children of the families being invoiced who finish before this invoice's quarters, and so are not on it:
+            // the family picked last, those still on the invoice, and those a change of quarters took a child from
+            // (on an invoice being changed or copied, that can be every child of the family).
+            const shownFamilies = new Set([lastFamily, ...droppedFamilies, ...inputs.students.map((e) => e.student.family_id)].filter(Boolean))
             const notOn = students.filter((s) => shownFamilies.has(s.family_id) && isBillable(s) && leftOff(s) && !selectedIds.includes(s.id))
             return (
               <>
