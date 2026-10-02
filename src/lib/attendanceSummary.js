@@ -3,7 +3,7 @@
 // (pages/PrintAttendance.jsx), so both always show the same numbers.
 
 import { LEVELS } from './fees'
-import { isEnrolled } from './studentRecords'
+import { isEnrolled, endDateOf } from './studentRecords'
 import { TRAVEL, tripsOf, statusOn } from './travel'
 
 export const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -76,8 +76,9 @@ const withRate = (c) => ({ ...c, absences: c.absent + c.travel, attended: c.pres
  *
  * Students listed are those in the year groups who are enrolled now, and anyone
  * else with marks in the period (a student who has since left still shows in
- * the months they came). Days before a student's start date, and for a student
- * who has left, days after their last mark, are not counted as unmarked.
+ * the months they came). Days before a student's start date, days after an
+ * enrolled student's expected end date (`until`), and for a student who has left,
+ * days after their last mark, are not counted as unmarked.
  *
  * `trips` are the students' trips (lib/travel.js). A class day inside a trip
  * counts as 'travel' unless the student was marked Present or Late on it; an
@@ -108,9 +109,13 @@ export function summarizeAttendance({ rows, students, groups, period, calendar, 
   const inGroups = students.filter((s) => groups.includes(s.level) && (isEnrolled(s) || byStudent.has(s.id)))
   const studentRow = (s) => {
     const mine = { ...(byStudent.get(s.id) || {}) }
+    // An enrolled student's expected end date (studentRecords.endDateOf): after it they are
+    // not expected, so a trip does not turn an unmarked day into A(T). A mark still counts.
+    const until = isEnrolled(s) ? endDateOf(s) : ''
     const away = tripsOf(trips, s.id)
     if (away.length) {
       classDays.forEach((d) => {
+        if (until && d > until && !mine[d]) return
         const trip = away.find((x) => x.from_date <= d && d <= x.to_date)
         if (trip && statusOn(mine[d], trip) === TRAVEL) mine[d] = { ...(mine[d] || { student_id: s.id, date: d }), status: TRAVEL, trip }
       })
@@ -119,13 +124,14 @@ export function summarizeAttendance({ rows, students, groups, period, calendar, 
     const perMonth = Object.fromEntries(months.map((k) => [k, tally()]))
     Object.values(mine).forEach((r) => { add(c, r.status); if (perMonth[r.date.slice(0, 7)]) add(perMonth[r.date.slice(0, 7)], r.status) })
     const start = s.start_date && s.start_date > first ? s.start_date : null
-    // Someone who has left is only expected up to the last day they were marked.
-    const end = isEnrolled(s) ? null : Object.keys(mine).sort().pop() || ''
+    // Someone who has left is only expected up to the last day they were marked; an
+    // enrolled student with an expected end date, up to that day.
+    const end = isEnrolled(s) ? until || null : Object.keys(mine).sort().pop() || ''
     const expected = (date) => (!start || date >= start) && (end == null || date <= end)
     const unmarked = classDays.filter((d) => !mine[d] && expected(d)).length
     const absentOn = Object.values(mine).filter((r) => r.status === 'absent' || r.status === TRAVEL).map((r) => r.date).sort()
     return {
-      s, marks: mine, expected, unmarked, absentOn,
+      s, marks: mine, expected, until, unmarked, absentOn,
       ...withRate(c),
       months: Object.fromEntries(months.map((k) => [k, withRate(perMonth[k])])),
     }

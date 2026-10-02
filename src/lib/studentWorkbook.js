@@ -134,6 +134,7 @@ export async function studentWorkbookBlob({ list, students, families, label = ''
     { key: 'phones', head: 'Parent phones', w: 28, group: 'FAMILY & CONTACT', h: 'left', get: (s, x) => x.join('phone') || (s.parent_phone || '').split(/\s*\|\s*/).filter(Boolean).join('\n') },
     { key: 'address', head: 'Address', w: 38, group: 'FAMILY & CONTACT', h: 'left', get: (s) => s.address || '' },
     { key: 'start', head: 'Start date', w: 13, group: 'OFFICE', numFmt: DATE_FMT, get: (s) => asDate(s.start_date) || '' },
+    { key: 'end', head: 'Expected end', w: 13, group: 'OFFICE', numFmt: DATE_FMT, get: (s) => asDate(s.end_date) || '' },
     { key: 'isNew', head: 'New this year', w: 9, group: 'OFFICE', get: (s) => (s.is_new ? 'Yes' : '') },
     { key: 'legacy', head: 'Legacy', w: 9, group: 'OFFICE', get: (s) => (s.legacy ? 'Yes' : '') },
     { key: 'notes', head: 'Notes', w: 34, group: 'OFFICE', h: 'left', get: (s) => s.notes || '' },

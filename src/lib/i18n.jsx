@@ -1077,6 +1077,29 @@ const STRINGS = {
   tdHomeMine: ['{n} for you', '{n} việc của bạn'],
   tdHomeLate: ['{n} late', '{n} quá hạn'],
   tdHomeCheck: ['{n} to check', '{n} cần kiểm tra'],
+
+  // Expected end dates (To-Do #37, lib/studentDates.js). Students are "học viên" here.
+  endDate: ['Expected end date', 'Ngày dự kiến kết thúc'],
+  endDateHint: ['Optional. After this day attendance stops expecting the student, and invoices for later quarters leave them out. The status does not change by itself.', 'Không bắt buộc. Sau ngày này, điểm danh không tính học viên nữa và hóa đơn của các quý sau không đưa học viên vào. Trạng thái không tự thay đổi.'],
+  endOfQuarter: ['End of quarter', 'Cuối quý'],
+  quarterEnds: ['{quarter} ends {date}', '{quarter} kết thúc ngày {date}'],
+  clearEndDate: ['Clear', 'Bỏ ngày'],
+  endBeforeStart: ['The expected end date is before the start date. Check both dates.', 'Ngày dự kiến kết thúc đang trước ngày bắt đầu. Vui lòng kiểm tra lại hai ngày này.'],
+  endsThisQuarter: ['Finishes this quarter', 'Kết thúc trong quý này'],
+  endsOnShort: ['finishes {date}', 'kết thúc {date}'],
+  endedOnShort: ['finished {date}', 'đã kết thúc {date}'],
+  endingFilter: ['Finishing this quarter', 'Kết thúc trong quý này'],
+  endingHome: ['{n} finishing this quarter', '{n} học viên kết thúc trong quý này'],
+  endedRegister: ['Expected end date: {date}. Mark only if they came in.', 'Ngày dự kiến kết thúc: {date}. Chỉ điểm danh nếu học viên vẫn đến lớp.'],
+  endDateSetup: ['Expected end dates are not set up in the database yet. Run supabase/updates-2026-10-02-student-dates-onboarding.sql in Supabase, then save again.', 'Chưa cài đặt ngày dự kiến kết thúc trong cơ sở dữ liệu. Hãy chạy supabase/updates-2026-10-02-student-dates-onboarding.sql trong Supabase rồi lưu lại.'],
+  startsLaterShort: ['Active, but the start date is {date}', 'Đang học nhưng ngày bắt đầu là {date}'],
+  startsLaterLong: ['Active, but the start date is {date}. Before that day the attendance summary does not expect this student, so missing marks are not flagged. Check the date.', 'Đang học nhưng ngày bắt đầu là {date}. Trước ngày này, bảng tổng hợp điểm danh không tính học viên này nên sẽ không báo thiếu điểm danh. Vui lòng kiểm tra lại ngày.'],
+  // Invoice builder
+  endNotOnInvoice: ['{name} finishes on {date}: not on this invoice.', '{name} dự kiến kết thúc ngày {date}: không đưa vào hóa đơn này.'],
+  endTickToAdd: ['To bill them anyway, tick their name in the list below.', 'Nếu vẫn cần thu phí, hãy đánh dấu tên học viên trong danh sách bên dưới.'],
+  endNotOnShort: ['finishes {date}: not on this invoice', 'kết thúc {date}: không có trong hóa đơn này'],
+  endOutOnInvoice: ['{name} finishes on {date}, before {quarter} begins. Remove them if they should not be on this invoice.', '{name} dự kiến kết thúc ngày {date}, trước khi {quarter} bắt đầu. Nếu không cần, hãy bỏ học viên khỏi hóa đơn này.'],
+  endPartInvoice: ['{name} finishes on {date}, before {quarter} begins. The amounts are not changed for this: adjust them by hand if needed.', '{name} dự kiến kết thúc ngày {date}, trước khi {quarter} bắt đầu. Số tiền không tự thay đổi: nếu cần, hãy chỉnh tay.'],
 }
 
 const LangContext = createContext({ lang: 'en', setLang: () => {}, t: (k) => k })

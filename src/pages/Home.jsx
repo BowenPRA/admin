@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PlusCircle, Users, CalendarCheck, CalendarDays, ClipboardList, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane } from 'lucide-react'
+import { PlusCircle, Users, CalendarCheck, CalendarDays, CalendarX, ClipboardList, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
@@ -8,7 +8,8 @@ import { useAuth } from '../lib/AuthContext'
 import { fmt, fmtDate } from '../lib/money'
 import { LEVELS } from '../lib/fees'
 import { splitSubjectKey } from '../data/staff'
-import { isEnrolled, activeFamilies } from '../lib/studentRecords'
+import { isEnrolled, activeFamilies, afterEnd } from '../lib/studentRecords'
+import { finishingThisQuarter } from '../lib/studentDates'
 import { summarize } from '../lib/leads'
 import { summarizeTodos } from '../lib/todos'
 import { tripOn, statusOn, travelingOn, tripLine, TRAVEL } from '../lib/travel'
@@ -36,8 +37,11 @@ function useTodayAttendance(students, trips) {
   const [marks, setMarks] = useState(null)
   useEffect(() => { db.attendance.list({ date: todayIso() }).then(setMarks).catch(() => setMarks([])) }, [])
   return (groups) => groups.map((g) => {
-    const kids = students.filter((s) => isEnrolled(s) && s.level === g)
-    const states = kids.map((k) => statusOn((marks || []).find((m) => m.student_id === k.id), tripOn(trips, k.id, todayIso()))).filter(Boolean)
+    const day = todayIso()
+    const markOf = (k) => (marks || []).find((m) => m.student_id === k.id)
+    // After an expected end date a student is not expected, unless someone marked them (as on the register).
+    const kids = students.filter((s) => isEnrolled(s) && s.level === g && (!afterEnd(s, day) || markOf(s)))
+    const states = kids.map((k) => statusOn(markOf(k), tripOn(trips, k.id, day))).filter(Boolean)
     return { g, total: kids.length, marked: states.length, absent: states.filter((st) => st === 'absent' || st === TRAVEL).length, travel: states.filter((st) => st === TRAVEL).length, loaded: !!marks }
   })
 }
@@ -379,6 +383,8 @@ function OfficeHome() {
   const groups = [...new Set(enrolled.map((s) => s.level).filter(Boolean))].sort(byLevel)
   const att = today(groups)
   const toRegister = att.filter((x) => x.total && x.marked < x.total).length
+  // Enrolled students expected to finish by the end of this quarter: the chip opens them on the Students page.
+  const finishing = finishingThisQuarter(data.students, data.calendar).students.length
 
   const stat = (label, value, cls = '') => (
     <div className="card p-5"><div className="label">{label}</div><div className={`text-2xl font-black tabular-nums ${cls}`}>{fmt(value)} <span className="text-sm font-semibold text-slate-400">VND</span></div></div>
@@ -392,6 +398,7 @@ function OfficeHome() {
           !reports.hidden && reports.work && !reports.work.error && reports.work.total > 0 && { icon: ClipboardList, text: `${reports.period.label}: ${reports.work.total - reports.work.done ? t('nLeft', { n: reports.work.total - reports.work.done }) : t('reportsAllDone')}` },
           leads && (leads.new || leads.due || webWaiting) && { icon: Sprout, to: '/leads', text: `${t('leadsNav')}: ${[leads.new && t('ldNewShort', { n: leads.new }), leads.due && t('ldDueShort', { n: leads.due }), webWaiting && t('ldWebShort', { n: webWaiting })].filter(Boolean).join(' · ')}` },
           travelFact(data.travel, data.students, t, lang),
+          finishing > 0 && { icon: CalendarX, to: '/students?ending=1', text: t('endingHome', { n: finishing }) },
           formsToCheck > 0 && { icon: FileSignature, to: '/enrollments', text: t('enHomeShort', { n: formsToCheck }) },
           todos && (todos.mine || todos.late || todos.check) > 0 && { icon: ListTodo, to: '/todo', text: `${t('todoNav')}: ${[todos.mine && t('tdHomeMine', { n: todos.mine }), todos.late && t('tdHomeLate', { n: todos.late }), todos.check && t('tdHomeCheck', { n: todos.check })].filter(Boolean).join(' · ')}` },
         ]} />

@@ -5,7 +5,8 @@ import { suggestClass } from '../../lib/placement'
 import { guessFirstName } from '../../lib/names'
 import { resizeImage, photoSrc } from '../../lib/report/photo'
 import { nextStudentCode, codeTakenBy, normalizeCode } from '../../lib/studentIds'
-import { ageOf, STATUSES, statusOf, withStatus, partialFrom, DEFAULT_PARTIAL_FROM } from '../../lib/studentRecords'
+import { ageOf, STATUSES, statusOf, withStatus, partialFrom, DEFAULT_PARTIAL_FROM, endDateOf, startsLater } from '../../lib/studentRecords'
+import { quartersOf, currentQuarter, dayText } from '../../lib/studentDates'
 import { Field, TextInput, Select, Checkbox, Modal, Avatar } from '../ui'
 import { StudentTrips } from '../attendance/Trips'
 
@@ -22,7 +23,7 @@ function Section({ title, children }) {
  * Add / edit a student (office accounts), or a read-only summary for teachers.
  * `onSave(row)` and `onDelete(row)` return promises; the modal stays open on error.
  */
-export default function StudentModal({ value, onClose, onSave, onDelete, students, families, schoolYear, canEdit, t, lang }) {
+export default function StudentModal({ value, onClose, onSave, onDelete, students, families, schoolYear, calendar, canEdit, t, lang }) {
   const [s, setS] = useState(value)
   const [busy, setBusy] = useState(false)
   const set = (k) => (v) => setS((cur) => ({ ...cur, [k]: v }))
@@ -39,6 +40,12 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
   const taken = codeTakenBy(students, s.student_code, s.id)
   const fam = families.find((f) => f.id === s.family_id)
   const programName = (id) => { const p = PROGRAMS.find((x) => x.id === id); return p ? (lang === 'vi' ? p.vi : p.en) : id }
+  // Expected end date (lib/studentDates.js): shortcuts to the end of each quarter in the calendar.
+  const end = endDateOf(s)
+  const quarters = quartersOf(calendar)
+  const thisQuarter = currentQuarter(calendar)
+  const endsThisQuarter = !!end && status === 'active' && !!thisQuarter && end <= thisQuarter.end
+  const endBeforeStart = !!end && !!s.start_date && end < String(s.start_date).slice(0, 10)
 
   const save = async (e) => {
     e?.preventDefault()
@@ -71,6 +78,7 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
           {row(t('classGroup'), s.class_group)}
           {row(t('allergies'), s.allergies && <span className="font-semibold text-red-700">{s.allergies}</span>)}
           {row(t('arrivesAt'), partialFrom(s) && <span className="font-semibold text-amber-700">{partialFrom(s)} · {t('partialDay')}</span>)}
+          {row(t('endDate'), end && <span className={endsThisQuarter ? 'font-semibold text-sky-800' : ''}>{dayText(end, lang)}{endsThisQuarter ? ` · ${t('endsThisQuarter')}` : ''}</span>)}
           {row(t('dob'), s.dob)}
           {row(t('nationality'), s.nationality)}
           {row(t('family'), fam?.name)}
@@ -134,8 +142,34 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
               <Select value={s.level} onChange={(v) => { setLevelTouched(true); set('level')(v) }} options={LEVELS.map((l) => ({ value: l, label: l }))} />
             </Field>
             <Field label={t('program')}><Select value={s.program} onChange={set('program')} options={PROGRAMS.map((p) => ({ value: p.id, label: lang === 'vi' ? p.vi : p.en }))} /></Field>
-            <Field label={t('classGroup')}><TextInput value={s.class_group} onChange={set('class_group')} placeholder={s.level} /></Field>
+            <Field label={t('classGroup')} className="sm:col-span-2"><TextInput value={s.class_group} onChange={set('class_group')} placeholder={s.level} /></Field>
             <Field label={t('startDate')}><TextInput type="date" value={s.start_date || ''} onChange={set('start_date')} /></Field>
+            <Field label={t('endDate')} hint={endsThisQuarter ? <span className="font-semibold text-sky-700">{t('endsThisQuarter')}</span> : undefined}>
+              <TextInput type="date" value={end} onChange={set('end_date')} />
+            </Field>
+            {/* Buttons sit outside the Field: a click inside its label would land on the date box. */}
+            {quarters.length > 0 && (
+              <div className="sm:col-span-2">
+                <span className="label">{t('endOfQuarter')}</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {quarters.map((q) => (
+                    <button key={q.id} type="button" aria-pressed={end === q.end} title={t('quarterEnds', { quarter: lang === 'vi' ? q.vi : q.en, date: dayText(q.end, lang) })}
+                      className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${end === q.end ? 'border-pra-blue bg-pra-blue text-white' : 'border-slate-300 bg-white text-slate-600 hover:border-pra-blue hover:text-pra-blue'}`}
+                      onClick={() => set('end_date')(q.end)}>
+                      {lang === 'vi' ? q.vi : q.en.replace('Quarter ', 'Q')}
+                    </button>
+                  ))}
+                  {end && <button type="button" className="px-1.5 py-1.5 text-xs text-slate-400 hover:text-red-600" onClick={() => set('end_date')('')}>{t('clearEndDate')}</button>}
+                </div>
+              </div>
+            )}
+            <p className={`text-xs sm:col-span-4 ${endBeforeStart ? 'font-semibold text-red-600' : 'text-slate-400'}`}>{endBeforeStart ? t('endBeforeStart') : t('endDateHint')}</p>
+            {startsLater(s) && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 sm:col-span-4">
+                <AlertTriangle size={16} className="mt-0.5 flex-none text-amber-600" />
+                <span>{t('startsLaterLong', { date: dayText(String(s.start_date).slice(0, 10), lang) })}</span>
+              </div>
+            )}
             <Field label={t('enrollmentStatus')} className="sm:col-span-4"><TextInput value={s.enrollment_status} onChange={set('enrollment_status')} placeholder="Enrolled, trial week…" /></Field>
             <div className="sm:col-span-4">
               <div className="flex min-h-[38px] flex-wrap items-center gap-x-4 gap-y-2">

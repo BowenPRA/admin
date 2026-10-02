@@ -14,7 +14,9 @@ import { normalizeCode, needsCodeUpdate, nextStudentCode } from '../lib/studentI
 import { Card, Checkbox, Empty, Spinner, Avatar, Segmented, SearchInput, PageHeader, Menu } from '../components/ui'
 import StudentModal from '../components/students/StudentModal'
 import FamilyModal from '../components/students/FamilyModal'
-import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact, isEnrolled, isPending, isPast, statusOf, familyStatus, partialFrom } from '../lib/studentRecords'
+import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact, isEnrolled, isPending, isPast, statusOf, familyStatus, partialFrom, endDateOf, startsLater } from '../lib/studentRecords'
+import { finishingThisQuarter, dayText } from '../lib/studentDates'
+import { todayIso } from '../lib/attendanceSummary'
 
 const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
 const levelIndex = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
@@ -36,7 +38,7 @@ function SortTh({ col, sort, onSort, children, className = '' }) {
 export default function Students() {
   const { t, lang } = useT()
   const toast = useToast()
-  const { loading, students, families, fees, refresh } = useData()
+  const { loading, students, families, fees, calendar, refresh } = useData()
   const { isOffice } = useAuth()
   const canEdit = isOffice
   const [params, setParams] = useSearchParams()
@@ -48,6 +50,8 @@ export default function Students() {
   const [level, setLevel] = useState('')
   const [program, setProgram] = useState('')
   const [noFamily, setNoFamily] = useState(false)
+  // Home's "finishing this quarter" opens this page as /students?ending=1.
+  const [ending, setEnding] = useState(() => params.get('ending') === '1')
   const [missingContact, setMissingContact] = useState(false)
   const [sort, setSort] = useState({ col: 'level', dir: 'asc' })
   const [editing, setEditing] = useState(null)
@@ -80,6 +84,10 @@ export default function Students() {
     families.forEach((f) => { c[familyStatus(kidsByFamily[f.id])]++ })
     return c
   }, [families, kidsByFamily])
+  // Enrolled students expected to finish by the end of this quarter (lib/studentDates.js).
+  const finishing = useMemo(() => finishingThisQuarter(students, calendar), [students, calendar])
+  const finishingIds = useMemo(() => new Set(finishing.students.map((s) => s.id)), [finishing])
+  const toggleEnding = (on) => { setEnding(on); if (!on && params.get('ending')) setParams(Object.fromEntries([...params].filter(([k]) => k !== 'ending')), { replace: true }) }
   const toConvert = useMemo(() => students.filter(needsCodeUpdate), [students])
   const withoutId = useMemo(() => students.filter((s) => !isPast(s) && !s.student_code), [students])
 
@@ -92,6 +100,7 @@ export default function Students() {
       .filter((s) => !level || s.level === level)
       .filter((s) => !program || s.program === program)
       .filter((s) => !noFamily || !s.family_id)
+      .filter((s) => !ending || finishingIds.has(s.id))
       .filter((s) => !needle || norm(`${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''} ${s.level} ${s.student_code} ${normalizeCode(s.student_code)} ${s.class_group}`).includes(needle))
     const dir = sort.dir === 'asc' ? 1 : -1
     const byName = (a, b) => (a.full_name || '').localeCompare(b.full_name || '')
@@ -104,7 +113,7 @@ export default function Students() {
       family: (a, b) => (famById[a.family_id]?.name || '~').localeCompare(famById[b.family_id]?.name || '~') || byName(a, b),
     }[sort.col] || byName
     return [...list].sort((a, b) => cmp(a, b) * dir)
-  }, [students, q, status, level, program, noFamily, famById, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [students, q, status, level, program, noFamily, ending, finishingIds, famById, sort]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const famRows = useMemo(() => {
     const needle = norm(q)
@@ -115,8 +124,8 @@ export default function Students() {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [families, kidsByFamily, q, status, missingContact])
 
-  const filtersOn = !!(q || level || program || noFamily || missingContact)
-  const clearFilters = () => { setQ(''); setLevel(''); setProgram(''); setNoFamily(false); setMissingContact(false) }
+  const filtersOn = !!(q || level || program || noFamily || ending || missingContact)
+  const clearFilters = () => { setQ(''); setLevel(''); setProgram(''); setNoFamily(false); toggleEnding(false); setMissingContact(false) }
   const onSort = (col) => setSort((s) => (s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' }))
 
   const run = async (fn) => {
@@ -146,7 +155,7 @@ export default function Students() {
       await refresh()
       closeStudent()
       toast(t('studentSaved', { name: s.nickname || s.full_name }))
-    } catch (e) { toast.error(/partial_from/.test(e.message || '') ? t('partialDaySetup') : e.message) }
+    } catch (e) { toast.error(/partial_from/.test(e.message || '') ? t('partialDaySetup') : /end_date/.test(e.message || '') ? t('endDateSetup') : e.message) }
   }
   const removeStudent = async (s) => {
     if (!confirm(t('confirmDeleteStudent', { name: s.full_name }))) return
@@ -231,7 +240,7 @@ export default function Students() {
 
   // The students listed right now (status tab, filters, search and sort) as an Excel file.
   const exportList = () => run(async () => {
-    const label = [status === 'all' ? 'All students' : status === 'active' ? 'Enrolled' : status === 'pending' ? 'Pending' : 'Past', level, program && programName(program)].filter(Boolean).join(' · ')
+    const label = [status === 'all' ? 'All students' : status === 'active' ? 'Enrolled' : status === 'pending' ? 'Pending' : 'Past', level, program && programName(program), ending && 'Finishing this quarter'].filter(Boolean).join(' · ')
     await exportStudentList({ list: rows, students, families, label, schoolYear: fees?.schoolYear })
     toast(t('exportStudentListDone', { n: rows.length }))
   })
@@ -258,6 +267,7 @@ export default function Students() {
   ]
   const levelCounts = students.filter(inStatus).reduce((m, s) => { m[s.level] = (m[s.level] || 0) + 1; return m }, {})
   const grouped = sort.col === 'level'
+  const today = todayIso()
 
   return (
     <div className="space-y-5">
@@ -316,6 +326,7 @@ export default function Students() {
               {PROGRAMS.map((p) => <option key={p.id} value={p.id}>{lang === 'vi' ? p.vi : p.en}</option>)}
             </select>
             {canEdit && <Checkbox checked={noFamily} onChange={setNoFamily} label={t('withoutFamily')} className="px-1" />}
+            {(finishing.students.length > 0 || ending) && <Checkbox checked={ending} onChange={toggleEnding} label={`${t('endingFilter')} (${finishing.students.length})`} className="px-1" />}
           </>) : (
             <Checkbox checked={missingContact} onChange={setMissingContact} label={t('missingContact')} className="px-1" />
           )}
@@ -364,8 +375,12 @@ export default function Students() {
                                 {s.nickname && <span>“{s.nickname}”</span>}
                                 {s.allergies && <span className="rounded bg-red-50 px-1 text-[10px] font-semibold text-red-700" title={s.allergies}>{lang === 'vi' ? 'dị ứng' : 'allergy'}</span>}
                                 {partialFrom(s) && <span className="rounded bg-amber-50 px-1 text-[10px] font-semibold text-amber-700" title={t('partialDay')}>{t('fromTime', { time: partialFrom(s) })}</span>}
+                                {finishingIds.has(s.id) && <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-800" title={t('endDate')}>{t(endDateOf(s) < today ? 'endedOnShort' : 'endsOnShort', { date: dayText(endDateOf(s), lang) })}</span>}
                                 <span className="md:hidden">{age != null ? `${age}y` : ''}</span>
                               </div>
+                              {startsLater(s, today) && (
+                                <div className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-amber-700"><AlertTriangle size={12} className="flex-none" />{t('startsLaterShort', { date: dayText(String(s.start_date).slice(0, 10), lang) })}</div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -444,7 +459,7 @@ export default function Students() {
 
       {shown && (
         <StudentModal key={shown.id || 'new'} value={shown} onClose={closeStudent} onSave={saveStudent} onDelete={removeStudent}
-          students={students} families={families} schoolYear={fees?.schoolYear} canEdit={canEdit} t={t} lang={lang} />
+          students={students} families={families} schoolYear={fees?.schoolYear} calendar={calendar} canEdit={canEdit} t={t} lang={lang} />
       )}
       {editingFam && (
         <FamilyModal key={editingFam.id || 'new-family'} value={editingFam} onClose={() => setEditingFam(null)} onSave={saveFamily} onDelete={removeFamily}

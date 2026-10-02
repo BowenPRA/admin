@@ -10,6 +10,7 @@ import { buildDocument, defaultStudentOptions, docTotals, PERIOD_OPTIONS, PLAN_O
 import { fmt, fmtDate, todayISO } from '../lib/money'
 import { suggestClass } from '../lib/placement'
 import { ageOf, isBillable, isPast, isPending } from '../lib/studentRecords'
+import { invoiceQuarters, endOnInvoice, dayText } from '../lib/studentDates'
 import { Card, Field, TextInput, NumberInput, MoneyInput, Select, Checkbox, Spinner } from '../components/ui'
 
 const PLAN_PERIOD_DEFAULT = { earlyBird: 'year', standard: 'year', quarterly: 'q1', split: 'sem1', weekly: 'custom', trial: 'custom', staff: 'q1', none: 'q1' }
@@ -38,6 +39,7 @@ export default function InvoiceBuilder() {
   const [loadedFrom, setLoadedFrom] = useState(null)
   const [showInactive, setShowInactive] = useState(false)
   const [issueDate, setIssueDate] = useState(null) // of the invoice being rebuilt
+  const [lastFamily, setLastFamily] = useState(null) // picked last: says why a child of theirs is not on the invoice
   const levelPicked = useRef(new Set()) // students whose year was changed on this page
 
   // ?edit=<id> re-opens an existing invoice's options; ?copy=<id> duplicates.
@@ -64,19 +66,35 @@ export default function InvoiceBuilder() {
   const ctx = { periodId: inputs.periodId }
   const selectedIds = inputs.students.map((e) => e.student.id)
 
+  // Expected end dates (lib/studentDates.js). A student who finishes before every quarter
+  // this invoice is for is left off it: picking the family skips them, and changing the
+  // quarters takes them off again. Ticking them in the list adds them by hand (`byHand`),
+  // and then they stay. No amount, rate or pro-rating changes for this.
+  const quarters = invoiceQuarters(inputs, calendar)
+  // The student record as it is now: an invoice being copied or rebuilt holds the student as they were then.
+  const current = (s) => students.find((x) => x.id === s.id) || s
+  const endNote = (s, qs = quarters) => endOnInvoice(current(s), qs)
+  const leftOff = (s, qs = quarters) => !!endNote(s, qs)?.out
+  /** The students to keep when the quarters change to those of `next`. */
+  const keptFor = (next) => { const qs = invoiceQuarters(next, calendar); return inputs.students.filter((e) => e.byHand || !leftOff(e.student, qs)) }
+
   const toggleStudent = (s) => {
     if (selectedIds.includes(s.id)) set({ students: inputs.students.filter((e) => e.student.id !== s.id) })
     else {
-      const entry = { student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) }
+      const entry = { student: s, opts: defaultStudentOptions(s, fees, calendar, ctx), ...(leftOff(s) ? { byHand: true } : {}) }
       const fam = famById[s.family_id]
       set({ students: [...inputs.students, entry], lang: inputs.students.length === 0 && fam?.language ? fam.language : inputs.lang })
     }
   }
+  /** A family's children for this invoice: those billable, less anyone who finishes before its quarters. */
+  const familyKids = (f) => students.filter((s) => s.family_id === f.id && isBillable(s) && !leftOff(s))
   const pickFamily = (f) => {
-    const kids = students.filter((s) => s.family_id === f.id && isBillable(s))
-    // Children already on the invoice keep the options chosen for them.
+    // Children already on the invoice keep the options chosen for them; one added by hand stays.
     const kept = Object.fromEntries(inputs.students.map((e) => [e.student.id, e]))
-    set({ students: kids.map((s) => kept[s.id] || { student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) }), lang: f.language || inputs.lang })
+    const handPicked = inputs.students.filter((e) => e.byHand && e.student.family_id === f.id)
+    const kids = familyKids(f)
+    setLastFamily(f.id)
+    set({ students: [...kids.map((s) => kept[s.id] || { student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) }), ...handPicked.filter((e) => !kids.some((s) => s.id === e.student.id))], lang: f.language || inputs.lang })
   }
   const pickInactiveFamily = async (f) => {
     const kids = students.filter((s) => s.family_id === f.id)
@@ -111,13 +129,13 @@ export default function InvoiceBuilder() {
   // Period or plan change: refresh day/month counts for everyone.
   const changePeriod = (periodId) => {
     const p = periodInfo(periodId, calendar)
-    set({ periodId, students: inputs.students.map((e) => ({ ...e, opts: { ...e.opts, mealDays: periodId === 'custom' ? e.opts.mealDays : p.days, transportMonths: periodId === 'custom' ? e.opts.transportMonths : p.months } })) })
+    set({ periodId, students: keptFor({ ...inputs, periodId }).map((e) => ({ ...e, opts: { ...e.opts, mealDays: periodId === 'custom' ? e.opts.mealDays : p.days, transportMonths: periodId === 'custom' ? e.opts.transportMonths : p.months } })) })
   }
   const changePlan = (plan) => {
     const periodId = PLAN_PERIOD_DEFAULT[plan] || inputs.periodId
     const billQuarters = plan === 'quarterly' ? ['q1'] : inputs.billQuarters
     const p = periodInfo(periodId, calendar)
-    set({ plan, periodId, billQuarters, students: inputs.students.map((e) => ({ ...e, opts: { ...e.opts, mealDays: periodId === 'custom' ? e.opts.mealDays : p.days, transportMonths: periodId === 'custom' ? e.opts.transportMonths : p.months, meals: plan === 'trial' ? false : e.opts.meals } })) })
+    set({ plan, periodId, billQuarters, students: keptFor({ ...inputs, plan, periodId, billQuarters }).map((e) => ({ ...e, opts: { ...e.opts, mealDays: periodId === 'custom' ? e.opts.mealDays : p.days, transportMonths: periodId === 'custom' ? e.opts.transportMonths : p.months, meals: plan === 'trial' ? false : e.opts.meals } })) })
   }
   const toggleQuarter = (qid) => {
     const next = inputs.billQuarters.includes(qid) ? inputs.billQuarters.filter((x) => x !== qid) : [...inputs.billQuarters, qid].sort()
@@ -125,7 +143,7 @@ export default function InvoiceBuilder() {
     // billing one quarter: meals/transport for that quarter; several: sum them
     const months = next.reduce((s, x) => s + periodInfo(x, calendar).months, 0)
     const periodId = next.length === 1 ? next[0] : (next.join('') === 'q1q2' ? 'sem1' : next.join('') === 'q3q4' ? 'sem2' : next.length === 4 ? 'year' : inputs.periodId)
-    set({ billQuarters: next, periodId, students: inputs.students.map((e) => ({ ...e, opts: { ...e.opts, mealDays: billedDays(next, e.opts, calendar), transportMonths: months } })) })
+    set({ billQuarters: next, periodId, students: keptFor({ ...inputs, billQuarters: next, periodId }).map((e) => ({ ...e, opts: { ...e.opts, mealDays: billedDays(next, e.opts, calendar), transportMonths: months } })) })
   }
   // Prorate one quarter for a student (days = null turns it off). Meal days
   // follow the prorated days for the quarters billed now.
@@ -220,22 +238,32 @@ export default function InvoiceBuilder() {
               .filter((f) => students.some((s) => s.family_id === f.id))
               .filter((f) => !needle || f.name.toLowerCase().includes(needle) || students.some((s) => s.family_id === f.id && `${s.full_name} ${s.nickname}`.toLowerCase().includes(needle)))
               .sort((a, b) => a.name.localeCompare(b.name)) : []
+            // Children of the families being invoiced who finish before this invoice's quarters, and so are not on it.
+            const shownFamilies = new Set([lastFamily, ...inputs.students.map((e) => e.student.family_id)].filter(Boolean))
+            const notOn = students.filter((s) => shownFamilies.has(s.family_id) && isBillable(s) && leftOff(s) && !selectedIds.includes(s.id))
             return (
               <>
                 {activeFamilies.length > 0 && (
                   <div className="mb-3 flex flex-wrap gap-1.5">
                     {activeFamilies.map((f) => {
-                      const kids = students.filter((s) => s.family_id === f.id && isBillable(s))
-                      const allSelected = kids.every((s) => selectedIds.includes(s.id))
+                      const all = students.filter((s) => s.family_id === f.id && isBillable(s))
+                      const kids = familyKids(f)
+                      const allSelected = kids.length > 0 && kids.every((s) => selectedIds.includes(s.id))
                       return (
                         <button key={f.id} onClick={() => pickFamily(f)}
-                          className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${allSelected ? 'border-pra-blue bg-pra-blue text-white' : 'border-slate-300 bg-white hover:border-pra-blue hover:text-pra-blue'}`}
-                          title={kids.map((s) => `${s.nickname || s.full_name} (${s.level})`).join(', ')}>
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${allSelected ? 'border-pra-blue bg-pra-blue text-white' : kids.length ? 'border-slate-300 bg-white hover:border-pra-blue hover:text-pra-blue' : 'border-dashed border-slate-300 bg-white text-slate-400 hover:border-pra-blue'}`}
+                          title={all.map((s) => `${s.nickname || s.full_name} (${s.level})${leftOff(s) ? `: ${t('endNotOnShort', { date: dayText(endNote(s).end, uiLang) })}` : ''}`).join(', ')}>
                           {f.name}
                           {kids.length > 1 && <span className="ml-1 opacity-60">×{kids.length}</span>}
                         </button>
                       )
                     })}
+                  </div>
+                )}
+                {notOn.length > 0 && (
+                  <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    {notOn.map((s) => <div key={s.id} className="font-semibold">{t('endNotOnInvoice', { name: s.nickname || s.full_name, date: dayText(endNote(s).end, uiLang) })}</div>)}
+                    <div className="mt-0.5">{t('endTickToAdd')}</div>
                   </div>
                 )}
                 {inactiveFamilies.length > 0 && (
@@ -264,6 +292,7 @@ export default function InvoiceBuilder() {
             {visible.map((s) => {
               const prog = PROGRAMS.find((p) => p.id === s.program)
               const progLabel = prog ? (uiLang === 'vi' ? prog.vi : prog.en) : s.program
+              const ends = endNote(s)
               return (
                 <label key={s.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-1.5 text-sm hover:bg-slate-50 ${selectedIds.includes(s.id) ? 'bg-sky-50' : ''} ${isPast(s) ? 'opacity-50' : ''}`}>
                   <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s)} />
@@ -271,6 +300,7 @@ export default function InvoiceBuilder() {
                   {s.nickname && <span className="text-slate-500">({s.nickname})</span>}
                   {isPending(s) && <span className="chip bg-amber-100 text-amber-700 text-[10px]">{t('pending')}</span>}
                   {isPast(s) && <span className="chip bg-slate-100 text-slate-600 text-[10px]">{t('inactive')}</span>}
+                  {ends && <span className="chip bg-amber-50 text-amber-800 text-[10px]">{t(ends.out && !selectedIds.includes(s.id) ? 'endNotOnShort' : 'endsOnShort', { date: dayText(ends.end, uiLang) })}</span>}
                   <span className="ml-auto text-xs text-slate-500">{s.level} · {progLabel} · {famById[s.family_id]?.name || '—'}</span>
                 </label>
               )
@@ -357,6 +387,15 @@ export default function InvoiceBuilder() {
                     {s.legacy && <span className="chip bg-purple-100 text-purple-800">legacy</span>}
                     <button className="btn-ghost ml-auto p-1 text-red-500" onClick={() => toggleStudent(s)}><Trash2 size={14} /></button>
                   </div>
+                  {(() => {
+                    // Finishes before some (or all) of the quarters billed: said here, amounts left as they are.
+                    const ends = endNote(s)
+                    return ends && (
+                      <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        {t(ends.out ? 'endOutOnInvoice' : 'endPartInvoice', { name: s.nickname || s.full_name, date: dayText(ends.end, uiLang), quarter: uiLang === 'vi' ? ends.first.vi : ends.first.en })}
+                      </p>
+                    )
+                  })()}
                   <div className="mb-3 grid gap-3 sm:grid-cols-2">
                     <Field label={t('levelForInvoice')}>
                       <Select value={s.level} onChange={(v) => setStudentChoice(s.id, { level: v })}

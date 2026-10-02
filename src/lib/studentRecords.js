@@ -23,6 +23,22 @@ export const isPast = (s) => statusOf(s) === 'inactive'
  */
 export const DEFAULT_PARTIAL_FROM = '11:35'
 export const partialFrom = (s) => String(s?.partial_from || '').trim()
+/**
+ * The expected end date: the last day a student is expected to come ('YYYY-MM-DD'),
+ * blank when none is set. It only informs: after it attendance stops expecting the
+ * student and invoices for later quarters leave them out (lib/studentDates.js), but
+ * the status still changes only by hand. Needs
+ * supabase/updates-2026-10-02-student-dates-onboarding.sql (db.js saves without it until then).
+ */
+export const endDateOf = (s) => String(s?.end_date || '').slice(0, 10)
+/** The day is after the student's expected end date. */
+export const afterEnd = (s, date) => !!endDateOf(s) && date > endDateOf(s)
+/**
+ * Enrolled, but the start date is still to come. The attendance summary does not expect
+ * a student before their start date, so a date typed wrong would hide missing marks:
+ * the Students page warns about it.
+ */
+export const startsLater = (s, today = localToday()) => isEnrolled(s) && String(s?.start_date || '').slice(0, 10) > today
 /** Pending students are billed like enrolled ones — that is how they start. */
 export const isBillable = (s) => statusOf(s) !== 'inactive'
 export const withStatus = (s, status) => ({ ...s, status, active: status === 'active' })
@@ -47,7 +63,7 @@ export const blankStudent = (students) => ({
   // a brand-new student, so spreading this over an existing row leaves it alone.
   ...(students ? { status: 'pending', active: false } : {}),
   student_code: students ? nextStudentCode(students) : '', gender: '', class_group: '', parents_email: '', parent_phone: '',
-  address: '', allergies: '', start_date: students ? localToday() : '', enrollment_status: '', photo: '',
+  address: '', allergies: '', start_date: students ? localToday() : '', end_date: '', enrollment_status: '', photo: '',
 })
 
 export const ageOf = (dob) => {

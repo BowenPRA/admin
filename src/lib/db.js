@@ -260,30 +260,32 @@ const withStatus = (row) => {
 // column and Postgres rejects the write; fall back to the boolean on its own.
 const noStatusColumn = (e) => /status/i.test(e?.message || '') && /(does not exist|schema cache)/i.test(e?.message || '')
 const dropStatus = (row) => { const r = { ...row }; delete r.status; return r }
-const saveStudent = async (row) => {
-  const r = withStatus(row)
-  try { return await A.upsert(TABLES.students, r) } catch (e) {
-    if (!noStatusColumn(e)) throw e
-    return A.upsert(TABLES.students, dropStatus(r))
+// Columns that a later database file adds, so the app may be live before Bowen has run it.
+// Until then a write that leaves the column empty goes through without it; one that fills it
+// in fails, and the page says which file to run.
+//   end_date: supabase/updates-2026-10-02-student-dates-onboarding.sql (expected end date)
+const LATER_COLUMNS = ['end_date']
+const missingLaterColumn = (e) => (/(does not exist|schema cache)/i.test(e?.message || '') && LATER_COLUMNS.find((c) => new RegExp(`['"]${c}['"]`).test(e.message))) || null
+const isBlank = (v) => v == null || v === ''
+const dropKey = (row, key) => { const r = { ...row }; delete r[key]; return r }
+/** Runs `write(rows)`, again without `status` or a later column when the database does not have it yet. */
+async function writeStudents(rows, write) {
+  let rs = rows
+  for (;;) {
+    try { return await write(rs) } catch (e) {
+      if (noStatusColumn(e) && rs.some((r) => 'status' in r)) { rs = rs.map(dropStatus); continue }
+      const col = missingLaterColumn(e)
+      if (col && rs.some((r) => col in r) && rs.every((r) => isBlank(r[col]))) { rs = rs.map((r) => dropKey(r, col)); continue }
+      throw e
+    }
   }
 }
-const saveStudents = async (rows) => {
-  const rs = rows.map(withStatus)
-  try { return await A.upsertMany(TABLES.students, rs) } catch (e) {
-    if (!noStatusColumn(e)) throw e
-    return A.upsertMany(TABLES.students, rs.map(dropStatus))
-  }
-}
+const saveStudent = (row) => writeStudents([withStatus(row)], ([r]) => A.upsert(TABLES.students, r))
+const saveStudents = (rows) => writeStudents(rows.map(withStatus), (rs) => A.upsertMany(TABLES.students, rs))
 
 // A change to some fields of one student. Unlike a save it is a plain update: the rest of the
 // row stays as it is in the database, whatever this browser loaded earlier.
-const patchStudent = async (id, fields) => {
-  const f = 'status' in fields || 'active' in fields ? withStatus(fields) : fields
-  try { return await A.patch(TABLES.students, id, f) } catch (e) {
-    if (!noStatusColumn(e)) throw e
-    return A.patch(TABLES.students, id, dropStatus(f))
-  }
-}
+const patchStudent = (id, fields) => writeStudents(['status' in fields || 'active' in fields ? withStatus(fields) : fields], ([f]) => A.patch(TABLES.students, id, f))
 
 // Documents parents attach to the enrollment form (supabase/updates-2026-09-30-enrollments.sql).
 const ENROLLMENT_BUCKET = 'adm-enrollment'
