@@ -1270,6 +1270,7 @@ const STRINGS = {
   mkLeadSetup: ['The student records were made, but their link to this family on the Leads list and their checklist were not saved: the database is not set up for them yet. Run supabase/updates-2026-10-02-student-dates-onboarding.sql in Supabase, then link them from the lead.', 'Đã tạo hồ sơ học viên, nhưng chưa lưu được liên kết với gia đình này trong danh sách Tuyển sinh và các bước cho học viên mới vì cơ sở dữ liệu chưa được cài đặt. Hãy chạy supabase/updates-2026-10-02-student-dates-onboarding.sql trong Supabase, rồi liên kết lại từ danh sách Tuyển sinh.'],
   obFeeOnInvoice: ['The admission fee is on invoice {number}.', 'Phí nhập học đã có trong hóa đơn {number}.'],
   leadEnrolledFailed: ['Saved. {name} on the Leads list could not be set to Enrolled: {error}', 'Đã lưu. Chưa chuyển được {name} trong danh sách Tuyển sinh sang Đã nhập học: {error}'],
+  leadEnrolledUnread: ['Saved. The family of {name} on the Leads list could not be read, so it was not set to Enrolled. Set it on the Leads page: {error}','Đã lưu. Không đọc được gia đình của {name} trong danh sách Tuyển sinh nên chưa chuyển sang Đã nhập học. Vui lòng chuyển trên trang Tuyển sinh: {error}'],
 }
 
 const LangContext = createContext({ lang: 'en', setLang: () => {}, t: (k) => k })

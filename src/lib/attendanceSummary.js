@@ -78,7 +78,7 @@ const withRate = (c) => ({ ...c, absences: c.absent + c.travel, attended: c.pres
  * else with marks in the period (a student who has since left still shows in
  * the months they came). Days before a student's start date, days after their
  * expected end date (`until`, kept when they are set to Past), and for a student who
- * has left with no end date, days after their last mark, are not counted as unmarked.
+ * is not enrolled now, days after their last mark, are not counted as unmarked.
  * A mark on any of those days still shows and counts.
  *
  * `trips` are the students' trips (lib/travel.js). A class day inside a trip
@@ -126,9 +126,11 @@ export function summarizeAttendance({ rows, students, groups, period, calendar, 
     const perMonth = Object.fromEntries(months.map((k) => [k, tally()]))
     Object.values(mine).forEach((r) => { add(c, r.status); if (perMonth[r.date.slice(0, 7)]) add(perMonth[r.date.slice(0, 7)], r.status) })
     const start = s.start_date && s.start_date > first ? s.start_date : null
-    // A student with an expected end date is expected up to that day. Without one, someone
-    // who has left is only expected up to the last day they were marked.
-    const end = until || (isEnrolled(s) ? null : Object.keys(mine).sort().pop() || '')
+    // An enrolled student is expected up to their expected end date, if they have one. The
+    // register lists enrolled students only, so nobody can mark a student who is not enrolled:
+    // they are expected up to their last mark, or their end date if that comes first.
+    const lastMark = Object.keys(mine).sort().pop() || ''
+    const end = isEnrolled(s) ? until || null : until && until < lastMark ? until : lastMark
     const expected = (date) => (!start || date >= start) && (end == null || date <= end)
     const unmarked = classDays.filter((d) => !mine[d] && expected(d)).length
     const absentOn = Object.values(mine).filter((r) => r.status === 'absent' || r.status === TRAVEL).map((r) => r.date).sort()

@@ -173,19 +173,27 @@ export default function Students() {
       else { const fields = changedFields(row, orig); if (Object.keys(fields).length) await db.students.patch(orig.id, fields) }
       // The lead follows the student: when this save makes them enrolled, the family on the Leads
       // list becomes Enrolled too. Only then: a later save of an enrolled student leaves the lead
-      // as the office set it. The student is saved either way; a lead that would not change is said.
+      // as the office set it. The lead is read here, not taken from the page's list, which may not
+      // have loaded yet. The student is saved either way; a lead that could not be read or changed
+      // is said. A lead that no longer exists needs nothing.
       const becameActive = statusOf(row) === 'active' && (!orig || statusOf(orig) !== 'active')
-      const lead = becameActive && row.lead_id ? (sources.leads || []).find((l) => l.id === row.lead_id) : null
+      let lead = null
       let leadError = null
-      if (lead && (lead.stage !== 'enrolled' || lead.archived)) {
-        try { await db.leads.patch(lead.id, { stage: 'enrolled', archived: false, updated_by: me?.email || null }) } catch (e) { leadError = e }
+      if (becameActive && row.lead_id) {
+        try {
+          lead = await db.leads.get(row.lead_id)
+          if (lead && (lead.stage !== 'enrolled' || lead.archived)) await db.leads.patch(lead.id, { stage: 'enrolled', archived: false, updated_by: me?.email || null })
+        } catch (e) { leadError = e }
       }
       newFamily.current = null
       await refresh()
       if (canEdit) sources.reload()
       closeStudent()
       toast(t('studentSaved', { name: s.nickname || s.full_name }))
-      if (leadError) toast.error(t('leadEnrolledFailed', { name: lead.family, error: leadError.message || String(leadError) }))
+      if (leadError) {
+        const error = leadError.message || String(leadError)
+        toast.error(lead ? t('leadEnrolledFailed', { name: lead.family, error }) : t('leadEnrolledUnread', { name: s.nickname || s.full_name, error }))
+      }
     } catch (e) { toast.error(/partial_from/.test(e.message || '') ? t('partialDaySetup') : /end_date/.test(e.message || '') ? t('endDateSetup') : e.message) }
   }
   const removeStudent = async (s) => {

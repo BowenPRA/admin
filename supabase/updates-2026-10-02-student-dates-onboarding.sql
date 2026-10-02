@@ -76,12 +76,21 @@ select 'Expected end dates are set up. ' || coalesce(
 -- The function behind the website's enrollment form (adm_enrollment_place) is
 -- replaced by a copy that also:
 --   - gives a student it adds the lead it found, and starts their checklist;
---   - finds a pending student already made from the same lead (same first name;
---     the birthday when both have one), so a form sent after the office made the
---     record early links to it instead of adding the child twice. Only when exactly
---     one of the lead's pending students fits: with two (siblings sharing a name
---     word, no birthdays yet) the form adds a new pending student, as before, and
---     the office merges;
+--   - puts a form on a student already on the list only when it is clearly that
+--     child: every word of the student's full name is in the name on the form,
+--     every word of the form's first name is in the student's name (word order
+--     and accents do not matter), and exactly one student fits. It looks first for
+--     the same birthday among all students (those who are not Past counted first),
+--     then for a pending student made from the same lead whose birthday is not on
+--     record or is the same, so a form sent after the office made the record early
+--     links to it instead of adding the child twice;
+--   - in every other case adds a new pending student, linked to the lead, and the
+--     office merges the two if they are the same child. That covers twins and
+--     siblings who share name words, a family name typed alone in the first-name
+--     box, and a record with a nickname or middle name the form leaves out. The new
+--     student joins the family of the lead's children the form may have been meant
+--     for, when they are all in one family; otherwise the family is found by the
+--     parents' email as before;
 --   - links an existing student to the lead (and the form to the student's lead)
 --     where one of them has it;
 --   - fills in what a pending student's record leaves blank (birthday, gender,
@@ -115,9 +124,11 @@ declare
   v_student uuid;
   v_family uuid;
   v_lead uuid;
+  v_name text;
   v_pick uuid;
   v_pick_family uuid;
   v_matches int;
+  v_tie_family uuid;
   v_found_lead boolean := false;
   v_made boolean := false;
   v_start int;
@@ -133,6 +144,8 @@ begin
   ps := case when jsonb_typeof(r.data->'parents') = 'array' then r.data->'parents' else '[]'::jsonb end;
   p1 := coalesce(ps->0, '{}'::jsonb);
   v_first := adm_fold(coalesce(r.first_name, r.student_name));
+  -- Part 2: the whole name on the form (both name boxes), folded like v_first.
+  v_name := adm_fold(coalesce(r.student_name, '') || ' ' || coalesce(r.first_name, ''));
   v_emails := coalesce(array(select distinct x from regexp_split_to_table(lower(coalesce(r.parent_email, '')), '[\s;,]+') x where x like '%@%'), '{}');
   v_student := r.student_id;
   v_family := r.family_id;
@@ -149,34 +162,66 @@ begin
     v_found_lead := v_lead is not null;
   end if;
 
-  -- The same child: the same birthday, and every word of the first name somewhere in the name we have.
-  if v_student is null and r.dob is not null then
-    select st.id, st.family_id into v_student, v_family from adm_students st
-     where st.dob = r.dob
-       and not exists (
-         select 1 from regexp_split_to_table(v_first, ' ') tok
-          where tok <> ''
-            and position(' ' || tok || ' ' in ' ' || adm_fold(st.full_name || ' ' || coalesce(st.first_name, '') || ' ' || coalesce(st.nickname, '')) || ' ') = 0)
-     order by (coalesce(st.status, 'active') = 'inactive'), st.created_at
-     limit 1;
-  end if;
+  -- A form is put on a student already on the list only when it is clearly that
+  -- child. The name test, in both steps below: every word of the form's first name
+  -- is in the student's name (full name, first name or nickname), and (Part 2) every
+  -- word of the student's full name is in the name on the form. Word order and
+  -- accents do not matter: "Nguyễn Gia Huy" fits a form with First "Gia Huy", Last
+  -- "Nguyen", and "Lan Pham" fits First "Pham", Last "Lan". A record with a word
+  -- the form does not have (a sibling's given name, a nickname or a middle name
+  -- the parents left out) does not fit, and the form adds a new pending student.
 
-  -- Part 2: or a pending student made from the same lead, with every word of the
-  -- first name in their name, whose birthday is not on record or is the same.
-  -- Only when exactly one of the lead's pending students fits: siblings made
-  -- together can share a name word (An, Thiên An) and have no birthday yet, and
-  -- the form must not land on the wrong child. On a tie, or none, the form adds
-  -- a new pending student linked to the lead, as before, and the office merges.
-  if v_student is null and v_lead is not null then
+  -- The same child: the same birthday and the name test. Part 2: only when exactly
+  -- one student fits, counting the students who are not Past first (a returning
+  -- child can also have an old record set to Past). With two, or none, it goes on
+  -- to the lead.
+  if v_student is null and r.dob is not null then
     select x.id, x.family_id, x.n into v_pick, v_pick_family, v_matches from (
-      select st.id, st.family_id, count(*) over () as n from adm_students st
-       where st.lead_id = v_lead and coalesce(st.status, 'active') = 'pending'
-         and (st.dob is null or r.dob is null or st.dob = r.dob)
+      select st.id, st.family_id, coalesce(st.status, 'active') = 'inactive' as past,
+             count(*) over (partition by coalesce(st.status, 'active') = 'inactive') as n
+        from adm_students st
+       where st.dob = r.dob
          and not exists (
            select 1 from regexp_split_to_table(v_first, ' ') tok
             where tok <> ''
               and position(' ' || tok || ' ' in ' ' || adm_fold(st.full_name || ' ' || coalesce(st.first_name, '') || ' ' || coalesce(st.nickname, '')) || ' ') = 0)
-    ) x limit 1;
+         and adm_fold(st.full_name) <> ''
+         and not exists (
+           select 1 from regexp_split_to_table(adm_fold(st.full_name), ' ') w
+            where w <> ''
+              and position(' ' || w || ' ' in ' ' || v_name || ' ') = 0)
+    ) x order by x.past limit 1;
+    if v_matches = 1 then
+      v_student := v_pick;
+      v_family := v_pick_family;
+    end if;
+  end if;
+
+  -- Part 2: or a pending student made from the same lead whose birthday is not on
+  -- record or is the same, with the name test. Only when exactly one of the lead's
+  -- pending students fits. Otherwise the form adds a new pending student linked to
+  -- the lead, and the office merges if it is the same child. v_tie_family is the
+  -- family of the lead's pending students the form may have been meant for (every
+  -- word of its first name is in their name), when they are all in one family: the
+  -- new student goes there.
+  if v_student is null and v_lead is not null then
+    select count(*) filter (where c.whole), (array_agg(c.id) filter (where c.whole))[1], (array_agg(c.family_id) filter (where c.whole))[1],
+           case when count(distinct c.family_id) = 1 and count(c.family_id) = count(*) then (array_agg(c.family_id))[1] end
+      into v_matches, v_pick, v_pick_family, v_tie_family
+      from (
+        select st.id, st.family_id,
+               adm_fold(st.full_name) <> '' and not exists (
+                 select 1 from regexp_split_to_table(adm_fold(st.full_name), ' ') w
+                  where w <> ''
+                    and position(' ' || w || ' ' in ' ' || v_name || ' ') = 0) as whole
+          from adm_students st
+         where st.lead_id = v_lead and coalesce(st.status, 'active') = 'pending'
+           and (st.dob is null or r.dob is null or st.dob = r.dob)
+           and not exists (
+             select 1 from regexp_split_to_table(v_first, ' ') tok
+              where tok <> ''
+                and position(' ' || tok || ' ' in ' ' || adm_fold(st.full_name || ' ' || coalesce(st.first_name, '') || ' ' || coalesce(st.nickname, '')) || ' ') = 0)
+      ) c;
     if v_matches = 1 then
       v_student := v_pick;
       v_family := v_pick_family;
@@ -184,6 +229,10 @@ begin
   end if;
 
   if v_student is null and p_create then
+    -- Part 2: the family of the lead's children the form may have been meant for.
+    if v_family is null then
+      v_family := v_tie_family;
+    end if;
     -- The family: one that already has a parent's email (on the family, in its contacts, or on a sibling).
     if v_family is null and cardinality(v_emails) > 0 then
       select f.id into v_family from adm_families f

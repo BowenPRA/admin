@@ -51,7 +51,8 @@ export function domainSlip(domain) {
   const name = d.slice(0, d.indexOf('.'))
   const ending = d.slice(d.indexOf('.') + 1)
   const comSlip = COM_SLIPS.includes(ending)
-  if (ONE_DOMAIN[name]) return ONE_DOMAIN[name]
+  // Its own keys only: "constructor.io" is a company's domain, not ONE_DOMAIN.constructor.
+  if (Object.hasOwn(ONE_DOMAIN, name)) return ONE_DOMAIN[name]
   // The name is right: only ".con" and the like is a slip; a country's ending is not.
   if (NAMES.has(name) || REAL_NAMES.includes(name)) return comSlip ? `${name}.com` : null
   if (name.length < 4) return null
