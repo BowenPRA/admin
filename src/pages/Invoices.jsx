@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { PlusCircle, Download, Trash2, FilePen } from 'lucide-react'
+import { PlusCircle, Download, Trash2, FilePen, Printer } from 'lucide-react'
 import { useToast } from '../lib/toast'
 import { gmailConfigured, draftLink, getToken, prepareGmail } from '../lib/gmail'
 import { draftInvoice, logDraft, lastDraft, invoiceRecipients } from '../lib/invoiceDraft'
@@ -8,10 +8,11 @@ import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { fmt, fmtDate } from '../lib/money'
-import { Card, StatusChip, Empty, Spinner } from '../components/ui'
+import { INVOICE_STATUSES, statusFields } from '../lib/invoiceStatus'
+import { Card, StatusSelect, Empty, Spinner } from '../components/ui'
 import { exportWorkbook } from '../lib/exportExcel'
 
-const STATUSES = ['all', 'draft', 'sent', 'partial', 'paid', 'void']
+const FILTERS = ['all', ...INVOICE_STATUSES]
 
 export default function Invoices() {
   const { t, lang } = useT()
@@ -31,29 +32,61 @@ export default function Invoices() {
     if (!confirm(`${i.number} · ${i.student_names}\n\n${t('confirmDeleteInvoice')}`)) return
     setBusy(true)
     try { await db.invoices.remove(i.id); setInvoices((xs) => xs.filter((x) => x.id !== i.id)); setSelected((s) => { const n = new Set(s); n.delete(i.id); return n }) }
-    catch (e) { alert(e.message) } finally { setBusy(false) }
+    catch (e) { toast.error(e.message || String(e)) } finally { setBusy(false) }
   }
+  // Only the rows on screen: a tick left on a row the filter now hides is not acted on.
   const removeSelected = async () => {
-    const ids = [...selected]
+    const ids = picked.map((r) => r.id)
     if (!ids.length || !confirm(`${ids.length} × ${t('invoices').toLowerCase()}\n\n${t('confirmDeleteInvoice')}`)) return
     setBusy(true)
-    try { for (const id of ids) await db.invoices.remove(id); setInvoices((xs) => xs.filter((x) => !selected.has(x.id))); setSelected(new Set()) }
-    catch (e) { alert(e.message) } finally { setBusy(false) }
+    const gone = new Set()
+    try { for (const id of ids) { await db.invoices.remove(id); gone.add(id) } }
+    catch (e) { toast.error(e.message || String(e)) }
+    finally {
+      setInvoices((xs) => xs.filter((x) => !gone.has(x.id)))
+      setSelected((s) => new Set([...s].filter((id) => !gone.has(id))))
+      setBusy(false)
+    }
   }
   const toggle = (id) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+
+  // The status is saved the moment it is picked; only the status fields are written.
+  const [savingStatus, setSavingStatus] = useState(() => new Set())
+  const writeStatus = async (inv, status) => {
+    const saved = await db.invoices.patch(inv.id, statusFields(inv, status, invoiceRecipients(inv, families, students)))
+    setInvoices((xs) => xs.map((x) => (x.id === saved.id ? saved : x)))
+  }
+  const changeStatus = async (inv, status) => {
+    if (status === inv.status || (status === 'void' && !confirm(`${inv.number} · ${inv.student_names}\n\n${t('confirmVoid')}`))) return
+    setSavingStatus((s) => new Set(s).add(inv.id))
+    try { await writeStatus(inv, status) }
+    catch (e) { toast.error(e.message || String(e)) }
+    finally { setSavingStatus((s) => { const n = new Set(s); n.delete(inv.id); return n }) }
+  }
+  const changeSelected = async (status) => {
+    const list = picked.filter((r) => r.status !== status)
+    if (!list.length || (status === 'void' && !confirm(t('confirmVoidMany', { n: list.length })))) return
+    setBusy(true)
+    let done = 0
+    try { for (const inv of list) { await writeStatus(inv, status); done++ } }
+    catch (e) { toast.error(e.message || String(e)) }
+    finally { setBusy(false) }
+    if (done) toast(t('statusChanged', { n: done, status: t(status) }))
+  }
 
   const rows = useMemo(() => {
     if (!invoices) return []
     const needle = q.trim().toLowerCase()
     return invoices
       .filter((i) => status === 'all' || i.status === status)
-      .filter((i) => !needle || `${i.number} ${i.student_names} ${i.family_name} ${i.period_label}`.toLowerCase().includes(needle))
+      .filter((i) => !needle || [i.number, i.student_names, i.family_name, i.period_label].filter(Boolean).join(' ').toLowerCase().includes(needle))
       .sort((a, b) => (b.number || '').localeCompare(a.number || ''))
   }, [invoices, q, status])
+  const picked = rows.filter((r) => selected.has(r.id))
 
   // Selected invoices → one Gmail draft each, PDF attached.
   const draftSelected = async () => {
-    const list = rows.filter((r) => selected.has(r.id) && r.status !== 'void')
+    const list = picked.filter((r) => r.status !== 'void')
     if (!list.length) return
     if (!gmailConfigured) { toast.info(t('gmailNotConfigured')); return }
     let made = 0
@@ -79,8 +112,8 @@ export default function Invoices() {
   }
 
   const doExport = async () => {
-    const payments = await db.payments.list()
-    exportWorkbook({ invoices: invoices || [], payments, students, families })
+    try { exportWorkbook({ invoices: invoices || [], payments: await db.payments.list(), students, families }) }
+    catch (e) { toast.error(e.message || String(e)) }
   }
 
   if (!invoices) return <Spinner />
@@ -91,13 +124,20 @@ export default function Invoices() {
         <h1 className="text-2xl font-black text-slate-800">{t('invoices')}</h1>
         <div className="flex-1" />
         <input className="input max-w-xs" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} />
-        {selected.size > 0 && <button className="btn-green" onClick={draftSelected} disabled={busy} title={gmailConfigured ? '' : t('gmailNotConfigured')}><FilePen size={16} /> {rendering ? `${t('makingDraft')} ${rendering.progress}` : `${t('gmailDrafts')} (${selected.size})`}</button>}
-        {selected.size > 0 && <button className="btn-danger" onClick={removeSelected} disabled={busy}><Trash2 size={16} /> {t('deleteSelected')} ({selected.size})</button>}
+        {picked.length > 0 && (
+          <select className="input w-auto font-semibold" value="" disabled={busy} aria-label={t('setStatus')} onChange={(e) => { if (e.target.value) changeSelected(e.target.value) }}>
+            <option value="">{t('setStatus')} ({picked.length})</option>
+            {INVOICE_STATUSES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
+          </select>
+        )}
+        {picked.length > 0 && <button className="btn-green" onClick={draftSelected} disabled={busy} title={gmailConfigured ? '' : t('gmailNotConfigured')}><FilePen size={16} /> {rendering ? `${t('makingDraft')} ${rendering.progress}` : `${t('gmailDrafts')} (${picked.length})`}</button>}
+        {picked.length > 0 && <button className="btn-danger" onClick={removeSelected} disabled={busy}><Trash2 size={16} /> {t('deleteSelected')} ({picked.length})</button>}
         <button className="btn-secondary" onClick={doExport}><Download size={16} /> {t('export')}</button>
+        <Link className="btn-secondary" to="/print/fees"><Printer size={16} /> {t('printSummary')}</Link>
         <button className="btn-green" onClick={() => navigate('/invoices/new')}><PlusCircle size={16} /> {t('newInvoice')}</button>
       </div>
       <div className="flex flex-wrap gap-1">
-        {STATUSES.map((s) => (
+        {FILTERS.map((s) => (
           <button key={s} onClick={() => setStatus(s)} className={`rounded-full px-3 py-1 text-xs font-bold ${status === s ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{t(s)} <span className="opacity-60">{s === 'all' ? invoices.length : invoices.filter((i) => i.status === s).length}</span></button>
         ))}
       </div>
@@ -107,14 +147,14 @@ export default function Invoices() {
             <table className="w-full text-sm">
               <thead><tr className="text-left text-xs uppercase text-slate-500">
                 <th className="py-2 w-6"><input type="checkbox" checked={rows.length > 0 && rows.every((r) => selected.has(r.id))} onChange={(e) => setSelected(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} /></th>
-                <th>{t('number')}</th><th>{t('student')}</th><th>{t('family')}</th><th>{t('period')}</th><th>{t('issued')}</th><th>{t('due')}</th><th className="text-right">{t('total')}</th><th className="text-right">{t('paidAmt')}</th><th className="text-right">{t('balance')}</th><th>{t('status')}</th><th></th></tr></thead>
+                <th>{t('number')}</th><th>{t('student')}</th><th>{t('family')}</th><th>{t('period')}</th><th>{t('issued')}</th><th>{t('due')}</th><th className="text-right">{t('total')}</th><th className="text-right">{t('paidAmt')}</th><th className="text-right">{t('balance')}</th><th className="pl-3">{t('status')}</th><th></th></tr></thead>
               <tbody>
                 {rows.map((i) => {
                   const bal = (Number(i.total) || 0) - (Number(i.paid) || 0)
                   return (
                     <tr key={i.id} className={`border-t border-slate-100 hover:bg-slate-50 cursor-pointer ${selected.has(i.id) ? 'bg-sky-50' : ''}`} onClick={() => navigate(`/invoices/${i.id}`)}>
                       <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.has(i.id)} onChange={() => toggle(i.id)} /></td>
-                      <td className="py-2"><Link className="font-semibold text-pra-blue" to={`/invoices/${i.id}`} onClick={(e) => e.stopPropagation()}>{i.number}</Link> <span className="text-[10px] uppercase text-slate-400">{i.lang}</span>{i.sent_at && <span className="ml-1 text-[10px] text-green-700" title={i.sent_to}>✉</span>}{!i.sent_at && lastDraft(i) && <FilePen size={11} className="ml-1 inline text-slate-400" aria-label={t('draftSavedAt')} />}</td>
+                      <td className="py-2"><Link className="font-semibold text-pra-blue" to={`/invoices/${i.id}`} onClick={(e) => e.stopPropagation()}>{i.number}</Link> <span className="text-[10px] uppercase text-slate-400">{i.lang}</span>{i.sent_at && <span className="ml-1 text-[10px] text-green-700" title={`${t('sentAt')}: ${new Date(i.sent_at).toLocaleString()}${i.sent_to ? ` → ${i.sent_to}` : ''}`}>✉</span>}{!i.sent_at && lastDraft(i) && <FilePen size={11} className="ml-1 inline text-slate-400" aria-label={t('draftSavedAt')} />}</td>
                       <td>{i.student_names}</td>
                       <td className="text-slate-500">{i.family_name}</td>
                       <td>{i.period_label}</td>
@@ -123,7 +163,7 @@ export default function Invoices() {
                       <td className="text-right tabular-nums">{fmt(i.total)}</td>
                       <td className="text-right tabular-nums text-green-700">{fmt(i.paid)}</td>
                       <td className={`text-right tabular-nums font-semibold ${bal > 0 && i.status !== 'void' ? 'text-amber-700' : ''}`}>{i.status === 'void' ? '—' : fmt(bal)}</td>
-                      <td><StatusChip status={i.status} t={t} /></td>
+                      <td className="pl-3" onClick={(e) => e.stopPropagation()}><StatusSelect status={i.status} statuses={INVOICE_STATUSES} t={t} disabled={busy || savingStatus.has(i.id)} onChange={(s) => changeStatus(i, s)} /></td>
                       <td className="text-right" onClick={(e) => e.stopPropagation()}><button className="btn-ghost p-1.5 text-red-500" title={t('delete')} disabled={busy} onClick={() => removeOne(i)}><Trash2 size={15} /></button></td>
                     </tr>
                   )

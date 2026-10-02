@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, FileSpreadsheet, MoreHorizontal, Upload, UserPlus } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ChevronDown, FileSpreadsheet, MoreHorizontal, Printer, Upload, UserPlus } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/AuthContext'
@@ -16,9 +17,12 @@ import WebMessages from '../components/leads/WebMessages'
 const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
 
 // `messages` is null until supabase/updates-2026-09-30-website-forms.sql has run; the website panel is then left out.
+// Any other failure is shown on the page (`messagesError`), so waiting messages are not hidden without a word.
 async function fetchLeads() {
-  const messages = await db.webMessages.list().catch(() => null)
-  try { return { leads: await db.leads.list(), messages, error: '' } } catch (e) { return { leads: [], messages, error: leadsError(e) } }
+  let messages = null
+  let messagesError = ''
+  try { messages = await db.webMessages.list() } catch (e) { if (!/does not exist|schema cache/i.test(e?.message || '')) messagesError = leadsError(e) }
+  try { return { leads: await db.leads.list(), messages, messagesError, error: '' } } catch (e) { return { leads: [], messages, messagesError: '', error: leadsError(e) } }
 }
 
 /** A figure at the top; clicking it filters the list to those families. */
@@ -116,9 +120,10 @@ export default function Leads() {
       put(saved); setEditing(null); toast(t('ldSaved', { name: saved.family }))
     } catch (e) { toast.error(leadsError(e)) }
   }
-  const toggleArchive = async (l) => {
+  // `changed` is what was typed in the form before Archive was pressed; it is saved in the same step.
+  const toggleArchive = async (l, changed = {}) => {
     try {
-      const saved = await db.leads.patch(l.id, { archived: !l.archived, updated_by: myEmail })
+      const saved = await db.leads.patch(l.id, { ...changed, archived: !l.archived, updated_by: myEmail })
       put(saved); setEditing(null); toast(t(saved.archived ? 'ldArchived' : 'ldRestored', { name: l.family }))
     } catch (e) { toast.error(leadsError(e)) }
   }
@@ -165,6 +170,7 @@ export default function Leads() {
   return (
     <div className="space-y-5">
       <PageHeader title={t('leadsNav')} subtitle={t('ldSubtitle')}>
+        <Link className="btn-secondary" to="/print/admissions"><Printer size={16} /> {t('printSummary')}</Link>
         <Menu label={t('more')} icon={MoreHorizontal} items={[
           { label: t('ldImport'), icon: Upload, onClick: () => fileInput.current?.click(), disabled: busy || !!error, hint: t('ldImportHint') },
           { label: t('ldExport'), icon: FileSpreadsheet, onClick: () => exportLeads(leads), disabled: !leads.length, hint: t('ldExportHint') },
@@ -175,6 +181,8 @@ export default function Leads() {
       </PageHeader>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+      {state.messagesError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{t('ldWebLoadError', { error: state.messagesError })}</div>}
 
       {messages && !error && <WebMessages messages={messages} leads={leads} busyId={marking} onOpen={openMessage} onDone={markMessage} t={t} lang={lang} />}
 

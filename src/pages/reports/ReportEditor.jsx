@@ -191,7 +191,11 @@ export default function ReportEditor() {
         const tries = (failed.current[key] || 0) + 1
         failed.current[key] = tries
         // Keep what was not saved (newer typing wins) and try again shortly, a few times.
-        waiting.current[key] = { save: job.save, fields: { ...job.fields, ...(waiting.current[key]?.fields || {}) } }
+        // The retry sends what is in the boxes now, not this save's older copy:
+        // a later save may have gone through since, and must not be undone.
+        const now = job.current() || {}
+        const fields = Object.fromEntries(Object.keys(job.fields).map((k) => [k, k in now ? now[k] : job.fields[k]]))
+        waiting.current[key] = { ...job, fields: { ...fields, ...(waiting.current[key]?.fields || {}) } }
         if (tries <= 3 && !timers.current[`retry:${key}`]) timers.current[`retry:${key}`] = setTimeout(() => { delete timers.current[`retry:${key}`]; run(key) }, 4000)
       })
       .then(() => {
@@ -201,8 +205,9 @@ export default function ReportEditor() {
       })
     return chains.current[key]
   }, [])
-  const queue = useCallback((key, fields, save) => {
-    waiting.current[key] = { save, fields: { ...(waiting.current[key]?.fields || {}), ...fields } }
+  // `current` returns the newest copy of what the key saves (from `latest`), for a retry.
+  const queue = useCallback((key, fields, save, current) => {
+    waiting.current[key] = { save, current, fields: { ...(waiting.current[key]?.fields || {}), ...fields } }
     setSaveState('saving')
     clearTimeout(timers.current[key])
     timers.current[key] = setTimeout(() => runKey(key), SAVE_DELAY)
@@ -229,21 +234,24 @@ export default function ReportEditor() {
 
   const patchReport = (p) => {
     const n = { ...latest.current.report, ...p }; latest.current.report = n; setReport(n)
-    queue('report', p, (fields) => db.reports.patch(n.id, fields))
+    queue('report', p, (fields) => db.reports.patch(n.id, fields), () => latest.current.report)
   }
   const patchSection = (sid, p) => {
     const fields = { ...p, updated_by: me?.email || null }
     const list = latest.current.sections.map((s) => (s.id === sid ? { ...s, ...fields } : s))
     latest.current.sections = list; setSections(list)
-    queue(`section:${sid}`, fields, (f) => db.sections.patch(sid, f))
+    queue(`section:${sid}`, fields, (f) => db.sections.patch(sid, f), () => latest.current.sections.find((s) => s.id === sid))
   }
   const patchNote = (key, p) => {
     const r = latest.current.report
-    const cur = latest.current.notes[key] || { id: genId(), school_year: r.school_year, period_label: r.period_label, year_group: r.year_group, subject_key: key, description: '', description_vi: '', teacher_name: '' }
+    // Notes are shared by the year group and found by year group + period + area.
+    const where = { school_year: r.school_year, period_label: r.period_label, year_group: r.year_group, subject_key: key }
+    const cur = latest.current.notes[key] || { id: genId(), ...where, description: '', description_vi: '', teacher_name: '' }
     const n = { ...cur, ...p }
     const map = { ...latest.current.notes, [key]: n }; latest.current.notes = map; setNotes(map)
-    // Notes are shared by the year group and saved whole, by year group + period + area.
-    queue(`note:${key}`, n, (note) => db.courseNotes.save(note))
+    // Only the changed fields are sent, so an editor left open does not wipe a
+    // translation or another teacher's text saved since it loaded.
+    queue(`note:${key}`, { ...where, ...p }, (fields) => db.courseNotes.save(fields), () => latest.current.notes[key])
   }
   const [adding, setAdding] = useState('')
   const addArea = async (key) => {
@@ -472,12 +480,13 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
   }
 
   const rawPatch = (raw, rawKey, pctKey) => {
+    // The percentage follows the raw score. One worked out from the score as it was
+    // ("40/50") is cleared when the score no longer reads as one, so it never stays beside
+    // a corrected score; a percentage typed by hand is left alone.
     const patch = { [rawKey]: raw }
-    if (isNA(raw) || !String(raw || '').trim()) patch[pctKey] = null
-    else {
-      const pct = pctFromRaw(raw)
-      if (pct != null) patch[pctKey] = pct
-    }
+    const pct = pctFromRaw(raw)
+    if (pct != null) patch[pctKey] = pct
+    else if (isNA(raw) || !String(raw || '').trim() || (hasNum(s[pctKey]) && Number(s[pctKey]) === pctFromRaw(s[rawKey]))) patch[pctKey] = null
     if (rawKey === 'score_raw' && patch.score_pct != null && cohortAvg != null && !hasNum(s.class_avg)) patch.class_avg = cohortAvg
     onPatch(patch)
   }

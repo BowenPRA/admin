@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { auth } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { Field, TextInput } from '../components/ui'
@@ -7,6 +7,7 @@ import { Field, TextInput } from '../components/ui'
 export default function Login() {
   const { t } = useT()
   const navigate = useNavigate()
+  const location = useLocation()
   const [id, setId] = useState('')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
@@ -17,7 +18,8 @@ export default function Login() {
     setBusy(true); setErr('')
     try {
       await auth.signIn(id, pw)
-      navigate('/')
+      // Back to the page that asked for the sign-in (a link to an invoice or a report), else home.
+      navigate(location.state?.from || '/', { replace: true })
     } catch (ex) {
       setErr(ex.message || 'Login failed')
     } finally { setBusy(false) }

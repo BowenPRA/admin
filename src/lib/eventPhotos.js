@@ -17,6 +17,7 @@
 
 import { supabase, hasSupabase } from './supabaseClient.js'
 import { db } from './db.js'
+import { todayISO } from './money.js'
 
 const BUCKET = 'adm-event-photos'
 const LINK_SECONDS = 24 * 60 * 60
@@ -96,7 +97,10 @@ export async function prepareFiles(keys) {
 export const allKeys = (photos) => photos.flatMap(storageKeys)
 export const thumbKeys = (photos) => photos.flatMap((p) => LOOKS.map((l) => fileKey(p, l, true)))
 
-/** Removes a photo for good: its pictures first, then its record. The original on the shared drive is not touched. */
+/**
+ * Removes a photo for good: its pictures first, then its record. The original on the shared drive is not touched.
+ * Ask stillPublic() first: a photo on the website must keep its record until the website has dropped it.
+ */
 export async function removePhoto(photo) {
   if (hasSupabase) {
     const keys = storageKeys(photo)
@@ -106,7 +110,7 @@ export async function removePhoto(photo) {
   await db.eventPhotos.remove(photo.id)
 }
 
-/** Removes an event with its photos and posts. */
+/** Removes an event with its photos and posts. Ask stillPublic() first, as for one photo. */
 export async function removeEvent(event, photos) {
   if (hasSupabase && allKeys(photos).length) {
     const { error } = await supabase.storage.from(BUCKET).remove(allKeys(photos))
@@ -334,6 +338,17 @@ const loads = (url) => new Promise((resolve) => {
 })
 
 /**
+ * The photos that are public or about to be: chosen for the website, or still served by it.
+ * Their records must stay. The list made from them is the only thing that tells the website
+ * to take a picture down, so a photo removed here too early would stay public.
+ */
+export async function stillPublic(photos) {
+  const sent = photos.filter((p) => p.website?.slug)
+  const live = await Promise.all(sent.map((p) => !!p.website.want || loads(webUrl(p.website.slug, (p.files?.sizes || webSizes(p.width || 480))[0]))))
+  return sent.filter((p, i) => live[i])
+}
+
+/**
  * For each chosen photo the website now serves: point the record at the website
  * and delete the Storage copy. A photo the website does not have yet is left alone.
  * @returns {Promise<{ photos: object[], moved: number, waiting: string[] }>}
@@ -349,7 +364,7 @@ export async function moveToWebsite(photos, step = () => {}) {
     const there = (await Promise.all(sizes.map((s) => loads(webUrl(p.website.slug, s))))).every(Boolean)
     if (!there) { waiting.push(p.title || p.code); continue }
     const keys = storageKeys(p)
-    const row = await db.eventPhotos.patch(p.id, { files: { web: p.website.slug, sizes }, website: { ...p.website, moved_on: new Date().toISOString().slice(0, 10) } })
+    const row = await db.eventPhotos.patch(p.id, { files: { web: p.website.slug, sizes }, website: { ...p.website, moved_on: todayISO() } })
     out.set(p.id, row)
     await removeKeys(keys)
     moved++

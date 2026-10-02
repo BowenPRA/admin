@@ -3,6 +3,7 @@ import { rowTotal } from './pricing'
 import { statusOf } from './studentRecords'
 import { LEVELS } from './fees'
 import { downloadBlob } from './pdf'
+import { todayISO } from './money'
 
 // One workbook, four sheets: Invoices, Line items, Payments, Students.
 function invoiceWorkbook({ invoices, payments, students, families }) {
@@ -51,7 +52,7 @@ function invoiceWorkbook({ invoices, payments, students, families }) {
   return wb
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = todayISO
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const toBlob = (wb) => new Blob([XLSX.write(wb, { type: 'array', bookType: 'xlsx', compression: true })], { type: XLSX_TYPE })
 

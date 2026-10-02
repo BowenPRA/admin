@@ -17,7 +17,9 @@ function Section({ title, children }) {
 /**
  * Add or edit one family. `onSave(row)` gets the whole row for a new family and
  * only the changed fields (plus id) for an existing one, so two people editing
- * different things do not undo each other. All handlers return promises.
+ * different things do not undo each other. `onArchive(row, changed)` gets the
+ * row as it was opened and the fields changed in the form, so archiving keeps
+ * what was just typed. All handlers return promises.
  */
 export default function LeadModal({ value, leads, messages = [], onClose, onSave, onArchive, onDelete, t, lang }) {
   const [s, setS] = useState(value)
@@ -34,12 +36,13 @@ export default function LeadModal({ value, leads, messages = [], onClose, onSave
   const hint = (x) => x?.hint?.[lang === 'vi' ? 1 : 0]
 
   const run = async (fn) => { setBusy(true); try { await fn() } finally { setBusy(false) } }
+  const row = { ...s, family: s.family.trim(), email }
+  const changed = Object.fromEntries(Object.entries(row).filter(([k, v]) => (v ?? '') !== (value[k] ?? '')))
+  const invalid = !s.family.trim() || !!emailHint
   const save = (e) => {
     e?.preventDefault()
-    if (!s.family.trim() || emailHint) return
-    const row = { ...s, family: s.family.trim(), email }
+    if (invalid) return
     if (isNew) return run(() => onSave(row))
-    const changed = Object.fromEntries(Object.entries(row).filter(([k, v]) => (v ?? '') !== (value[k] ?? '')))
     if (!Object.keys(changed).length) return onClose()
     return run(() => onSave({ id: s.id, ...changed }))
   }
@@ -54,12 +57,12 @@ export default function LeadModal({ value, leads, messages = [], onClose, onSave
       footer={<>
         {!isNew && <button type="button" className="btn-danger mr-auto" disabled={busy} onClick={() => run(() => onDelete(s))}><Trash2 size={16} /> {t('delete')}</button>}
         {!isNew && (
-          <button type="button" className="btn-secondary" disabled={busy} onClick={() => run(() => onArchive(value))}>
+          <button type="button" className="btn-secondary" disabled={busy || (invalid && Object.keys(changed).length > 0)} onClick={() => run(() => onArchive(value, changed))}>
             {s.archived ? <><ArchiveRestore size={16} /> {t('ldRestore')}</> : <><Archive size={16} /> {t('ldArchive')}</>}
           </button>
         )}
         <button type="button" className="btn-secondary" onClick={onClose}>{t('cancel')}</button>
-        <button type="submit" form="lead-form" className="btn-primary" disabled={busy || !s.family.trim() || !!emailHint}>{busy ? t('saving') : t('save')}</button>
+        <button type="submit" form="lead-form" className="btn-primary" disabled={busy || invalid}>{busy ? t('saving') : t('save')}</button>
       </>}>
       <form id="lead-form" onSubmit={save} className="space-y-5">
         <Section>

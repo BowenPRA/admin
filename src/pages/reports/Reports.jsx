@@ -68,6 +68,7 @@ function ReportsList({ settings }) {
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
+  const [failed, setFailed] = useState(false) // the reports could not be fetched
   const [translating, setTranslating] = useState(false)
   // Translation files write every teacher's parts, so only head teachers and super admins get them.
   const canTranslate = ['super_admin', 'head'].includes(me?.access)
@@ -83,7 +84,8 @@ function ReportsList({ settings }) {
   }, [sections, reports, students, settings])
   useEffect(() => {
     let alive = true
-    fetchPeriod(settings, period).then(({ rs, ss, ns }) => { if (alive) { setReports(rs); setSections(ss); setNotes(ns) } }).catch((e) => alert(e.message))
+    fetchPeriod(settings, period).then(({ rs, ss, ns }) => { if (alive) { setReports(rs); setSections(ss); setNotes(ns); setFailed(false) } })
+      .catch((e) => { if (alive) setFailed(true); alert(e.message) })
     return () => { alive = false }
   }, [settings, period, reloadKey])
 
@@ -202,7 +204,7 @@ function ReportsList({ settings }) {
       {/* Which quarter, which year group, whose classes. */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="seg" role="group" aria-label="Period">
-          {periods.map((p) => <button key={p.label} type="button" aria-pressed={p.label === period} title={`${shortDate(p.start)} – ${shortDate(p.end)}`} onClick={() => { setPeriod(p.label); setGroup(''); setReports(null) }}>{p.label}</button>)}
+          {periods.map((p) => <button key={p.label} type="button" aria-pressed={p.label === period} title={`${shortDate(p.start)} – ${shortDate(p.end)}`} onClick={() => { setGroup(''); if (p.label !== period) { setPeriod(p.label); setReports(null); setFailed(false) } }}>{p.label}</button>)}
         </div>
         <select className="input w-auto" value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Year group">
           <option value="">All year groups</option>
@@ -217,7 +219,9 @@ function ReportsList({ settings }) {
         {periodInfo?.start && <span className="ml-auto text-xs text-slate-500">{period}: {shortDate(periodInfo.start)} – {shortDate(periodInfo.end)}</span>}
       </div>
 
-      {!reports ? <Spinner /> : !byGroup.length ? (
+      {!reports ? (failed ? (
+        <Empty text={`The ${period} reports could not be loaded. Check the internet connection. `}><button className="font-semibold text-pra-blue" onClick={() => { setFailed(false); load() }}>Try again →</button></Empty>
+      ) : <Spinner />) : !byGroup.length ? (
         <Empty text={`No ${period} reports yet. `}>{isHead && <button className="font-semibold text-pra-blue" onClick={() => setCreating(true)}>Create them →</button>}</Empty>
       ) : (<>
         {/* The period at a glance. */}
@@ -401,11 +405,14 @@ function CreateForm({ onClose, settings, students, defaultPeriod, defaultGroup, 
 
   const create = async () => {
     if (!period || !template) return
+    // One student's report uses the template of their own year group, never the one in the dropdown.
+    const lost = single ? fresh.find((s) => !templateForYearGroup(settings, s.level)) : null
+    if (lost) { alert(`No report template includes ${lost.level || 'a student without a year group'}, so a report for ${lost.full_name} cannot be created. Add the year group to a template in Settings first.`); return }
     setBusy(true)
     try {
       const reports = [], sections = []
       for (const s of fresh) {
-        const t = single ? (templateForYearGroup(settings, s.level) || template) : template
+        const t = single ? templateForYearGroup(settings, s.level) : template
         const r = buildReport(s, period, t, settings, scheduledHomeroom(schedule, s.level))
         const prev = await loadPreviousSections(s.id, settings.schoolYear, period.index)
         reports.push(r); sections.push(...buildSections(r.id, t, settings, { yearGroup: s.level, prevSections: prev, teachers, student: s }))

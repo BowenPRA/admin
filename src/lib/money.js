@@ -10,16 +10,19 @@ export function fmtSigned(n) {
   return v < 0 ? `-${fmt(-v)}` : fmt(v)
 }
 
+// Amounts are whole dong, so dots and commas are both thousands separators:
+// "80.000" (the Vietnamese way) and "80,000" are the same eighty thousand.
 export function parseMoney(s) {
   if (typeof s === 'number') return s
-  const cleaned = String(s ?? '').replace(/[^\d.-]/g, '')
-  const v = Number(cleaned)
-  return Number.isFinite(v) ? v : 0
+  const text = String(s ?? '').trim()
+  const v = Number(text.replace(/\D/g, ''))
+  if (!Number.isFinite(v)) return 0
+  return text.startsWith('-') ? -v : v
 }
 
-// Percentage helper that avoids 0.1+0.2 style drift for VND amounts.
+// A percentage of a VND amount, to the whole dong.
 export function pct(amount, p) {
-  return Math.round((Number(amount) || 0) * (Number(p) || 0)) / 100
+  return Math.round((Number(amount) || 0) * (Number(p) || 0) / 100)
 }
 
 // ---------- English words ----------
@@ -106,10 +109,14 @@ export function amountWordsVi(n) {
   return `${w.charAt(0).toUpperCase()}${w.slice(1)} đồng chẵn./.`
 }
 
-export function todayISO() {
-  const d = new Date()
+/** A Date as 'YYYY-MM-DD' in local time (toISOString is UTC: the day before until 7am in Vietnam). */
+export function isoDate(d) {
   const p = (x) => String(x).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+export function todayISO() {
+  return isoDate(new Date())
 }
 
 const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']

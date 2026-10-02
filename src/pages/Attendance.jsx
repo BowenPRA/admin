@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, Check, ChevronLeft, ChevronRight, CheckCheck, MessageSquare, TrendingDown } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Calendar, Check, ChevronLeft, ChevronRight, CheckCheck, MessageSquare, Plane, Printer, TrendingDown } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { LEVELS } from '../lib/fees'
 import { photoSrc } from '../lib/report/photo'
 import { isEnrolled, partialFrom } from '../lib/studentRecords'
+import { iso, todayIso, parseIso as parse, levelIndex, asMarked, attendancePeriods, defaultPeriod, summarizeAttendance, LOW_RATE } from '../lib/attendanceSummary'
+import { TRAVEL, tripOn, statusOn, tripLine, blankTrip } from '../lib/travel'
 import { Card, Empty, Spinner, Avatar, Segmented, PageHeader } from '../components/ui'
+import { TripForm } from '../components/attendance/Trips'
 
 // Daily attendance: one mark per student per school day. Separate from
 // progress reports, which deliberately leave attendance out.
@@ -19,16 +22,11 @@ const STATUSES = [
   { key: 'late', on: 'bg-amber-500 text-white border-amber-500', soft: 'bg-amber-100 text-amber-800', stripe: 'shadow-[inset_4px_0_0_#f59e0b]', bar: 'bg-amber-500' },
   { key: 'absent', on: 'bg-red-600 text-white border-red-600', soft: 'bg-red-100 text-red-700', stripe: 'shadow-[inset_4px_0_0_#dc2626]', bar: 'bg-red-600' },
 ]
-const STATUS = Object.fromEntries(STATUSES.map((st) => [st.key, st]))
-// PRA does not use "excused" (removed 22 September 2026): older marks read as absent.
-// supabase/updates-2026-09-22-no-excused.sql changes the saved rows too.
-const asMarked = (r) => (r.status === 'excused' ? { ...r, status: 'absent' } : r)
+// A(T), Absent (Traveling): a day inside a trip (lib/travel.js). Nobody taps it: it comes from the trip.
+const AWAY = { key: TRAVEL, on: 'bg-violet-600 text-white border-violet-600', soft: 'bg-violet-100 text-violet-800', stripe: 'shadow-[inset_4px_0_0_#7c3aed]', bar: 'bg-violet-500' }
+const STATUS = Object.fromEntries([...STATUSES, AWAY].map((st) => [st.key, st]))
 const GROUP_KEY = 'pra-attendance-group'
 const isPhone = () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 639px)').matches
-const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-const todayIso = () => iso(new Date())
-const parse = (s) => new Date(`${s}T00:00:00`)
-const levelIndex = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
 const isWeekend = (s) => [0, 6].includes(parse(s).getDay())
 const shiftSchoolDay = (s, dir) => { const d = parse(s); do { d.setDate(d.getDate() + dir) } while ([0, 6].includes(d.getDay())); return iso(d) }
 
@@ -36,7 +34,9 @@ export default function Attendance() {
   const { t } = useT()
   const { loading, students } = useData()
   const { canAttendance, myYearGroups, me, isOffice } = useAuth()
-  const [tab, setTab] = useState('take')
+  // The printed summary's Back button returns to the Summary tab.
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState(() => (params.get('tab') === 'summary' ? 'summary' : 'take'))
   const scoped = !isOffice && !!myYearGroups
 
   const enrolled = useMemo(() => students.filter(isEnrolled), [students])
@@ -60,15 +60,16 @@ export default function Attendance() {
       <Segmented className="flex w-full sm:hidden [&>button]:flex-1 [&>button]:py-2" value={tab} onChange={setTab} options={tabs} />
       {!myGroups.length && tab === 'take'
         ? <Empty text={groups.length ? t('noClassesToTake') : t('noData')} />
-        : tab === 'take' ? <TakeAttendance students={enrolled} groups={myGroups} /> : <Summary students={enrolled} groups={scoped ? myGroups : groups} />}
+        : tab === 'take' ? <TakeAttendance students={enrolled} groups={myGroups} /> : <Summary students={students} groups={scoped ? myGroups : groups} />}
     </div>
   )
 }
 
 function TakeAttendance({ students, groups }) {
-  const { t } = useT()
+  const { t, lang } = useT()
   const toast = useToast()
   const { displayName } = useAuth()
+  const { travel: trips } = useData()
   const [date, setDate] = useState(() => { const d = todayIso(); return isWeekend(d) ? shiftSchoolDay(d, -1) : d })
   // Remember the last year group on this device, so a teacher reopening the app lands on their class.
   const [group, setGroupState] = useState(() => { try { return localStorage.getItem(GROUP_KEY) || groups[0] } catch { return groups[0] } })
@@ -78,14 +79,31 @@ function TakeAttendance({ students, groups }) {
   const marks = loaded.date === date ? loaded.map : null
   const [noteOpen, setNoteOpen] = useState({})
   const [noteDraft, setNoteDraft] = useState({})
+  const [tripOpen, setTripOpen] = useState({}) // student_id -> the trip boxes are showing
   const activeGroup = groups.includes(group) ? group : groups[0]
+  // The trip a student is on that day, and what the day counts as: a mark, or A(T) from the trip.
+  const tripFor = (s) => tripOn(trips, s.id, date)
+  const stateOf = (s) => statusOn(marks?.[s.id], tripFor(s))
+  const showTrip = (s, on = true) => { setTripOpen((o) => ({ ...o, [s.id]: on })); if (on) setNoteOpen((o) => ({ ...o, [s.id]: true })) }
+  const inFlight = useRef({}) // student_id -> the save still on its way
+
+  // Reads a day's marks. On a day already on screen, marks still on their way from this
+  // device stay as they are shown; everything else follows the database.
+  const readDay = async (day, alive = () => true) => {
+    const rows = await db.attendance.list({ date: day })
+    const server = Object.fromEntries(rows.map((r) => [r.student_id, asMarked(r)]))
+    const sending = (map) => Object.fromEntries(Object.entries(map).filter(([sid]) => inFlight.current[sid]))
+    if (alive()) setLoaded((cur) => ({ date: day, map: cur.date === day ? { ...server, ...sending(cur.map) } : server }))
+    return server
+  }
 
   useEffect(() => {
     let alive = true
-    db.attendance.list({ date })
-      .then((rows) => alive && setLoaded({ date, map: Object.fromEntries(rows.map((r) => [r.student_id, asMarked(r)])) }))
-      .catch((e) => { toast.error(e.message); if (alive) setLoaded({ date, map: {} }) })
-    return () => { alive = false }
+    readDay(date, () => alive).catch((e) => { toast.error(e.message); if (alive) setLoaded((cur) => (cur.date === date ? cur : { date, map: {} })) })
+    // Marks made on another phone (the gate, the office) show when this one is looked at again.
+    const onShow = () => { if (document.visibilityState === 'visible') readDay(date, () => alive).catch(() => {}) }
+    document.addEventListener('visibilitychange', onShow)
+    return () => { alive = false; document.removeEventListener('visibilitychange', onShow) }
   }, [date]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const kids = useMemo(() => students.filter((s) => s.level === activeGroup).sort((a, b) => (a.nickname || a.full_name).localeCompare(b.nickname || b.full_name)), [students, activeGroup])
@@ -95,17 +113,22 @@ function TakeAttendance({ students, groups }) {
   const save = async (rows) => {
     const day = date
     const before = Object.fromEntries(rows.map((r) => [r.student_id, marks[r.student_id]]))
-    const full = rows.map((r) => ({ date: day, year_group: activeGroup, taken_by: displayName, note: marks[r.student_id]?.note || null, ...r }))
+    // The note is only sent when it is the note being changed: a status tap leaves a note written on another device alone.
+    const full = rows.map((r) => ({ date: day, year_group: activeGroup, taken_by: displayName, ...r }))
     applyTo(day, (m) => { const n = { ...m }; full.forEach((r) => { n[r.student_id] = { ...(m[r.student_id] || {}), ...r } }); return n })
+    const sent = db.attendance.mark(full)
+    rows.forEach((r) => { inFlight.current[r.student_id] = sent })
     try {
-      const saved = await db.attendance.mark(full)
-      applyTo(day, (m) => { const n = { ...m }; saved.forEach((r) => { n[r.student_id] = r }); return n })
+      const saved = await sent
+      applyTo(day, (m) => { const n = { ...m }; saved.forEach((r) => { n[r.student_id] = asMarked(r) }); return n })
       return true
     } catch (e) {
       // Put back only the rows that failed, so marks made in the meantime stay.
       applyTo(day, (m) => { const n = { ...m }; rows.forEach((r) => { if (before[r.student_id]) n[r.student_id] = before[r.student_id]; else delete n[r.student_id] }); return n })
       toast.error(e.message)
       return false
+    } finally {
+      rows.forEach((r) => { if (inFlight.current[r.student_id] === sent) delete inFlight.current[r.student_id] })
     }
   }
   // Tapping the chosen status again takes the mark off (e.g. the wrong student was tapped).
@@ -114,23 +137,40 @@ function TakeAttendance({ students, groups }) {
     const row = marks[s.id]
     if (!row) return
     if (row.note && !confirm(t('clearMarkConfirm', { name: s.nickname || s.full_name }))) return
-    applyTo(day, (m) => { const n = { ...m }; delete n[s.id]; return n })
+    const drop = () => applyTo(day, (m) => { const n = { ...m }; delete n[s.id]; return n })
+    drop()
     setNoteDraft((d) => { const n = { ...d }; delete n[s.id]; return n })
     setNoteOpen((o) => ({ ...o, [s.id]: false }))
     try {
-      // A mark still being saved has no id yet: save it first so there is a row to remove.
-      const id = row.id || (await db.attendance.mark([{ date: day, year_group: activeGroup, taken_by: displayName, note: null, student_id: s.id, status: row.status }]))[0]?.id
-      await db.attendance.clear(id)
+      // A mark still on its way (a quick second tap) is waited for: it brings the row to
+      // remove, and its reply has by then put the mark back on screen, so that is taken off again.
+      let id = row.id
+      const sent = inFlight.current[s.id]
+      if (sent) {
+        id = (await sent.catch(() => [])).find((r) => r.student_id === s.id)?.id || id
+        drop()
+      }
+      if (id) await db.attendance.clear(id)
     } catch (e) {
       applyTo(day, (m) => (m[s.id] ? m : { ...m, [s.id]: row }))
       toast.error(e.message)
     }
   }
-  const setStatus = (s, status) => (marks[s.id]?.status === status ? clearMark(s) : save([{ student_id: s.id, status }]))
+  // A note typed before any status is chosen waits, and is saved with the status when one is tapped.
+  const waitingNote = (s) => (marks[s.id] ? '' : (noteDraft[s.id] || '').trim())
+  const setStatus = (s, status) => {
+    // Already A(T) from a trip: tapping it shows the trip, there is no mark to make.
+    if (status === 'absent' && !marks[s.id] && tripFor(s)) return showTrip(s)
+    if (marks[s.id]?.status === status) return clearMark(s)
+    const note = waitingNote(s)
+    return save([{ student_id: s.id, status, ...(note ? { note } : {}) }])
+  }
   const saveNote = (s) => {
-    const note = (noteDraft[s.id] ?? marks[s.id]?.note ?? '').trim()
-    if (note === (marks[s.id]?.note || '')) return
-    save([{ student_id: s.id, status: marks[s.id]?.status || 'present', note: note || null }])
+    // No status yet: a note on its own must not mark the student present.
+    if (!marks[s.id]) return
+    const note = (noteDraft[s.id] ?? marks[s.id].note ?? '').trim()
+    if (note === (marks[s.id].note || '')) return
+    save([{ student_id: s.id, status: marks[s.id].status, note: note || null }])
   }
   // A partial-day student (see partialFrom) is not marked present in bulk before
   // they arrive today; the teacher marks them when they come in.
@@ -141,21 +181,29 @@ function TakeAttendance({ students, groups }) {
     return now.getHours() * 60 + now.getMinutes() < minutes(partialFrom(s))
   }
   const markRestPresent = async () => {
-    const open = kids.filter((s) => !marks[s.id])
+    // Someone else may have marked students since this page was opened (the gate, another
+    // phone). The day is read again first, so their marks stay and only the students still
+    // unmarked are set present.
+    let known = marks
+    try { known = { ...marks, ...(await readDay(date)) } } catch { /* no connection for a moment: go by what is on screen */ }
+    // A student who is traveling is A(T) already, and is left as that.
+    const open = kids.filter((s) => !known[s.id] && !tripFor(s))
     const waiting = open.filter(notArrived)
     const rest = open.filter((s) => !notArrived(s))
     const later = waiting.length ? t('arrivesLater', { names: waiting.map((s) => s.nickname || s.full_name).join(', '), time: partialFrom(waiting[0]) }) : ''
     if (!rest.length) { if (later) toast.info(later); return }
     const ok = await save(rest.map((s) => ({ student_id: s.id, status: 'present' })))
+    // Notes typed before a status was chosen go with the mark.
+    if (ok) for (const s of rest) { const note = waitingNote(s); if (note) await save([{ student_id: s.id, status: 'present', note }]) }
     if (ok && later) toast.info(later)
     // On phones the bottom bar already turns to "All marked"; a toast would cover it.
     else if (ok && !isPhone()) toast(t('attendanceSaved'))
   }
 
-  const counts = STATUSES.reduce((m, st) => ({ ...m, [st.key]: kids.filter((s) => marks?.[s.id]?.status === st.key).length }), {})
-  const unmarked = kids.filter((s) => !marks?.[s.id]).length
+  const counts = [...STATUSES, AWAY].reduce((m, st) => ({ ...m, [st.key]: kids.filter((s) => stateOf(s) === st.key).length }), {})
+  const unmarked = kids.filter((s) => !stateOf(s)).length
   const done = kids.length - unmarked
-  const groupDone = (g) => { const ks = students.filter((s) => s.level === g); return { done: marks ? ks.filter((s) => marks[s.id]).length : 0, total: ks.length } }
+  const groupDone = (g) => { const ks = students.filter((s) => s.level === g); return { done: marks ? ks.filter((s) => stateOf(s)).length : 0, total: ks.length } }
   const dateLabel = parse(date).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
   const shortDateLabel = parse(date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
   // After finishing a class, offer the next one that still has students to mark.
@@ -169,7 +217,7 @@ function TakeAttendance({ students, groups }) {
     chipsRef.current?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
   }, [activeGroup])
 
-  const tap = (fn) => () => { navigator.vibrate?.(8); fn() }
+  const tap = (fn) => { navigator.vibrate?.(8); fn() }
 
   return (
     <div className="space-y-3 pb-28 sm:space-y-4 sm:pb-0">
@@ -213,6 +261,7 @@ function TakeAttendance({ students, groups }) {
         <div className="space-y-2.5 border-b border-slate-100 px-3 py-3 sm:px-4">
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             {STATUSES.map((st) => <span key={st.key} className={`chip ${st.soft} ${counts[st.key] ? '' : 'opacity-60'}`}>{t(st.key)} · {counts[st.key]}</span>)}
+            {counts[TRAVEL] > 0 && <span className={`chip ${AWAY.soft}`} title={t('absentTravelLong')}>{t('absentTravel')} · {counts[TRAVEL]}</span>}
             {unmarked > 0 && <span className="chip bg-slate-100 text-slate-600">{t('notMarked')} · {unmarked}</span>}
             <button className="btn-green ml-auto hidden !py-1.5 text-xs sm:inline-flex" disabled={!marks || !unmarked} onClick={markRestPresent}><CheckCheck size={15} /> {t('markAllPresent')}</button>
           </div>
@@ -222,9 +271,12 @@ function TakeAttendance({ students, groups }) {
           <ul className="divide-y divide-slate-100">
             {kids.map((s) => {
               const m = marks[s.id]
+              const trip = tripFor(s)
+              const state = statusOn(m, trip)
+              const away = state === TRAVEL
               const showNote = noteOpen[s.id] || !!m?.note
               return (
-                <li key={s.id} className={`px-3 py-3 sm:px-4 sm:py-2.5 ${m ? STATUS[m.status]?.stripe || '' : 'bg-amber-50/40'}`}>
+                <li key={s.id} className={`px-3 py-3 sm:px-4 sm:py-2.5 ${state ? STATUS[state]?.stripe || '' : 'bg-amber-50/40'}`}>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
                     <Avatar src={photoSrc(s.photo)} name={s.full_name} size={40} />
                     <div className="min-w-0 flex-1">
@@ -233,6 +285,7 @@ function TakeAttendance({ students, groups }) {
                         {partialFrom(s) && <span className="flex-none rounded bg-amber-50 px-1.5 text-[11px] font-semibold text-amber-700" title={t('partialDay')}>{t('fromTime', { time: partialFrom(s) })}</span>}
                       </div>
                       <div className="truncate text-xs text-slate-500">{s.nickname ? s.full_name : ''} {s.student_code && <span className="font-mono">{s.student_code}</span>}</div>
+                      {trip && <div className={`flex items-center gap-1 truncate text-xs font-semibold ${away ? 'text-violet-700' : 'text-slate-400'}`}><Plane size={12} className="flex-none" /><span className="truncate">{t('traveling')}: {tripLine(trip, lang)}</span></div>}
                     </div>
                     <button type="button" aria-pressed={showNote} className={`relative grid h-11 w-11 flex-none place-items-center rounded-lg sm:order-last sm:h-9 sm:w-9 ${showNote ? 'text-pra-blue' : 'text-slate-400 hover:text-slate-600'} active:bg-slate-100`} title={t('addNote')} aria-label={t('addNote')}
                       onClick={() => setNoteOpen((o) => ({ ...o, [s.id]: !o[s.id] }))}>
@@ -241,17 +294,28 @@ function TakeAttendance({ students, groups }) {
                     </button>
                     {/* Phones: four big buttons on their own line under the name. */}
                     <div className="grid basis-full grid-cols-3 gap-1.5 sm:flex sm:basis-auto sm:gap-1" role="group" aria-label={s.full_name}>
-                      {STATUSES.map((st) => (
-                        <button key={st.key} type="button" aria-pressed={m?.status === st.key} title={m?.status === st.key ? t('tapToClear') : t(st.key)} onClick={tap(() => setStatus(s, st.key))}
-                          className={`h-11 touch-manipulation select-none rounded-lg border px-0.5 text-xs font-bold transition active:scale-95 min-[350px]:text-[13px] sm:h-9 sm:min-w-[4.5rem] sm:px-2 sm:text-sm ${m?.status === st.key ? st.on : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'}`}>
-                          {t(st.key)}
-                        </button>
-                      ))}
+                      {STATUSES.map((st) => {
+                        // On a day inside a trip the Absent button reads A(T), and is lit without a mark.
+                        const awayHere = away && st.key === 'absent'
+                        const on = awayHere || m?.status === st.key
+                        return (
+                          <button key={st.key} type="button" aria-pressed={on} title={awayHere ? t('absentTravelLong') : on ? t('tapToClear') : t(st.key)} onClick={() => tap(() => setStatus(s, st.key))}
+                            className={`h-11 touch-manipulation select-none rounded-lg border px-0.5 text-xs font-bold transition active:scale-95 min-[350px]:text-[13px] sm:h-9 sm:min-w-[4.5rem] sm:px-2 sm:text-sm ${awayHere ? AWAY.on : on ? st.on : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'}`}>
+                            {awayHere ? t('absentTravel') : t(st.key)}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
                   {showNote && (
-                    <input className="input mt-2.5 text-base sm:ml-[52px] sm:mt-2 sm:w-[calc(100%-52px)] sm:text-xs" placeholder={t('addNote')} value={noteDraft[s.id] ?? m?.note ?? ''} autoFocus={!m?.note} enterKeyHint="done"
-                      onChange={(e) => setNoteDraft((d) => ({ ...d, [s.id]: e.target.value }))} onBlur={() => saveNote(s)} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+                    <div className="mt-2.5 space-y-2 sm:ml-[52px] sm:mt-2">
+                      <input className="input text-base sm:text-xs" placeholder={t('addNote')} value={noteDraft[s.id] ?? m?.note ?? ''} autoFocus={!m?.note && !tripOpen[s.id]} enterKeyHint="done"
+                        onChange={(e) => setNoteDraft((d) => ({ ...d, [s.id]: e.target.value }))} onBlur={() => saveNote(s)} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+                      {/* Traveling is added here: from this day, until when, and where. */}
+                      {tripOpen[s.id]
+                        ? <TripForm key={trip?.id || 'new'} trip={trip || blankTrip(s.id, date)} onDone={() => showTrip(s, false)} />
+                        : <button type="button" className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-lg px-1 text-xs font-semibold text-violet-700 hover:underline" onClick={() => showTrip(s)}><Plane size={14} /> {trip ? t('changeTrip') : t('markTraveling')}</button>}
+                    </div>
                   )}
                 </li>
               )
@@ -273,7 +337,7 @@ function TakeAttendance({ students, groups }) {
               <div className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">{activeGroup}</div>
             </div>
             {unmarked > 0 ? (
-              <button type="button" className="btn-green h-12 flex-1 justify-center text-sm" onClick={tap(markRestPresent)}><CheckCheck size={18} /> {t('markAllPresent')}</button>
+              <button type="button" className="btn-green h-12 flex-1 justify-center text-sm" onClick={() => tap(markRestPresent)}><CheckCheck size={18} /> {t('markAllPresent')}</button>
             ) : nextGroup ? (
               <button type="button" className="btn-primary h-12 flex-1 justify-center text-sm" onClick={() => { setGroup(nextGroup); chipsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }}>
                 <Check size={18} /> {t('nextGroup', { group: nextGroup })} <ChevronRight size={16} />
@@ -291,7 +355,7 @@ function TakeAttendance({ students, groups }) {
 function ProgressBar({ counts, total }) {
   return (
     <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
-      {STATUSES.map((st) => counts[st.key] > 0 && <div key={st.key} className={`${st.bar} transition-all duration-300`} style={{ width: `${(counts[st.key] / total) * 100}%` }} />)}
+      {[...STATUSES, AWAY].map((st) => counts[st.key] > 0 && <div key={st.key} className={`${st.bar} transition-all duration-300`} style={{ width: `${(counts[st.key] / total) * 100}%` }} />)}
     </div>
   )
 }
@@ -299,19 +363,10 @@ function ProgressBar({ counts, total }) {
 function Summary({ students, groups }) {
   const { t, lang } = useT()
   const toast = useToast()
-  const { calendar } = useData()
-  const periods = useMemo(() => {
-    const cal = calendar || { months: [], quarters: [] }
-    const monthRows = (cal.months || []).map((m) => {
-      const [y, mo] = m.key.split('-').map(Number)
-      return { key: m.key, label: lang === 'vi' ? m.vi : `${m.en} ${y}`, from: `${m.key}-01`, to: iso(new Date(y, mo, 0)), days: m.days }
-    })
-    const quarterRows = (cal.quarters || []).map((q) => ({ key: q.id, label: lang === 'vi' ? q.vi : q.en, from: q.start, to: q.end, days: q.days }))
-    const year = cal.firstDay ? [{ key: 'year', label: cal.schoolYear || 'Year', from: cal.firstDay, to: cal.lastDay, days: (cal.months || []).reduce((s, m) => s + Number(m.days || 0), 0) }] : []
-    return [...monthRows, ...quarterRows, ...year]
-  }, [calendar, lang])
+  const { calendar, travel: trips } = useData()
+  const periods = useMemo(() => attendancePeriods(calendar, lang), [calendar, lang])
   const [periodKey, setPeriodKey] = useState(() => todayIso().slice(0, 7))
-  const period = periods.find((p) => p.key === periodKey) || periods[0]
+  const period = defaultPeriod(periods, periodKey)
   const [group, setGroup] = useState('')
   const rangeKey = period ? `${period.from}|${period.to}` : ''
   const [loaded, setLoaded] = useState({ key: null, rows: [] })
@@ -322,34 +377,15 @@ function Summary({ students, groups }) {
     let alive = true
     const [from, to] = rangeKey.split('|')
     db.attendance.between(from, to)
-      .then((r) => alive && setLoaded({ key: rangeKey, rows: r.map(asMarked) }))
+      .then((r) => alive && setLoaded({ key: rangeKey, rows: r }))
       .catch((e) => { toast.error(e.message); if (alive) setLoaded({ key: rangeKey, rows: [] }) })
     return () => { alive = false }
   }, [rangeKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const table = useMemo(() => {
-    if (!rows) return null
-    const inGroups = students.filter((s) => groups.includes(s.level) && (!group || s.level === group))
-    return inGroups.map((s) => {
-      const mine = rows.filter((r) => r.student_id === s.id)
-      const c = { present: 0, late: 0, absent: 0 }
-      mine.forEach((r) => { c[r.status] = (c[r.status] || 0) + 1 })
-      const marked = mine.length
-      const rate = marked ? Math.round(((c.present + c.late) / marked) * 100) : null
-      return { s, ...c, marked, rate }
-    }).sort((a, b) => levelIndex(a.s.level) - levelIndex(b.s.level) || (a.s.nickname || a.s.full_name).localeCompare(b.s.nickname || b.s.full_name))
-  }, [rows, students, groups, group])
-
-  const byGroup = useMemo(() => {
-    if (!table) return []
-    return groups.filter((g) => !group || g === group).map((g) => {
-      const list = table.filter((x) => x.s.level === g)
-      const marked = list.reduce((n, x) => n + x.marked, 0)
-      const attended = list.reduce((n, x) => n + x.present + x.late, 0)
-      const days = new Set(rows.filter((r) => list.some((x) => x.s.id === r.student_id)).map((r) => r.date)).size
-      return { g, n: list.length, rate: marked ? Math.round((attended / marked) * 100) : null, days, absent: list.reduce((n, x) => n + x.absent, 0) }
-    })
-  }, [table, groups, group, rows])
+  // Students who have left still show in the periods they were marked in (see summarizeAttendance).
+  const sum = useMemo(() => (rows && period ? summarizeAttendance({ rows, students, groups: group ? [group] : groups, period, calendar, trips }) : null), [rows, students, groups, group, period, calendar, trips])
+  const table = sum ? sum.groups.flatMap((x) => x.students) : null
+  const byGroup = sum ? sum.groups.map((x) => ({ g: x.g, n: x.students.length, rate: x.rate, days: x.daysMarked, absences: x.absences, travel: x.travel })) : []
 
   if (!period) return <Empty text={t('noData')} />
 
@@ -364,6 +400,7 @@ function Summary({ students, groups }) {
           <option value="">{t('allYearGroups')}</option>
           {groups.map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
+        <Link className="btn-secondary col-span-2 h-11 justify-center sm:order-last sm:ml-auto sm:h-auto" to={`/print/attendance?period=${period.key}${group ? `&group=${encodeURIComponent(group)}` : ''}`}><Printer size={16} /> {t('printSummary')}</Link>
         {period.days ? <span className="col-span-2 text-xs text-slate-500">{lang === 'vi' ? `${period.days} ngày học theo lịch` : `${period.days} days in the PRA calendar`}</span> : null}
       </div>
 
@@ -372,8 +409,8 @@ function Summary({ students, groups }) {
           {byGroup.map((x) => (
             <button key={x.g} type="button" onClick={() => setGroup(group === x.g ? '' : x.g)} className={`card p-3 text-left transition-colors hover:border-pra-blue active:bg-slate-50 sm:p-4 ${group === x.g ? 'border-pra-blue ring-1 ring-pra-blue' : ''}`}>
               <div className="flex flex-col gap-x-2 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between"><span className="truncate font-bold text-slate-700">{x.g}</span><span className="text-xs text-slate-400">{x.n} · {x.days} {lang === 'vi' ? 'ngày' : x.days === 1 ? 'day' : 'days'}</span></div>
-              <div className={`mt-1 text-xl font-black tabular-nums sm:text-2xl ${x.rate == null ? 'text-slate-300' : x.rate < 90 ? 'text-amber-600' : 'text-green-700'}`}>{x.rate == null ? '—' : `${x.rate}%`}</div>
-              <div className="text-xs text-slate-500">{x.absent} {t('absent').toLowerCase()}</div>
+              <div className={`mt-1 text-xl font-black tabular-nums sm:text-2xl ${x.rate == null ? 'text-slate-300' : x.rate < LOW_RATE ? 'text-amber-600' : 'text-green-700'}`}>{x.rate == null ? '—' : `${x.rate}%`}</div>
+              <div className="text-xs text-slate-500">{x.absences} {t('absent').toLowerCase()}{x.travel > 0 && <span className="text-violet-700" title={t('absentTravelLong')}> ({x.travel} {t('absentTravel')})</span>}</div>
             </button>
           ))}
         </div>
@@ -388,13 +425,13 @@ function Summary({ students, groups }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-1.5"><span className="truncate font-semibold text-slate-800">{x.s.nickname || x.s.full_name}</span>{!group && <span className="flex-none text-[11px] text-slate-400">{x.s.level}</span>}</div>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {x.marked ? STATUSES.filter((st) => x[st.key]).map((st) => <span key={st.key} className={`chip !px-2 !text-[11px] ${st.soft}`}>{t(st.key)} {x[st.key]}</span>) : <span className="text-xs text-slate-400">{t('notMarked')}</span>}
+                      {x.marked ? [...STATUSES, AWAY].filter((st) => x[st.key]).map((st) => <span key={st.key} className={`chip !px-2 !text-[11px] ${st.soft}`}>{st.key === TRAVEL ? t('absentTravel') : t(st.key)} {x[st.key]}</span>) : <span className="text-xs text-slate-400">{t('notMarked')}</span>}
                     </div>
                   </div>
                   <div className="flex-none text-right">
                     {x.rate == null ? <span className="text-lg text-slate-300">—</span> : (
-                      <span className={`inline-flex items-center gap-1 text-lg font-black tabular-nums ${x.rate < 90 ? 'text-amber-600' : 'text-green-700'}`} title={x.rate < 90 ? t('lowAttendance') : undefined}>
-                        {x.rate < 90 && <TrendingDown size={15} />}{x.rate}%
+                      <span className={`inline-flex items-center gap-1 text-lg font-black tabular-nums ${x.rate < LOW_RATE ? 'text-amber-600' : 'text-green-700'}`} title={x.rate < LOW_RATE ? t('lowAttendance') : undefined}>
+                        {x.rate < LOW_RATE && <TrendingDown size={15} />}{x.rate}%
                       </span>
                     )}
                     <div className="text-[11px] tabular-nums text-slate-400">{x.marked} {lang === 'vi' ? 'ngày' : x.marked === 1 ? 'day' : 'days'}</div>
@@ -411,6 +448,7 @@ function Summary({ students, groups }) {
               <thead className="border-b border-slate-100 bg-slate-50/60"><tr>
                 <th className="th pl-4">{t('student')}</th><th className="th">{t('yearGroup')}</th>
                 {STATUSES.map((st) => <th key={st.key} className="th text-right">{t(st.key)}</th>)}
+                <th className="th text-right" title={t('absentTravelLong')}>{t('absentTravel')}</th>
                 <th className="th text-right">{t('daysMarked')}</th><th className="th pr-4 text-right">{t('attendanceRate')}</th>
               </tr></thead>
               <tbody>
@@ -419,11 +457,12 @@ function Summary({ students, groups }) {
                     <td className="td pl-4"><div className="flex items-center gap-2"><Avatar src={photoSrc(x.s.photo)} name={x.s.full_name} size={26} /><span className="font-semibold text-slate-800">{x.s.nickname || x.s.full_name}</span><span className="hidden font-mono text-[11px] text-slate-400 sm:inline">{x.s.student_code}</span></div></td>
                     <td className="td whitespace-nowrap text-slate-500">{x.s.level}</td>
                     {STATUSES.map((st) => <td key={st.key} className={`td text-right tabular-nums ${x[st.key] ? (st.key === 'absent' ? 'font-semibold text-red-700' : 'text-slate-700') : 'text-slate-300'}`}>{x[st.key]}</td>)}
+                    <td className={`td text-right tabular-nums ${x.travel ? 'font-semibold text-violet-700' : 'text-slate-300'}`}>{x.travel}</td>
                     <td className="td text-right tabular-nums text-slate-500">{x.marked}</td>
                     <td className="td pr-4 text-right">
                       {x.rate == null ? <span className="text-slate-300">—</span> : (
-                        <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${x.rate < 90 ? 'text-amber-600' : 'text-green-700'}`} title={x.rate < 90 ? t('lowAttendance') : undefined}>
-                          {x.rate < 90 && <TrendingDown size={14} />}{x.rate}%
+                        <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${x.rate < LOW_RATE ? 'text-amber-600' : 'text-green-700'}`} title={x.rate < LOW_RATE ? t('lowAttendance') : undefined}>
+                          {x.rate < LOW_RATE && <TrendingDown size={14} />}{x.rate}%
                         </span>
                       )}
                     </td>

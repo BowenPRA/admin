@@ -41,8 +41,10 @@ export function wordingIssues(text, { lang = 'en', legalName = '', nickname = ''
   if (nick && legal && nick !== legal && !word(esc(legal)).test(nick) && word(esc(nick)).test(outsideLegal)) {
     out.push(viMessages ? `Dùng tên chính thức "${legalName}", không dùng tên thường gọi "${nickname}".` : `Use the legal first name "${legalName}", not the nickname "${nickname}".`)
   }
-  // "Bao Chau" typed without the accents of "Bảo Châu".
-  if (legal && legal !== legalName.toLowerCase() && word(legal).test(t)) {
+  // "Bao Chau" typed without the accents of "Bảo Châu". Only with its capital
+  // letters: Thế or Mỹ without accents would otherwise match every "the" and "my".
+  const plain = legal.replace(/(?<![\p{L}\p{N}])\p{L}/gu, (c) => c.toUpperCase())
+  if (legal && legal !== legalName.toLowerCase() && new RegExp(word(esc(plain)).source, 'u').test(t.normalize('NFC'))) {
     out.push(viMessages ? `Viết tên có dấu: "${legalName}".` : `Write the name with its Vietnamese accents: "${legalName}".`)
   }
   return out

@@ -68,6 +68,21 @@ export const CONSENT = {
   private: { en: 'Private use only', vi: 'Chỉ dùng nội bộ', hint: ['Class chat and internal use only. Not for the website or Facebook: add this child to the no-photo list.', 'Chỉ dùng trong nhóm lớp và nội bộ. Không đăng lên trang web hay Facebook: hãy thêm học viên này vào danh sách không đăng ảnh.'] },
 }
 
+/** What the form asks about each previous school, after its name. */
+export const SCHOOL_FIELDS = [
+  ['years', ['Years attended', 'Năm học']],
+  ['grades', ['Grade levels', 'Lớp đã học']],
+  ['language', ['Language of instruction', 'Ngôn ngữ giảng dạy']],
+]
+
+/** The form's document questions: a file's `kind` says which one it answers (none on forms sent before 2 October 2026). */
+export const DOC_KINDS = {
+  photo: ['Student photo', 'Ảnh học viên'],
+  student_id: ['Student\'s passport or ID', 'Hộ chiếu hoặc căn cước của học viên'],
+  parent_id: ['Parent\'s passport or ID', 'Hộ chiếu hoặc căn cước của phụ huynh'],
+  report: ['Academic report', 'Học bạ hoặc báo cáo học tập'],
+}
+
 export const ID_FIELDS = [
   ['id_number', ['ID / passport number', 'Số CCCD / hộ chiếu']],
   ['issue_date', ['Issue date', 'Ngày cấp'], 'date'],

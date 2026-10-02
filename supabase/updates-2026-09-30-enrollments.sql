@@ -48,6 +48,8 @@ create table if not exists adm_enrollments (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+-- A table made by an earlier run of this file did not have this column yet.
+alter table adm_enrollments add column if not exists lang text;
 create index if not exists adm_enrollments_student on adm_enrollments (student_id);
 
 -- 2. The private part. One row per form.
@@ -321,8 +323,9 @@ end $$;
 --      submission_id, source, lang, submitted_at, applying_for, photo_consent, link_only,
 --      student {first_name, full_name, dob, gender, nationality, languages, address, start_date},
 --      parents [{name, relation, nationality, language, profession, address, phone, email}],
---      emergency [...], pickup [...], schools [...], school_language, background {...}, health {...}, terms,
---      private {ids {...}, files [...], signature}
+--      emergency [...], pickup [...], schools [{name, years, grades, language}], background {...}, health {...}, terms,
+--      private {ids {...}, files [{path, name, kind}], signature}
+--    (school_language: one answer for all schools, on forms sent before 2 October 2026.)
 --    With link_only a child who is not on the list is left off it (old forms).
 --    Nobody calls this directly; adm_enroll_submit and adm_enrollment_import do.
 create or replace function adm_enrollment_save(e jsonb) returns uuid
@@ -467,13 +470,17 @@ begin
   where o->>'name' <> '' or o->>'phone' <> '';
 
   select coalesce(jsonb_agg(o order by ord), '[]'::jsonb) into v_schools from (
-    select ord, jsonb_build_object('name', adm_txt(c, 'name', 200), 'years', adm_txt(c, 'years', 200)) o
+    select ord, jsonb_build_object('name', adm_txt(c, 'name', 200), 'years', adm_txt(c, 'years', 200),
+                                   'grades', adm_txt(c, 'grades', 200), 'language', adm_txt(c, 'language', 160)) o
     from jsonb_array_elements(case when jsonb_typeof(p->'schools') = 'array' then p->'schools' else '[]'::jsonb end) with ordinality t(c, ord)
     where ord <= 3) x
-  where o->>'name' <> '' or o->>'years' <> '';
+  where o->>'name' <> '' or o->>'years' <> '' or o->>'grades' <> '' or o->>'language' <> '';
 
-  -- Only documents that are really in this form's folder are listed.
-  select coalesce(jsonb_agg(jsonb_build_object('path', f->>'path', 'name', adm_txt(f, 'name', 120)) order by ord), '[]'::jsonb) into v_files
+  -- Only documents that are really in this form's folder are listed. `kind` is
+  -- the question a document answers on the form.
+  select coalesce(jsonb_agg(jsonb_build_object('path', f->>'path', 'name', adm_txt(f, 'name', 120),
+                                               'kind', case when f->>'kind' in ('photo', 'student_id', 'parent_id', 'report') then f->>'kind' else '' end)
+                            order by ord), '[]'::jsonb) into v_files
     from jsonb_array_elements(case when jsonb_typeof(p->'files') = 'array' then p->'files' else '[]'::jsonb end) with ordinality t(f, ord)
    where ord <= 12 and (f->>'path') like v_sub || '/%'
      and exists (select 1 from storage.objects o where o.bucket_id = 'adm-enrollment' and o.name = f->>'path');

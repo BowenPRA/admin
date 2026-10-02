@@ -6,7 +6,8 @@ import { MAX_PROOFS, prepareProofFile, uploadProof, removeProofs } from '../lib/
 import ProofPicker from '../components/ProofPicker'
 import { gmailConfigured, draftLink, getToken, prepareGmail } from '../lib/gmail'
 import { draftInvoice, logDraft, lastDraft, invoiceRecipients } from '../lib/invoiceDraft'
-import { db, genId } from '../lib/db'
+import { db, genId, isDuplicate } from '../lib/db'
+import { INVOICE_STATUSES, statusFields, statusWithPayments } from '../lib/invoiceStatus'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { docTotals, recomputeRow, columnTotal, buildDocument, withStudentChoice, defaultQ4Full, smartDueDate } from '../lib/pricing'
@@ -17,7 +18,7 @@ import { invoicePdfBlob } from '../lib/invoicePdf'
 import InvoicePdfPreview from '../components/InvoicePdfPreview'
 import SendInvoiceModal from '../components/SendInvoiceModal'
 import { invoiceFilename } from '../lib/invoiceEmail'
-import { Card, Field, TextInput, NumberInput, MoneyInput, Select, Checkbox, Modal, StatusChip, Spinner } from '../components/ui'
+import { Card, Field, TextInput, NumberInput, MoneyInput, Select, Checkbox, Modal, StatusChip, Spinner, Empty } from '../components/ui'
 
 let seq = 0
 const uid = (p = 'r') => `${p}${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -56,8 +57,12 @@ export default function InvoiceEditor() {
   const { t, lang: uiLang } = useT()
   const { fees, calendar, loading, families, students, refresh } = useData()
   const [inv, setInv] = useState(null)
+  const [missing, setMissing] = useState(false)
   const [payments, setPayments] = useState([])
   const [dirty, setDirty] = useState(false)
+  const edits = useRef(0) // counts changes, so a save that finishes late does not hide newer ones
+  const levelPicked = useRef(new Set()) // students whose year was changed on this page
+  const touch = () => { edits.current++; setDirty(true) }
   const [busy, setBusy] = useState(false)
   const [editHeads, setEditHeads] = useState(false)
   const [payModal, setPayModal] = useState(null)
@@ -73,59 +78,41 @@ export default function InvoiceEditor() {
   const defaultTo = useMemo(() => (inv ? invoiceRecipients(inv, families, students) : ''), [inv, families, students])
   const draft = lastDraft(inv)
 
-  const recordDraft = async (d) => { const saved = await logDraft(inv, d); setInv(saved); setDirty(false) }
-
-  // PDF + email from the template, saved to admin@'s Gmail Drafts without a review step
-  // (used after "Create + Gmail draft" in the builder).
-  const quickDraft = async () => {
-    if (!gmailConfigured) { setSendOpen(true); return }
-    setDrafting(true)
-    try {
-      await getToken()
-      const d = await draftInvoice({ inv, fees, to: defaultTo })
-      await recordDraft(d)
-      toast(<span>{t('draftSaved')} · <a className="font-semibold text-pra-blue underline" href={d.link} target="_blank" rel="noreferrer">{t('openInGmail')}</a></span>)
-    } catch (e) { toast.error(e.message) } finally { setDrafting(false) }
-  }
-
-  // Arriving from "Create + Gmail draft".
-  useEffect(() => { prepareGmail() }, [])
-  const autoDraft = params.get('draft') === '1'
-  const autoRan = useRef(false)
-  useEffect(() => {
-    if (!autoDraft || !inv || !fees || autoRan.current) return
-    autoRan.current = true
-    Promise.resolve().then(() => {
-      setParams({}, { replace: true })
-      if (gmailConfigured) quickDraft()
-      else toast.info(t('gmailNotConfigured'))
-    })
-  }, [autoDraft, inv, fees]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const downloadPdf = async () => {
     setBusy(true)
-    try { downloadBlob(await invoicePdfBlob(inv, fees), invoiceFilename(inv)) } catch (e) { alert(e.message) } finally { setBusy(false) }
+    try { downloadBlob(await invoicePdfBlob(inv, fees), invoiceFilename(inv)) } catch (e) { toast.error(e.message || String(e)) } finally { setBusy(false) }
   }
 
   useEffect(() => {
     let alive = true
-    Promise.all([db.invoices.get(id), db.payments.list()]).then(([i, ps]) => {
+    levelPicked.current = new Set()
+    Promise.all([db.invoices.get(id), db.payments.forInvoice(id)]).then(([i, ps]) => {
       if (!alive) return
-      setInv(i); setPayments(ps.filter((p) => p.invoice_id === id).sort((a, b) => (a.paid_on || '').localeCompare(b.paid_on || '')))
+      setMissing(!i)
+      setInv(i); setPayments(ps)
       setDirty(false)
-    })
+    }).catch((e) => { if (alive) { setMissing(true); toast.error(e.message || String(e)) } })
     return () => { alive = false }
-  }, [id])
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Closing or reloading the tab with unsaved changes asks first.
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
 
   const totals = useMemo(() => (inv ? docTotals(inv.doc) : null), [inv])
 
-  const patch = (p) => { setInv((s) => ({ ...s, ...p })); setDirty(true) }
-  const patchDoc = (fn) => { setInv((s) => { const doc = structuredClone(s.doc); fn(doc); return { ...s, doc } }); setDirty(true) }
+  const patch = (p) => { setInv((s) => ({ ...s, ...p })); touch() }
+  const patchDoc = (fn) => { setInv((s) => { const doc = structuredClone(s.doc); fn(doc); return { ...s, doc } }); touch() }
 
   // Change a student's year / program / Q4 choice: rebuild the tuition table
   // from the invoice's options and refresh that student's meal rate. Headings,
   // summary label and the quarters being billed are kept.
   const repriceStudent = (studentId, change) => {
+    if (change.student?.level) levelPicked.current.add(studentId)
     setInv((cur) => {
       const inputs = structuredClone(cur.inputs)
       inputs.students = inputs.students.map((e) => {
@@ -168,7 +155,7 @@ export default function InvoiceEditor() {
       }
       return { ...cur, inputs, doc }
     })
-    setDirty(true)
+    touch()
   }
 
   // Switch the invoice between English and Vietnamese: the document is rebuilt
@@ -197,27 +184,82 @@ export default function InvoiceEditor() {
       fresh.flags = { ...fresh.flags, ...(cur.doc.flags || {}) }
       return { ...cur, lang, inputs, doc: fresh, period_label: lang === 'vi' ? fresh.periodLabelVi : fresh.periodLabelEn }
     })
-    setDirty(true)
+    touch()
   }
 
+  // Writes what this page edits and nothing else, so a status or a draft noted
+  // from the invoice list in the meantime is not put back.
+  const persist = async () => {
+    const at = edits.current
+    // A year picked on this page is the student's year now: keep the record in step.
+    // The year an older invoice was made with is left alone (the student may have moved up since).
+    const moved = (inv.inputs?.students || []).filter((e) => levelPicked.current.has(e.student.id))
+      .map((e) => [students.find((s) => s.id === e.student.id), e.student.level]).filter(([rec, lvl]) => rec && lvl && rec.level !== lvl)
+    if (moved.length) { for (const [rec, level] of moved) await db.students.patch(rec.id, { level }); await refresh() }
+    levelPicked.current.clear()
+    const paid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    const total = docTotals(inv.doc).total
+    const saved = await db.invoices.patch(id, {
+      lang: inv.lang, period_label: inv.period_label, issue_date: inv.issue_date, due_date: inv.due_date, notes: inv.notes,
+      inputs: inv.inputs, doc: inv.doc, total, paid, status: statusWithPayments(inv.status, paid, total),
+    })
+    setInv((cur) => ({ ...cur, total: saved.total, paid: saved.paid, status: saved.status, updated_at: saved.updated_at }))
+    if (edits.current === at) setDirty(false)
+  }
   const save = async () => {
     setBusy(true)
-    try {
-      // A year picked on the invoice is the student's year: keep the record in step.
-      const moved = (inv.inputs?.students || []).map((e) => [students.find((s) => s.id === e.student.id), e.student.level]).filter(([rec, lvl]) => rec && lvl && rec.level !== lvl)
-      if (moved.length) { await db.students.saveMany(moved.map(([rec, level]) => ({ ...rec, level }))); await refresh() }
-      const paid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0)
-      const total = docTotals(inv.doc).total
-      let status = inv.status
-      if (status !== 'void') status = paid >= total && total > 0 ? 'paid' : paid > 0 ? 'partial' : (status === 'paid' || status === 'partial' ? 'sent' : status)
-      const saved = await db.invoices.save({ ...inv, total, paid, status })
-      setInv(saved); setDirty(false)
-    } finally { setBusy(false) }
+    try { await persist() } catch (e) { toast.error(e.message || String(e)) } finally { setBusy(false) }
   }
+
+  // The status is saved the moment it is picked, apart from the other edits on the page.
+  const setStatus = async (status) => {
+    if (status === inv.status || (status === 'void' && !confirm(t('confirmVoid')))) return
+    setBusy(true)
+    try {
+      const saved = await db.invoices.patch(id, statusFields(inv, status, defaultTo))
+      setInv((cur) => ({ ...cur, status: saved.status, sent_at: saved.sent_at, sent_to: saved.sent_to, updated_at: saved.updated_at }))
+      if (status === 'sent') toast(t('markedSent'))
+    } catch (e) { toast.error(e.message || String(e)) } finally { setBusy(false) }
+  }
+
+  // The draft's PDF shows what is on screen, so unsaved changes are saved with it.
+  const recordDraft = async (d) => {
+    if (dirty) await persist()
+    const saved = await logDraft(inv, d)
+    setInv((cur) => ({ ...cur, send_log: saved.send_log, updated_at: saved.updated_at }))
+  }
+
+  // PDF + email from the template, saved to admin@'s Gmail Drafts without a review step
+  // (used after "Create + Gmail draft" in the builder).
+  const quickDraft = async () => {
+    if (!gmailConfigured) { setSendOpen(true); return }
+    setDrafting(true)
+    try {
+      await getToken()
+      const d = await draftInvoice({ inv, fees, to: defaultTo })
+      await recordDraft(d)
+      toast(<span>{t('draftSaved')} · <a className="font-semibold text-pra-blue underline" href={d.link} target="_blank" rel="noreferrer">{t('openInGmail')}</a></span>)
+    } catch (e) { toast.error(e.message) } finally { setDrafting(false) }
+  }
+
+  // Arriving from "Create + Gmail draft".
+  useEffect(() => { prepareGmail() }, [])
+  const autoDraft = params.get('draft') === '1'
+  const autoRan = useRef(false)
+  useEffect(() => {
+    if (!autoDraft || !inv || !fees || autoRan.current) return
+    autoRan.current = true
+    Promise.resolve().then(() => {
+      setParams({}, { replace: true })
+      if (gmailConfigured) quickDraft()
+      else toast.info(t('gmailNotConfigured'))
+    })
+  }, [autoDraft, inv, fees]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const remove = async () => {
     if (!confirm(t('confirmDelete'))) return
-    await db.invoices.remove(id); navigate('/invoices')
+    setBusy(true)
+    try { await db.invoices.remove(id); navigate('/invoices') } catch (e) { toast.error(e.message || String(e)); setBusy(false) }
   }
 
   const openPayment = () => {
@@ -241,6 +283,16 @@ export default function InvoiceEditor() {
       setPayModal((m) => (m ? { ...m, files: [...(m.files || []), ...ready].slice(0, MAX_PROOFS) } : m))
     } catch (e) { toast.error(e.message) }
   }
+  // Payments changed: read them again and bring the invoice's paid amount and status in step.
+  const afterPayments = async () => {
+    const ps = await db.payments.forInvoice(id)
+    const paid = ps.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    let status = statusWithPayments(inv.status, paid, docTotals(inv.doc).total)
+    if (!paid && (status === 'paid' || status === 'partial')) status = 'sent'
+    const saved = await db.invoices.patch(id, { paid, status })
+    setInv((cur) => ({ ...cur, paid: saved.paid, status: saved.status, updated_at: saved.updated_at }))
+    setPayments(ps)
+  }
   const savePayment = async () => {
     setBusy(true)
     const proof = []
@@ -248,16 +300,18 @@ export default function InvoiceEditor() {
       const { files = [], ...fields } = payModal
       const paymentId = genId()
       for (const f of files) proof.push(await uploadProof(paymentId, f))
-      const receipt_number = await db.nextNumber('receipt', inv.school_year)
-      // `proof` is only sent when there is some, so payments still save before the proof SQL has run.
-      await db.payments.save({ ...fields, id: paymentId, invoice_id: inv.id, student_names: inv.student_names, receipt_number, ...(proof.length ? { proof } : {}) })
+      // Someone else recording a payment at the same moment can take the number first: ask for the next one.
+      for (let attempt = 0; ; attempt++) {
+        const receipt_number = await db.nextNumber('receipt', inv.school_year)
+        try {
+          // `proof` is only sent when there is some, so payments still save before the proof SQL has run.
+          await db.payments.save({ ...fields, id: paymentId, invoice_id: inv.id, student_names: inv.student_names, receipt_number, ...(proof.length ? { proof } : {}) })
+          break
+        } catch (e) { if (attempt >= 2 || !isDuplicate(e)) throw e }
+      }
       proof.length = 0
-      const ps = (await db.payments.list()).filter((p) => p.invoice_id === id).sort((a, b) => (a.paid_on || '').localeCompare(b.paid_on || ''))
-      const paid = ps.reduce((s, p) => s + (Number(p.amount) || 0), 0)
-      const total = docTotals(inv.doc).total
-      const status = inv.status === 'void' ? 'void' : paid >= total ? 'paid' : paid > 0 ? 'partial' : inv.status
-      const saved = await db.invoices.save({ ...inv, total, paid, status })
-      setInv(saved); setPayments(ps); setPayModal(null)
+      await afterPayments()
+      setPayModal(null)
     } catch (e) {
       removeProofs(proof).catch(() => {}) // uploaded, but the payment was not saved
       toast.error(e.message || String(e))
@@ -291,15 +345,12 @@ export default function InvoiceEditor() {
   }
   const removePayment = async (p) => {
     if (!confirm(t('confirmDelete'))) return
-    await db.payments.remove(p.id)
-    const ps = payments.filter((x) => x.id !== p.id)
-    const paid = ps.reduce((s, x) => s + (Number(x.amount) || 0), 0)
-    const total = docTotals(inv.doc).total
-    const status = inv.status === 'void' ? 'void' : paid >= total && total > 0 ? 'paid' : paid > 0 ? 'partial' : 'sent'
-    const saved = await db.invoices.save({ ...inv, total, paid, status })
-    setInv(saved); setPayments(ps)
+    setBusy(true)
+    try { await db.payments.remove(p.id); await afterPayments() }
+    catch (e) { toast.error(e.message || String(e)) } finally { setBusy(false) }
   }
 
+  if (missing) return <Empty text={t('invoiceMissing')}><div className="mt-3"><Link className="btn-secondary" to="/invoices">{t('backToInvoices')}</Link></div></Empty>
   if (loading || !inv) return <Spinner />
   const doc = inv.doc
   const vi = inv.lang === 'vi'
@@ -336,7 +387,7 @@ export default function InvoiceEditor() {
           <Card>
             <div className="grid gap-3 sm:grid-cols-4">
               <Field label={t('status')}>
-                <Select value={inv.status} onChange={(v) => patch({ status: v })} options={['draft', 'sent', 'partial', 'paid', 'void'].map((s) => ({ value: s, label: t(s) }))} />
+                <Select value={inv.status} onChange={setStatus} disabled={busy} options={INVOICE_STATUSES.map((s) => ({ value: s, label: t(s) }))} />
               </Field>
               <Field label={t('issueDate')}><input type="date" className="input" value={inv.issue_date || ''} onChange={(e) => patch({ issue_date: e.target.value })} /></Field>
               <Field label={t('dueDate')} hint={t('dueOnInvoice')}>
@@ -352,9 +403,9 @@ export default function InvoiceEditor() {
               <Field label={t('internalNotes')} className="sm:col-span-4"><TextInput value={inv.notes || ''} onChange={(v) => patch({ notes: v })} /></Field>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {inv.status === 'draft' && <button className="btn-secondary" onClick={() => patch({ status: 'sent' })}><Send size={14} /> {t('markSent')}</button>}
-              {inv.status !== 'void' && <button className="btn-danger" onClick={() => { if (confirm(t('confirmVoid'))) patch({ status: 'void' }) }}><Ban size={14} /> {t('void')}</button>}
-              <button className="btn-danger" onClick={remove}><Trash2 size={14} /> {t('delete')}</button>
+              {inv.status === 'draft' && <button className="btn-secondary" onClick={() => setStatus('sent')} disabled={busy}><Send size={14} /> {t('markSent')}</button>}
+              {inv.status !== 'void' && <button className="btn-danger" onClick={() => setStatus('void')} disabled={busy}><Ban size={14} /> {t('void')}</button>}
+              <button className="btn-danger" onClick={remove} disabled={busy}><Trash2 size={14} /> {t('delete')}</button>
             </div>
           </Card>
 
@@ -371,7 +422,7 @@ export default function InvoiceEditor() {
                       <td className="whitespace-nowrap text-right">
                         <button className={`btn-ghost p-1.5 ${p.proof?.length ? 'text-green-700' : 'text-slate-400'}`} onClick={() => setProofModal(p)} title={t('proofOfPayment')}><Paperclip size={14} />{p.proof?.length ? <span className="text-xs font-bold">{p.proof.length}</span> : null}</button>
                         <Link className="btn-ghost p-1.5" to={`/print/receipt/${p.id}`} target="_blank" title={t('printReceipt')}><Printer size={14} /></Link>
-                        <button className="btn-ghost p-1.5 text-red-500" onClick={() => removePayment(p)}><Trash2 size={14} /></button>
+                        <button className="btn-ghost p-1.5 text-red-500" onClick={() => removePayment(p)} disabled={busy} title={t('delete')}><Trash2 size={14} /></button>
                       </td>
                     </tr>
                   ))}
@@ -505,7 +556,7 @@ export default function InvoiceEditor() {
             <Field label={t('method')}><Select value={payModal.method} onChange={(v) => setPayModal({ ...payModal, method: v })} options={[{ value: 'transfer', label: t('transfer') }, { value: 'cash', label: t('cash') }]} /></Field>
             <Field label={t('reference')} className="sm:col-span-3"><TextInput value={payModal.reference} onChange={(v) => setPayModal({ ...payModal, reference: v })} /></Field>
             <div className="sm:col-span-3 mt-2 border-t border-slate-200 pt-3 text-sm font-bold">{t('receipt')}</div>
-            <Field label={t('payer')}><TextInput value={payModal.receipt.student} onChange={(v) => setPayModal({ ...payModal, receipt: { ...payModal.receipt, student: v } })} /></Field>
+            <Field label={t('student')}><TextInput value={payModal.receipt.student} onChange={(v) => setPayModal({ ...payModal, receipt: { ...payModal.receipt, student: v } })} /></Field>
             <Field label={t('address')} className="sm:col-span-2"><TextInput value={payModal.receipt.address} onChange={(v) => setPayModal({ ...payModal, receipt: { ...payModal.receipt, address: v } })} /></Field>
             <Field label={t('receiptForVi')} className="sm:col-span-3"><TextInput value={payModal.receipt.forVi} onChange={(v) => setPayModal({ ...payModal, receipt: { ...payModal.receipt, forVi: v } })} /></Field>
             <Field label={t('receiptForEn')} className="sm:col-span-3"><TextInput value={payModal.receipt.forEn} onChange={(v) => setPayModal({ ...payModal, receipt: { ...payModal.receipt, forEn: v } })} /></Field>

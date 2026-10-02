@@ -48,7 +48,8 @@ function roundPhoto(src) {
           resolve(null)
         }
       }
-      img.onerror = () => resolve(null)
+      // A photo that did not load is tried again for the next PDF, not remembered as missing.
+      img.onerror = () => { photos.delete(src); resolve(null) }
       img.src = src
     }))
   }

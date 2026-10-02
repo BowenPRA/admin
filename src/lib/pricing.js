@@ -14,7 +14,7 @@
 // }
 
 import { bandFor, hasProgram, mealRateFor, periodInfo, PROGRAMS } from './fees.js'
-import { pct, fmtDate, todayISO } from './money.js'
+import { pct, fmtDate, todayISO, isoDate } from './money.js'
 import { normalizeCode } from './studentIds.js'
 import { ROSTER_CODES as ROSTER_CODE_LIST, ROSTER_NAME_HASHES } from '../data/rosterIndex.js'
 
@@ -195,6 +195,15 @@ export function billedDays(billQuarters, opts, calendar) {
   }, 0)
 }
 
+// A full-year price typed in by hand for one student, or null when the fee schedule applies.
+const overrideOf = (opts) => (opts?.tuitionOverride !== '' && opts?.tuitionOverride != null ? Number(opts.tuitionOverride) || 0 : null)
+
+/** The sibling discount in percent: 5 unless Settings says otherwise (0 switches it off). */
+export function siblingPct(fees) {
+  const v = fees?.siblingDiscountPct
+  return v === '' || v == null || !Number.isFinite(Number(v)) ? 5 : Math.max(0, Number(v))
+}
+
 // Prorated amounts are rounded to the nearest 1,000 VND.
 const round1000 = (v) => Math.round(v / 1000) * 1000
 
@@ -214,7 +223,7 @@ function tuitionValue(entry, inputs, fees) {
   const basePlan = plan === 'split' ? (inputs.splitBase || 'earlyBird') : plan
   let v = 0
   if (!opts.upper || opts.includePathway) {
-    v += opts.tuitionOverride !== '' && opts.tuitionOverride != null ? Number(opts.tuitionOverride) || 0 : annualTuition(student, basePlan, fees)
+    v += overrideOf(opts) ?? annualTuition(student, basePlan, fees)
   }
   if (opts.upper && opts.includeAcellus) v += annualTuition(student, basePlan, fees, 'acellus')
   return v
@@ -264,7 +273,7 @@ export function smartDueDate(inputs, fees, issueDate) {
   if (due && due >= issue) return due
   const t = new Date(`${issue}T00:00:00`)
   t.setDate(t.getDate() + 7)
-  return t.toISOString().slice(0, 10)
+  return isoDate(t)
 }
 
 /**
@@ -297,22 +306,21 @@ export function buildDocument(inputs, fees, calendar) {
   const periodPhraseEn = /^the /.test(periodLabelEn) ? periodLabelEn : `the ${periodLabelEn}`
 
   // ---------- Sibling discount: pick the cheapest tuition among 2+ students ----------
+  const sibPct = siblingPct(fees)
   let discountId = null
-  if (inputs.siblingDiscount && tuitionEntries.length >= 2 && !['staff', 'trial', 'none'].includes(plan)) {
+  if (inputs.siblingDiscount && sibPct > 0 && tuitionEntries.length >= 2 && !['staff', 'trial', 'none'].includes(plan)) {
     if (inputs.siblingStudentId && tuitionEntries.some((e) => e.student.id === inputs.siblingStudentId)) {
       discountId = inputs.siblingStudentId
     } else {
       let best = null
       tuitionEntries.forEach((e) => {
-        const base = e.opts.tuitionOverride !== '' ? Number(e.opts.tuitionOverride) : annualTuition(e.student, plan === 'split' ? (inputs.splitBase || 'earlyBird') : plan, fees)
+        const base = overrideOf(e.opts) ?? annualTuition(e.student, plan === 'split' ? (inputs.splitBase || 'earlyBird') : plan, fees)
         // `<=` so that on a tie the discount goes to the child listed last (the younger sibling).
         if (best === null || base <= best.amount) best = { id: e.student.id, amount: base }
       })
       discountId = best?.id ?? null
     }
   }
-  const sibPct = fees.siblingDiscountPct || 5
-
   // ---------- Tuition section ----------
   const isUpperAny = tuitionEntries.some((e) => e.opts.upper)
   const showDiscountCol = discountId !== null
@@ -375,7 +383,7 @@ export function buildDocument(inputs, fees, calendar) {
         // Discounts never touch the Acellus fee: PRA pays it in full on the family's behalf.
         const dPct = item.id === 'main' ? (isDisc ? sibPct : 0) + Number(opts.extraDiscountPct || 0) : 0
         const cells = { name: idx === 0 ? studentDisplayName(student) + (isDisc && !showDiscountCol ? '' : '') : '', curriculum: curriculumLabel(student, lang), item: item.label }
-        const override = item.id === 'main' && opts.tuitionOverride !== '' ? Number(opts.tuitionOverride) : null
+        const override = item.id === 'main' ? overrideOf(opts) : null
         const annual = override ?? annualTuition(student, plan, fees, item.id)
 
         const applyDisc = (v) => (dPct ? pct(v, 100 - dPct) : v)
@@ -387,7 +395,12 @@ export function buildDocument(inputs, fees, calendar) {
         } else if (plan === 'quarterly') {
           let qa = quarterAmounts(student, fees)
           if (item.id === 'acellus') qa = [annual / 4, annual / 4, annual / 4, annual / 4]
-          if (override !== null) { const s = qa.reduce((a, b) => a + b, 0); qa = qa.map((x) => Math.round(override * x / s)) }
+          if (override !== null) {
+            // Shared out in the schedule's proportions; the last quarter takes the rounding so the four add up exactly.
+            const s = qa.reduce((a, b) => a + b, 0)
+            const first = qa.slice(0, 3).map((x) => (s ? Math.round(override * x / s) : 0))
+            qa = [...first, override - first.reduce((a, b) => a + b, 0)]
+          }
           // Joined or left mid-quarter: charge only the school days attended.
           const pro = item.id === 'main' ? proratedQuarters(opts, calendar) : []
           if (pro.length) {

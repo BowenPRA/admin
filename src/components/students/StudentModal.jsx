@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Camera, RotateCcw, Trash2, AlertTriangle, Mail, Phone } from 'lucide-react'
-import { LEVELS, PROGRAMS, SCHOOL_YEAR } from '../../lib/fees'
+import { LEVELS, PROGRAMS } from '../../lib/fees'
 import { suggestClass } from '../../lib/placement'
 import { guessFirstName } from '../../lib/names'
 import { resizeImage, photoSrc } from '../../lib/report/photo'
 import { nextStudentCode, codeTakenBy, normalizeCode } from '../../lib/studentIds'
 import { ageOf, STATUSES, statusOf, withStatus, partialFrom, DEFAULT_PARTIAL_FROM } from '../../lib/studentRecords'
 import { Field, TextInput, Select, Checkbox, Modal, Avatar } from '../ui'
+import { StudentTrips } from '../attendance/Trips'
 
 function Section({ title, children }) {
   return (
@@ -21,7 +22,7 @@ function Section({ title, children }) {
  * Add / edit a student (office accounts), or a read-only summary for teachers.
  * `onSave(row)` and `onDelete(row)` return promises; the modal stays open on error.
  */
-export default function StudentModal({ value, onClose, onSave, onDelete, students, families, canEdit, t, lang }) {
+export default function StudentModal({ value, onClose, onSave, onDelete, students, families, schoolYear, canEdit, t, lang }) {
   const [s, setS] = useState(value)
   const [busy, setBusy] = useState(false)
   const set = (k) => (v) => setS((cur) => ({ ...cur, [k]: v }))
@@ -30,7 +31,7 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
   const [levelTouched, setLevelTouched] = useState(false)
   const [levelAuto, setLevelAuto] = useState(false)
   const setDob = (dob) => {
-    const g = isNew && !levelTouched ? suggestClass({ ...s, dob }, students, SCHOOL_YEAR) : null
+    const g = isNew && !levelTouched ? suggestClass({ ...s, dob }, students, schoolYear) : null
     setS((cur) => ({ ...cur, dob, ...(g ? { level: g.level } : {}) }))
     setLevelAuto(!!g)
   }
@@ -75,6 +76,11 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
           {row(t('family'), fam?.name)}
           {row(t('parentsEmail'), s.parents_email)}
           {row(t('parentPhone'), s.parent_phone)}
+        </div>
+        {/* Trips are added from the attendance page by whoever takes the class; here they are only listed. */}
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <div className="mb-2 text-xs font-bold uppercase tracking-wider text-pra-navy">{t('travelSection')}</div>
+          <StudentTrips student={s} canEdit={false} />
         </div>
       </Modal>
     )
@@ -144,6 +150,13 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
             </div>
           </div>
         </Section>
+
+        {/* Trips save by themselves, apart from the Save button below. */}
+        {!isNew && (
+          <Section title={t('travelSection')}>
+            <StudentTrips student={s} />
+          </Section>
+        )}
 
         <Section title={t('sectionPersonal')}>
           <div className="grid gap-3 sm:grid-cols-4">

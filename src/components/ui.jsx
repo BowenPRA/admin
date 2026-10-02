@@ -34,8 +34,13 @@ export function MoneyInput({ value, onChange, className = '', allowBlank = false
   const [text, setText] = useState(shown)
   const [prev, setPrev] = useState(value)
   // Re-format when the value changes from outside (e.g. a rebuild), but keep
-  // the user's keystrokes while they are typing.
-  if (value !== prev) { setPrev(value); setText(shown) }
+  // the user's keystrokes while they are typing: re-formatting mid-word would
+  // throw the cursor to the end.
+  if (value !== prev) {
+    setPrev(value)
+    const typed = text.trim() === '' ? '' : parseMoney(text)
+    if (typed !== (value ?? '') && !(typed === '' && !allowBlank && !value)) setText(shown)
+  }
   return (
     <input className={`input text-right font-mono ${className}`} value={text} inputMode="numeric"
       onChange={(e) => {
@@ -88,15 +93,26 @@ export function Card({ title, children, className = '', actions, locked, subtitl
   )
 }
 
+const STATUS_TONE = {
+  draft: 'bg-slate-100 text-slate-700',
+  sent: 'bg-sky-100 text-sky-800',
+  partial: 'bg-amber-100 text-amber-800',
+  paid: 'bg-green-100 text-green-800',
+  void: 'bg-red-100 text-red-700',
+}
+
 export function StatusChip({ status, t }) {
-  const map = {
-    draft: 'bg-slate-100 text-slate-700',
-    sent: 'bg-sky-100 text-sky-800',
-    partial: 'bg-amber-100 text-amber-800',
-    paid: 'bg-green-100 text-green-800',
-    void: 'bg-red-100 text-red-700',
-  }
-  return <span className={`chip ${map[status] || map.draft}`}>{t(status)}</span>
+  return <span className={`chip ${STATUS_TONE[status] || STATUS_TONE.draft}`}>{t(status)}</span>
+}
+
+/** The status chip as a picker, for changing an invoice's status where it is listed. */
+export function StatusSelect({ status, statuses, onChange, t, disabled }) {
+  return (
+    <select className={`chip cursor-pointer border-0 py-1 pr-1 focus:outline-none focus:ring-2 focus:ring-pra-sky/40 disabled:cursor-wait disabled:opacity-60 ${STATUS_TONE[status] || STATUS_TONE.draft}`}
+      value={status || 'draft'} disabled={disabled} aria-label={t('status')} title={t('changeStatus')} onChange={(e) => onChange(e.target.value)}>
+      {statuses.map((s) => <option key={s} value={s} className="bg-white text-slate-800">{t(s)}</option>)}
+    </select>
+  )
 }
 
 export function Modal({ open, onClose, title, subtitle, children, wide = false, footer }) {

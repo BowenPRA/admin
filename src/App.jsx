@@ -16,10 +16,16 @@ import PrintBatch from './pages/reports/PrintBatch'
 import Teachers from './pages/reports/Teachers'
 import ReportSettings from './pages/reports/ReportSettings'
 import Attendance from './pages/Attendance'
+import PrintAttendance from './pages/PrintAttendance'
+import PrintFees from './pages/PrintFees'
+import PrintClassLists from './pages/PrintClassLists'
+import PrintAdmissions from './pages/PrintAdmissions'
 import Schedule from './pages/Schedule'
+import Assessments from './pages/Assessments'
 import Photos from './pages/photos/Photos'
 import Leads from './pages/Leads'
 import Enrollments from './pages/Enrollments'
+import Todos from './pages/Todos'
 import PhotoEvent from './pages/photos/PhotoEvent'
 import { DataProvider } from './lib/DataContext'
 import { AuthProvider, useAuth } from './lib/AuthContext'
@@ -48,6 +54,10 @@ export default function App() {
         <Route path="/print/receipt/:id" element={<Guard><Office><PrintReceipt /></Office></Guard>} />
         <Route path="/print/report/:id" element={<Guard><PrintReport /></Guard>} />
         <Route path="/print/reports" element={<Guard><PrintBatch /></Guard>} />
+        <Route path="/print/attendance" element={<Guard><PrintAttendance /></Guard>} />
+        <Route path="/print/class-lists" element={<Guard><PrintClassLists /></Guard>} />
+        <Route path="/print/fees" element={<Guard><Office><PrintFees /></Office></Guard>} />
+        <Route path="/print/admissions" element={<Guard><Office><PrintAdmissions /></Office></Guard>} />
         <Route element={<Guard><Layout /></Guard>}>
           <Route index element={<Home />} />
           <Route path="/invoices" element={<Office><Invoices /></Office>} />
@@ -60,8 +70,10 @@ export default function App() {
           <Route path="/students" element={<Students />} />
           <Route path="/leads" element={<Office><Leads /></Office>} />
           <Route path="/enrollments" element={<Office><Enrollments /></Office>} />
+          <Route path="/todo" element={<Office><Todos /></Office>} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/schedule" element={<Schedule />} />
+          <Route path="/assessments" element={<Assessments />} />
           <Route path="/photos" element={<Office><Photos /></Office>} />
           <Route path="/photos/:id" element={<Office><PhotoEvent /></Office>} />
           <Route path="/settings" element={<Office><SettingsPage /></Office>} />

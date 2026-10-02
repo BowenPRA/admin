@@ -313,7 +313,7 @@ const COLUMNS = [
   ['Next step', 40, (l) => l.next_step || ''],
   ['Follow up by', 13, (l) => l.follow_up, true],
   ['Notes', 60, (l) => l.notes || ''],
-  ['Last changed', 13, (l) => String(l.updated_at || '').slice(0, 10), true],
+  ['Last changed', 13, (l) => (l.updated_at ? fmtIso(new Date(l.updated_at)) : ''), true], // the day here, not in UTC
   ['Changed by', 14, (l) => personName(l.updated_by)],
 ]
 

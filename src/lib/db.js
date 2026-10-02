@@ -24,6 +24,8 @@ const TABLES = {
   sections: 'adm_report_sections',
   courseNotes: 'adm_course_notes',
   attendance: 'adm_attendance',
+  // Trips: the days a student is away traveling (anyone who takes attendance)
+  travel: 'adm_travel',
   // Event photos (office only)
   photoEvents: 'adm_photo_events',
   eventPhotos: 'adm_event_photos',
@@ -35,13 +37,29 @@ const TABLES = {
   // Enrollment forms from the website (office); the private part is for the super admin only
   enrollments: 'adm_enrollments',
   enrollmentPrivate: 'adm_enrollment_private',
+  // To-Do: tasks for staff and for Claude (office only)
+  todos: 'adm_todos',
 }
 
 // Rows that come straight from form inputs may hold '' where Postgres wants
 // null (date / numeric columns). Applied to the report tables and students.
-const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes, TABLES.attendance, TABLES.photoEvents, TABLES.eventPhotos, TABLES.eventPosts, TABLES.leads])
-const cleanRow = (table, row) => (CLEAN.has(table) ? Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v === '' ? null : v])) : row)
+const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes, TABLES.attendance, TABLES.travel, TABLES.photoEvents, TABLES.eventPhotos, TABLES.eventPosts, TABLES.leads, TABLES.todos])
+// Invoices and payments keep their text as typed; only a date that was cleared needs to be null.
+const DATE_COLS = { [TABLES.invoices]: ['issue_date', 'due_date'], [TABLES.payments]: ['paid_on'] }
+const cleanRow = (table, row) => {
+  if (CLEAN.has(table)) return Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v === '' ? null : v]))
+  const dates = DATE_COLS[table]
+  if (!dates?.some((k) => row[k] === '')) return row
+  const r = { ...row }
+  dates.forEach((k) => { if (r[k] === '') r[k] = null })
+  return r
+}
+// The column that tells rows apart when a list is read page by page.
+const ROW_KEY = { [TABLES.enrollmentPrivate]: 'enrollment_id' }
 const matches = (row, filter) => Object.entries(filter || {}).every(([k, v]) => (Array.isArray(v) ? v.includes(row[k]) : row[k] === v))
+
+/** A number that was handed out twice: the database refused the second one. */
+export const isDuplicate = (e) => /duplicate key|unique constraint/i.test(e?.message || '')
 
 export const genId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`)
 
@@ -133,18 +151,25 @@ function throwIf(error) { if (error) throw new Error(error.message || String(err
 
 const supaAdapter = {
   mode: 'supabase',
+  // Read page by page: Supabase returns at most 1000 rows to one request, and a
+  // list cut off there would, for one, hand out invoice numbers that are taken.
   async list(table, filter) {
-    let q = supabase.from(table).select('*')
-    for (const [k, v] of Object.entries(filter || {})) q = Array.isArray(v) ? q.in(k, v) : q.eq(k, v)
-    const { data, error } = await q.order('created_at', { ascending: true })
-    throwIf(error)
-    return data || []
+    const key = ROW_KEY[table] || 'id'
+    const out = []
+    for (let start = 0; ; start += 1000) {
+      let q = supabase.from(table).select('*')
+      for (const [k, v] of Object.entries(filter || {})) q = Array.isArray(v) ? q.in(k, v) : q.eq(k, v)
+      const { data, error } = await q.order('created_at', { ascending: true }).order(key, { ascending: true }).range(start, start + 999)
+      throwIf(error)
+      out.push(...(data || []))
+      if (!data || data.length < 1000) return out
+    }
   },
   // Pages through the rows so long ranges are not cut off at Supabase's 1000-row limit.
   async listRange(table, col, from, to) {
     const out = []
     for (let start = 0; ; start += 1000) {
-      const { data, error } = await supabase.from(table).select('*').gte(col, from).lte(col, to).order(col).range(start, start + 999)
+      const { data, error } = await supabase.from(table).select('*').gte(col, from).lte(col, to).order(col).order('id').range(start, start + 999)
       throwIf(error)
       out.push(...(data || []))
       if (!data || data.length < 1000) return out
@@ -250,6 +275,16 @@ const saveStudents = async (rows) => {
   }
 }
 
+// A change to some fields of one student. Unlike a save it is a plain update: the rest of the
+// row stays as it is in the database, whatever this browser loaded earlier.
+const patchStudent = async (id, fields) => {
+  const f = 'status' in fields || 'active' in fields ? withStatus(fields) : fields
+  try { return await A.patch(TABLES.students, id, f) } catch (e) {
+    if (!noStatusColumn(e)) throw e
+    return A.patch(TABLES.students, id, dropStatus(f))
+  }
+}
+
 // Documents parents attach to the enrollment form (supabase/updates-2026-09-30-enrollments.sql).
 const ENROLLMENT_BUCKET = 'adm-enrollment'
 const enrollmentPrivate = (id) => A.list(TABLES.enrollmentPrivate, { enrollment_id: id }).then((rows) => rows[0] || null)
@@ -263,6 +298,7 @@ export const db = {
     ...crud(TABLES.students),
     save: saveStudent,
     saveMany: saveStudents,
+    patch: patchStudent,
   },
   teachers: crud(TABLES.teachers),
   reports: crud(TABLES.reports),
@@ -281,10 +317,17 @@ export const db = {
     /** Takes a mark off again; fails loudly if the database refuses. */
     clear: (id) => A.removeStrict(TABLES.attendance, id),
   },
+  // Trips (supabase/updates-2026-10-01-travel.sql): attendance shows a student as A(T) on the days inside one.
+  travel: {
+    list: () => A.list(TABLES.travel),
+    save: (row) => A.upsert(TABLES.travel, row),
+    remove: (id) => A.removeStrict(TABLES.travel, id),
+  },
   invoices: {
     list: () => A.list(TABLES.invoices),
     get: (id) => A.get(TABLES.invoices, id),
     save: (row) => A.upsert(TABLES.invoices, row),
+    patch: (id, fields) => A.patch(TABLES.invoices, id, fields),
     // Its payments go with it (cascade), so their proof files are cleared too.
     async remove(id) {
       const ps = await A.list(TABLES.payments, { invoice_id: id }).catch(() => [])
@@ -294,6 +337,8 @@ export const db = {
   },
   payments: {
     list: () => A.list(TABLES.payments),
+    /** One invoice's payments, oldest first. */
+    forInvoice: (invoiceId) => A.list(TABLES.payments, { invoice_id: invoiceId }).then((ps) => ps.sort((a, b) => (a.paid_on || '').localeCompare(b.paid_on || ''))),
     get: (id) => A.get(TABLES.payments, id),
     save: (row) => A.upsert(TABLES.payments, row).catch((e) => { throw (row.proof?.length ? proofError(e) : e) }),
     patch: (id, fields) => A.patch(TABLES.payments, id, fields).catch((e) => { throw ('proof' in fields ? proofError(e) : e) }),
@@ -319,6 +364,26 @@ export const db = {
     remove: (id) => A.removeStrict(TABLES.eventPosts, id),
   },
   leads: { ...crud(TABLES.leads), remove: (id) => A.removeStrict(TABLES.leads, id) },
+  // To-Do tasks (supabase/updates-2026-10-01-todos.sql). A note is added by a database function, so
+  // two people adding one at the same moment both keep theirs; offline it is added to the row here.
+  todos: {
+    ...crud(TABLES.todos),
+    // The database numbers a new task and notes when one is done; offline that is done here.
+    save: async (row) => {
+      if (A.mode !== 'local') return A.upsert(TABLES.todos, row)
+      const all = await A.list(TABLES.todos)
+      const number = row.number ?? Math.max(0, ...all.map((x) => x.number || 0)) + 1
+      return A.upsert(TABLES.todos, { ...row, number, done_at: row.status === 'done' ? row.done_at || new Date().toISOString() : null })
+    },
+    patch: (id, fields) => A.patch(TABLES.todos, id, A.mode === 'local' && 'status' in fields ? { ...fields, done_at: fields.status === 'done' ? new Date().toISOString() : null } : fields),
+    remove: (id) => A.removeStrict(TABLES.todos, id),
+    addUpdate: async (id, text, by) => {
+      if (A.mode === 'supabase') return A.rpc('adm_todo_add_update', { p_id: id, p_text: text })
+      const row = await A.get(TABLES.todos, id)
+      if (!row) throw new Error('This record no longer exists.')
+      return A.patch(TABLES.todos, id, { updates: [...(row.updates || []), { at: new Date().toISOString(), by: by || '', text: String(text).trim() }] })
+    },
+  },
   // The website writes these itself (adm_web_submit); the office only reads them and marks them done.
   webMessages: {
     list: () => A.list(TABLES.webMessages),
@@ -414,7 +479,10 @@ export const auth = {
   async signOut() { if (hasSupabase) await supabase.auth.signOut() },
   async changePassword(password) {
     if (!hasSupabase) throw new Error('Passwords only apply when connected to Supabase.')
-    const { error } = await supabase.auth.updateUser({ password })
+    // Short-name accounts sign in with a suffix on the password (see signIn): the new one needs it too.
+    const { data } = await supabase.auth.getSession()
+    const short = (data.session?.user?.email || '').endsWith('@science.local')
+    const { error } = await supabase.auth.updateUser({ password: short ? `${password.trim()}-y8s` : password })
     if (error) throw error
   },
 }

@@ -6,15 +6,15 @@ import { db } from '../../lib/db'
 import { useAuth } from '../../lib/AuthContext'
 import { useToast } from '../../lib/toast'
 import { Empty, Menu, PageHeader, SearchInput, Segmented, Select, Spinner } from '../../components/ui'
-import { TAG_GROUPS, allKeys, canPublish, finishEvent, moveToWebsite, onWebsite, photoError, prepareFiles, removeEvent, removePhoto, tagValues, websiteSlug } from '../../lib/eventPhotos'
+import { TAG_GROUPS, allKeys, canPublish, finishEvent, moveToWebsite, onWebsite, photoError, prepareFiles, removeEvent, removePhoto, stillPublic, tagValues, websiteSlug } from '../../lib/eventPhotos'
+import { cancelScheduled, isScheduled } from '../../lib/facebook'
+import { todayISO as today } from '../../lib/money'
 import PhotoCard from '../../components/photos/PhotoCard'
 import PhotoModal from '../../components/photos/PhotoModal'
 import PhotoViewer from '../../components/photos/PhotoViewer'
 import EventNotes from '../../components/photos/EventNotes'
 import PostCard from '../../components/photos/PostCard'
 import WebsitePanel from '../../components/photos/WebsitePanel'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 // The quick filters above the grid. Every one except "delisted" is about photos still in the album.
 const STATUSES = [
@@ -72,11 +72,13 @@ export default function PhotoEvent() {
       toast.error(photoError(e).message)
     }
   }, [toast])
+  // Answers true when the change was saved, so a step that depends on it can stop when it was not.
   const patchPost = useCallback(async (post, fields) => {
     setPosts((ps) => ps.map((p) => (p.id === post.id ? { ...p, ...fields } : p)))
-    try { await db.eventPosts.patch(post.id, fields) } catch (e) {
+    try { await db.eventPosts.patch(post.id, fields); return true } catch (e) {
       setPosts((ps) => ps.map((p) => (p.id === post.id ? post : p)))
       toast.error(photoError(e).message)
+      return false
     }
   }, [toast])
   const patchEvent = async (fields) => {
@@ -135,13 +137,33 @@ export default function PhotoEvent() {
       setTimeout(() => document.getElementById(`post-${row.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
     } catch (e) { toast.error(photoError(e).message) }
   }
-  const deletePost = async (post) => { await patchPost(post, { status: 'dropped' }); toast(t('phPostDeleted')) }
+  // A post still waiting on Facebook is taken off there first, or Facebook would publish it
+  // anyway. Gives back the post as it is afterwards (a draft again), or null to stop the delete.
+  const offFacebook = async (post) => {
+    if (!isScheduled(post)) return post
+    if (!window.confirm(t('fbDeleteScheduledConfirm'))) return null
+    try { await cancelScheduled(post) } catch (e) { toast.error(t('fbDeleteStopped', { error: e.message })); return null }
+    const now = { ...post, status: 'draft', facebook: null, posted_at: null, posted_by: null }
+    setPosts((ps) => ps.map((p) => (p.id === post.id ? now : p)))
+    return now
+  }
+  const deletePost = async (post) => {
+    const now = await offFacebook(post)
+    if (!now) return
+    // After a cancel its fields are written again here, in case the function could not save them.
+    const fields = now === post ? { status: 'dropped' } : { status: 'dropped', facebook: null, posted_at: null, posted_by: null }
+    if (await patchPost(now, fields)) toast(t('phPostDeleted'))
+  }
   const deleteForGood = async (post) => {
     if (!window.confirm(t('phPostForGoodConfirm', { title: post.title || t('phPostRecap') }))) return
+    if (!(await offFacebook(post))) return
     try { await db.eventPosts.remove(post.id); setPosts((ps) => ps.filter((p) => p.id !== post.id)) } catch (e) { toast.error(photoError(e).message) }
   }
 
+  // A photo on the public website cannot be removed here: its record is what tells the
+  // website to take the picture down. It has to come off the website first.
   const remove = async (photo) => {
+    if ((await stillPublic([photo])).length) { toast.error(t('phRemoveOnWebsite', { title: photo.title || photo.code })); return }
     if (!window.confirm(t('phRemoveConfirm', { title: photo.title || photo.code }))) return
     try {
       await removePhoto(photo)
@@ -151,6 +173,8 @@ export default function PhotoEvent() {
     } catch (e) { toast.error(photoError(e).message) }
   }
   const removeAll = async () => {
+    const live = await stillPublic(photos)
+    if (live.length) { toast.error(t('phRemoveEventOnWebsite', { n: live.length })); return }
     if (!window.confirm(t('phRemoveEventConfirm', { name: event.name, n: photos.length }))) return
     try { await removeEvent(event, photos); navigate('/photos') } catch (e) { toast.error(photoError(e).message) }
   }

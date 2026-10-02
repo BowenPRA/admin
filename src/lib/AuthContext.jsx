@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { auth, db, dbMode } from './db'
 import { splitSubjectKey } from '../data/staff'
 
@@ -24,6 +24,7 @@ const readViewAs = () => { try { return localStorage.getItem(VIEW_AS_KEY) || '' 
 export function AuthProvider({ children }) {
   const [state, setState] = useState({ loading: true, session: null, me: null })
   const [viewAs, setViewAsState] = useState(readViewAs)
+  const lastRow = useRef(null) // { email, row } from the last lookup that worked
 
   const resolve = useCallback(async (session) => {
     if (!session) { setState({ loading: false, session: null, me: null }); return }
@@ -34,7 +35,12 @@ export function AuthProvider({ children }) {
     try {
       const rows = await db.teachers.list()
       row = rows.find((t) => (t.email || '').toLowerCase() === email && t.active !== false) || null
-    } catch { /* table may not exist yet */ }
+      lastRow.current = { email, row }
+    } catch {
+      // The table may not exist yet. A lookup that fails later on (this runs each time the tab is
+      // looked at again) keeps the classes the person had, rather than leaving them with none.
+      if (lastRow.current?.email === email) row = lastRow.current.row
+    }
     const metaRole = local ? (viewAs ? '' : 'super_admin') : session.user?.app_metadata?.role
     let access = KNOWN.includes(metaRole) ? metaRole : ADMIN_EMAILS.includes(email) ? 'super_admin' : row ? 'teacher' : 'viewer'
     if (local && viewAs && row?.role === 'head') access = 'head'

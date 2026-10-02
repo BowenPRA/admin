@@ -4,7 +4,7 @@ import { Check, ExternalLink, Lock, Paperclip, Trash2, Undo2, UserPlus } from 'l
 import { db } from '../../lib/db'
 import { fmtDay, fmtMoment, personName } from '../../lib/leads'
 import {
-  STUDENT_FIELDS, PARENT_FIELDS, PERSON_FIELDS, BACKGROUND_QUESTIONS, HEALTH_QUESTIONS, CONSENT, ID_FIELDS,
+  STUDENT_FIELDS, PARENT_FIELDS, PERSON_FIELDS, SCHOOL_FIELDS, DOC_KINDS, BACKGROUND_QUESTIONS, HEALTH_QUESTIONS, CONSENT, ID_FIELDS,
   showValue, birthdayLine, yesNo, isYes, placeOf,
 } from '../../lib/enrollment'
 import { Chip, Modal } from '../ui'
@@ -112,6 +112,7 @@ function PrivatePart({ id, studentName, t, lang }) {
               {files.map((f) => (
                 <li key={f.path} className="flex items-center gap-1.5">
                   <Paperclip size={13} className="shrink-0 text-slate-400" />
+                  {DOC_KINDS[f.kind] && <span className="shrink-0 text-slate-500">{DOC_KINDS[f.kind][i]}:</span>}
                   {state.urls[f.path]
                     ? <a href={state.urls[f.path]} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1.5 break-all text-pra-blue hover:underline">{f.name || f.path}<ExternalLink size={12} className="shrink-0 opacity-60" /></a>
                     : <span className="break-all text-slate-700">{f.name || f.path}</span>}
@@ -189,9 +190,19 @@ export default function EnrollmentModal({ value: e, student, isSuper, onClose, o
         <Section title={t('enSecEducation')}>
           <dl>
             <Row label={t('enSchools')}>
-              {d.schools?.length > 0 && <ul className="space-y-0.5">{d.schools.map((s, n) => <li key={n}>{[s.name, s.years].filter(Boolean).join(' · ')}</li>)}</ul>}
+              {d.schools?.length > 0 && (
+                <ul className="space-y-1.5">
+                  {d.schools.map((s, n) => (
+                    <li key={n}>
+                      <div className="font-semibold">{s.name || '—'}</div>
+                      <div className="text-slate-600">{SCHOOL_FIELDS.filter(([k]) => s[k]).map(([k, label]) => `${label[i]}: ${s[k]}`).join(' · ')}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Row>
-            <Row label={t('enSchoolLang')}>{d.school_language}</Row>
+            {/* Forms sent before 2 October 2026 had one language answer for all the schools. */}
+            {d.school_language && <Row label={t('enSchoolLang')}>{d.school_language}</Row>}
           </dl>
           <YesNoList questions={BACKGROUND_QUESTIONS} answers={d.background} lang={lang} />
           <dl><Row label={t('enExplain')}>{d.background?.explain && <span className="whitespace-pre-wrap">{d.background.explain}</span>}</Row></dl>

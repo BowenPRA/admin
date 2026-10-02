@@ -5,7 +5,6 @@ import { blobToBase64 } from './pdf'
 import { invoicePdfBlob } from './invoicePdf'
 import { createDraft } from './gmail'
 import { invoiceFilename, emailTemplate } from './invoiceEmail'
-import { docTotals } from './pricing'
 import { emailsOf } from './families'
 import { contactsOf } from './studentRecords'
 
@@ -35,7 +34,7 @@ export async function draftInvoice({ inv, fees, to, cc = '', subject, text }) {
 /** Notes the draft on the invoice's send log (the invoice stays unsent until the email goes out). */
 export async function logDraft(inv, { to, cc, subject, id, messageId }) {
   const entry = { at: new Date().toISOString(), to, cc, subject, draft: true, draft_id: id, message_id: messageId }
-  return db.invoices.save({ ...inv, total: docTotals(inv.doc).total, send_log: [...(inv.send_log || []), entry] })
+  return db.invoices.patch(inv.id, { send_log: [...(inv.send_log || []), entry] })
 }
 
 export const lastDraft = (inv) => [...(inv?.send_log || [])].reverse().find((e) => e.draft) || null

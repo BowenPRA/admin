@@ -131,9 +131,15 @@ export async function runUpload({ bundle, uploads, replaceText = false, delistMi
     if (moved.has(p.code)) { delete m.files; delete m.width; delete m.height }
     return m
   }
-  const again = bundle.photos.filter((p) => byCode.has(p.code)).map((p) => onto(byCode.get(p.code), replaceText ? { ...kept(p), title: p.title, caption: p.caption } : kept(p)))
+  const row = (p) => onto(byCode.get(p.code), replaceText ? { ...kept(p), title: p.title, caption: p.caption } : kept(p))
+  const known = bundle.photos.filter((p) => byCode.has(p.code))
+  // Rows saved together must carry the same columns (one that is missing is written as empty),
+  // so the photos on the website, which leave their pictures out, are saved on their own.
+  const again = known.filter((p) => !moved.has(p.code)).map(row)
+  const onSite = known.filter((p) => moved.has(p.code)).map(row)
   if (fresh.length) await db.eventPhotos.saveMany(fresh)
   if (again.length) await db.eventPhotos.saveMany(again)
+  if (onSite.length) await db.eventPhotos.saveMany(onSite)
 
   // 4. Photos that have left the album: delisted (kept, with their sign-off), and their text corrected when replacing it.
   const inAlbum = new Set(bundle.photos.map((p) => p.code))
@@ -159,5 +165,5 @@ export async function runUpload({ bundle, uploads, replaceText = false, delistMi
   if (send.length) await db.eventPosts.saveMany(send)
 
   step({ stage: 'done', done: 1, total: 1 })
-  return { event: ev, fresh: fresh.length, again: again.length, delisted, postsWritten: send.length, pictures: sent }
+  return { event: ev, fresh: fresh.length, again: again.length + onSite.length, delisted, postsWritten: send.length, pictures: sent }
 }

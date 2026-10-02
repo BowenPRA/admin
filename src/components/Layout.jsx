@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout, Briefcase, Megaphone, FileSignature } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout, Briefcase, Megaphone, FileSignature, FileCheck, BookOpen, ListTodo } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -9,16 +9,21 @@ import { useToast } from '../lib/toast'
 import { ACCESS_ROLES } from '../data/staff'
 import { Avatar, Chip, Field, Modal, TextInput } from './ui'
 
-// The top row. Pages everyone uses day to day stand alone; the rest sit in
-// groups, and a group's pages show as a second row of tabs while you are in it.
+// The top row. Home, Students, Attendance and To-Do (office accounts) stand alone;
+// everything else sits in a group (Teaching for everyone, Office and Outreach for
+// office accounts), and a group's pages show as a second row of tabs while you are in it.
 // A group with one page you can see is shown as that page. A new page (the
 // newsletter, say) goes into a group's `pages` and the top row stays as it is.
 const NAV = [
   { to: '/', icon: Home, label: 'home', end: true },
   { to: '/students', icon: Users, label: 'students' },
-  { to: '/reports', icon: ClipboardList, label: 'reportsNav' },
   { to: '/attendance', icon: CalendarCheck, label: 'attendance' },
-  { to: '/schedule', icon: CalendarDays, label: 'schedule' },
+  { to: '/todo', icon: ListTodo, label: 'todoNav', who: 'office' },
+  { id: 'teaching', icon: BookOpen, label: 'navTeaching', pages: [
+    { to: '/reports', icon: ClipboardList, label: 'reportsNav', who: 'all' },
+    { to: '/schedule', icon: CalendarDays, label: 'schedule', who: 'all' },
+    { to: '/assessments', icon: FileCheck, label: 'asNav', who: 'all' },
+  ] },
   { id: 'office', icon: Briefcase, label: 'navOffice', pages: [
     { to: '/invoices', icon: FileText, label: 'invoices', who: 'office' },
     { to: '/leads', icon: Sprout, label: 'leadsNav', who: 'office' },
@@ -49,8 +54,8 @@ export default function Layout() {
   const navRef = useRef(null)
   const headerRef = useRef(null)
 
-  const can = { office: isOffice, head: isHead }
-  const nav = NAV.map((n) => (n.pages ? { ...n, pages: n.pages.filter((p) => can[p.who]) } : n)).filter((n) => !n.pages || n.pages.length)
+  const can = { all: true, office: isOffice, head: isHead }
+  const nav = NAV.map((n) => (n.pages ? { ...n, pages: n.pages.filter((p) => can[p.who]) } : n)).filter((n) => (n.pages ? n.pages.length : can[n.who || 'all']))
   const group = nav.find((n) => n.pages?.length > 1 && n.pages.some((p) => under(pathname, p.to)))
   const last = readLast()
 

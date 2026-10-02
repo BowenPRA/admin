@@ -32,16 +32,18 @@ function SettingsForm({ data }) {
   const [cal, setCal] = useState(() => structuredClone(data.calendar))
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
+  const [failed, setFailed] = useState(false)
+  const fail = (e) => { setFailed(true); setMsg(e.message || String(e)) }
 
   const M = (label, path) => <Field label={label}><MoneyInput value={getPath(fees, path)} onChange={(v) => setFees(setPath(fees, path, v))} /></Field>
   const T = (label, path, type = 'text') => <Field label={label}><TextInput value={getPath(fees, path)} onChange={(v) => setFees(setPath(fees, path, v))} type={type} /></Field>
 
   const save = async () => {
-    setBusy(true); setMsg('')
+    setBusy(true); setMsg(''); setFailed(false)
     try {
       const c = { ...cal, quarters: cal.quarters.map((q) => ({ ...q, days: Number(q.days) || 0, months: Number(q.months) || 0 })), months: cal.months.map((m) => ({ ...m, days: Number(m.days) || 0 })) }
       await db.setFees(fees); await db.setCalendar(c); await data.refresh(); setMsg(t('saved'))
-    } catch (e) { setMsg(e.message) } finally { setBusy(false) }
+    } catch (e) { fail(e) } finally { setBusy(false) }
   }
   const reset = () => { if (confirm(t('resetDefaults') + '?')) { setFees(structuredClone(DEFAULT_FEES)); setCal(structuredClone(DEFAULT_CALENDAR)) } }
 
@@ -59,18 +61,21 @@ function SettingsForm({ data }) {
         n++
       }
       await data.refresh(); setMsg(`${n} ${t('students').toLowerCase()} +`)
-    } catch (e) { setMsg(e.message) } finally { setBusy(false) }
+    } catch (e) { fail(e) } finally { setBusy(false) }
   }
 
   const doExport = async () => {
-    const [invoices, payments] = await Promise.all([db.invoices.list(), db.payments.list()])
-    exportWorkbook({ invoices, payments, students: data.students, families: data.families })
+    setBusy(true); setMsg(''); setFailed(false)
+    try {
+      const [invoices, payments] = await Promise.all([db.invoices.list(), db.payments.list()])
+      exportWorkbook({ invoices, payments, students: data.students, families: data.families })
+    } catch (e) { fail(e) } finally { setBusy(false) }
   }
 
   const exportStudents = async () => {
-    setBusy(true); setMsg('')
+    setBusy(true); setMsg(''); setFailed(false)
     try { await exportStudentList({ list: officeOrder(data.students), students: data.students, families: data.families, label: 'All students', schoolYear: fees.schoolYear }) }
-    catch (e) { setMsg(e.message) } finally { setBusy(false) }
+    catch (e) { fail(e) } finally { setBusy(false) }
   }
 
   return (
@@ -78,7 +83,7 @@ function SettingsForm({ data }) {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-2xl font-black text-slate-800">{t('settings')}</h1>
         <div className="flex-1" />
-        {msg && <span className="text-sm font-semibold text-green-700">{msg}</span>}
+        {msg && <span className={`text-sm font-semibold ${failed ? 'text-red-600' : 'text-green-700'}`}>{msg}</span>}
         <button className="btn-secondary" onClick={reset}><RotateCcw size={16} /> {t('resetDefaults')}</button>
         <button className="btn-primary" onClick={save} disabled={busy}><Save size={16} /> {busy ? t('saving') : t('save')}</button>
       </div>

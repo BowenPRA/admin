@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PlusCircle, Users, CalendarCheck, CalendarDays, ClipboardList, ArrowRight, Check, Sun, Sprout, FileSignature } from 'lucide-react'
+import { PlusCircle, Users, CalendarCheck, CalendarDays, ClipboardList, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
@@ -10,6 +10,8 @@ import { LEVELS } from '../lib/fees'
 import { splitSubjectKey } from '../data/staff'
 import { isEnrolled, activeFamilies } from '../lib/studentRecords'
 import { summarize } from '../lib/leads'
+import { summarizeTodos } from '../lib/todos'
+import { tripOn, statusOn, travelingOn, tripLine, TRAVEL } from '../lib/travel'
 import { teacherDay, todayIndex, isNow, subjectTone } from '../lib/schedule'
 import { currentPeriod, reportWork, studentSections, HOMEROOM_PART, WRITING } from '../lib/report/utils'
 import { Card, StatusChip, Empty, Spinner } from '../components/ui'
@@ -29,15 +31,23 @@ const DescriptionIcon = WRITING_PARTS[1].Icon
 // ---------------------------------------------------------------------------
 // Data
 
-/** Today's attendance progress for the given year groups. */
-function useTodayAttendance(students) {
+/** Today's attendance progress for the given year groups. A student who is traveling today is A(T) already: marked, and one of the absent. */
+function useTodayAttendance(students, trips) {
   const [marks, setMarks] = useState(null)
   useEffect(() => { db.attendance.list({ date: todayIso() }).then(setMarks).catch(() => setMarks([])) }, [])
   return (groups) => groups.map((g) => {
     const kids = students.filter((s) => isEnrolled(s) && s.level === g)
-    const marked = (marks || []).filter((m) => kids.some((k) => k.id === m.student_id))
-    return { g, total: kids.length, marked: marked.length, absent: marked.filter((m) => m.status === 'absent').length, loaded: !!marks }
+    const states = kids.map((k) => statusOn((marks || []).find((m) => m.student_id === k.id), tripOn(trips, k.id, todayIso()))).filter(Boolean)
+    return { g, total: kids.length, marked: states.length, absent: states.filter((st) => st === 'absent' || st === TRAVEL).length, travel: states.filter((st) => st === TRAVEL).length, loaded: !!marks }
   })
+}
+
+/** 'Traveling: Helios (Australia · until Fri 30 Oct)' for the greeting band, or nothing when nobody is away today. */
+function travelFact(trips, students, t, lang) {
+  const away = travelingOn(trips, students.filter(isEnrolled), todayIso())
+  if (!away.length) return null
+  const names = away.slice(0, 4).map((x) => `${x.s.nickname || x.s.full_name} (${tripLine(x.trip, lang)})`).join(', ')
+  return { icon: Plane, to: '/attendance', text: t('travelingNow', { names: away.length > 4 ? `${names} +${away.length - 4}` : names }) }
 }
 
 /**
@@ -342,7 +352,8 @@ function OfficeHome() {
   const [leads, setLeads] = useState(null)
   const [webWaiting, setWebWaiting] = useState(0)
   const [formsToCheck, setFormsToCheck] = useState(0)
-  const today = useTodayAttendance(data.students)
+  const [todos, setTodos] = useState(null)
+  const today = useTodayAttendance(data.students, data.travel)
   const reports = useReportWork()
   const lessons = useTodayLessons()
 
@@ -353,6 +364,9 @@ function OfficeHome() {
   useEffect(() => { db.webMessages.list().then((ms) => setWebWaiting(ms.filter((m) => !m.done_at).length)).catch(() => setWebWaiting(0)) }, [])
   // And for enrollment forms from the website (updates-2026-09-30-enrollments.sql).
   useEffect(() => { db.enrollments.list().then((fs) => setFormsToCheck(fs.filter((f) => !f.checked_at).length)).catch(() => setFormsToCheck(0)) }, [])
+
+  // And for the To-Do tab (updates-2026-10-01-todos.sql).
+  useEffect(() => { db.todos.list().then((ts) => setTodos(summarizeTodos(ts, me?.email || ''))).catch(() => setTodos(null)) }, [me?.email])
 
   if (!invoices || data.loading) return <Spinner />
 
@@ -377,7 +391,9 @@ function OfficeHome() {
           att[0]?.loaded && { icon: CalendarCheck, text: toRegister ? t(toRegister === 1 ? 'classToRegister' : 'classesToRegister', { n: toRegister }) : t('allRegistered') },
           !reports.hidden && reports.work && !reports.work.error && reports.work.total > 0 && { icon: ClipboardList, text: `${reports.period.label}: ${reports.work.total - reports.work.done ? t('nLeft', { n: reports.work.total - reports.work.done }) : t('reportsAllDone')}` },
           leads && (leads.new || leads.due || webWaiting) && { icon: Sprout, to: '/leads', text: `${t('leadsNav')}: ${[leads.new && t('ldNewShort', { n: leads.new }), leads.due && t('ldDueShort', { n: leads.due }), webWaiting && t('ldWebShort', { n: webWaiting })].filter(Boolean).join(' · ')}` },
+          travelFact(data.travel, data.students, t, lang),
           formsToCheck > 0 && { icon: FileSignature, to: '/enrollments', text: t('enHomeShort', { n: formsToCheck }) },
+          todos && (todos.mine || todos.late || todos.check) > 0 && { icon: ListTodo, to: '/todo', text: `${t('todoNav')}: ${[todos.mine && t('tdHomeMine', { n: todos.mine }), todos.late && t('tdHomeLate', { n: todos.late }), todos.check && t('tdHomeCheck', { n: todos.check })].filter(Boolean).join(' · ')}` },
         ]} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -427,10 +443,10 @@ function OfficeHome() {
 }
 
 function TeacherHome() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const data = useData()
   const { me, displayName, isHead } = useAuth()
-  const today = useTodayAttendance(data.students)
+  const today = useTodayAttendance(data.students, data.travel)
   const reports = useReportWork()
   const lessons = useTodayLessons()
   if (data.loading) return <Spinner />
@@ -453,6 +469,7 @@ function TeacherHome() {
         facts={[
           lessons.onSchedule && { icon: CalendarDays, text: lessons.items.length === 1 ? t('lessonToday') : lessons.items.length ? t('lessonsToday', { n: lessons.items.length }) : t('noLessonsToday') },
           groups.length > 0 && att[0]?.loaded && { icon: CalendarCheck, text: toRegister ? t(toRegister === 1 ? 'classToRegister' : 'classesToRegister', { n: toRegister }) : t('allRegistered') },
+          travelFact(data.travel, data.students.filter((s) => groups.includes(s.level)), t, lang),
           !reports.hidden && work && { icon: ClipboardList, text: work.total ? `${reports.period.label}: ${partsLeft ? t('nLeft', { n: partsLeft }) : t('reportsAllDone')}` : t('noReportsYet') },
         ]} />
 

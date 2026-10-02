@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet, Printer } from 'lucide-react'
 import { db } from '../lib/db'
 import { exportStudentList } from '../lib/exportExcel'
 import { useT } from '../lib/i18n'
@@ -59,7 +59,8 @@ export default function Students() {
   const wanted = params.get('student')
   const linked = useMemo(() => { const s = wanted ? students.find((x) => x.id === wanted) : null; return s ? { ...blankStudent(), ...s } : null }, [wanted, students])
   const shown = editing || linked
-  const closeStudent = () => { setEditing(null); if (wanted) setParams({}, { replace: true }) }
+  const newFamily = useRef(null) // a family made for a student whose own save then failed: used again, not made twice
+  const closeStudent = () => { newFamily.current = null; setEditing(null); if (wanted) setParams({}, { replace: true }) }
 
   const famById = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families])
   const kidsByFamily = useMemo(() => {
@@ -124,14 +125,24 @@ export default function Students() {
   }
 
   // ---- students ----
+  // Changes to a student are written field by field. This page's copy of the list can be hours
+  // old, and saving a whole row from it would undo what a colleague changed in the meantime.
+  const sameValue = (a, b) => ((a ?? '') === '' && (b ?? '') === '') || JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+  const changedFields = (next, orig) => Object.fromEntries(Object.entries(next).filter(([k, v]) => !['id', 'created_at', 'updated_at'].includes(k) && !sameValue(v, orig[k])))
+  const patchStudents = async (changes) => { for (const [id, fields] of changes) await db.students.patch(id, fields) }
+
   const saveStudent = async (s) => {
     try {
       let familyId = s.family_id || null
       if (familyId === '__new') {
-        const fam = await db.families.save({ name: familyNameFor([s]), email: emailsOf(s).join(', '), phone: s.parent_phone || '', language: looksVietnamese([s]) ? 'vi' : 'en', notes: '', contacts: [] })
-        familyId = fam.id
+        newFamily.current ||= (await db.families.save({ name: familyNameFor([s]), email: emailsOf(s).join(', '), phone: s.parent_phone || '', language: looksVietnamese([s]) ? 'vi' : 'en', notes: '', contacts: [] })).id
+        familyId = newFamily.current
       }
-      await db.students.save({ ...s, family_id: familyId, dob: s.dob || null })
+      const row = { ...s, family_id: familyId, dob: s.dob || null }
+      const orig = s.id ? students.find((x) => x.id === s.id) : null
+      if (!orig) await db.students.save(row)
+      else { const fields = changedFields(row, orig); if (Object.keys(fields).length) await db.students.patch(orig.id, fields) }
+      newFamily.current = null
       await refresh()
       closeStudent()
       toast(t('studentSaved', { name: s.nickname || s.full_name }))
@@ -147,14 +158,14 @@ export default function Students() {
       const fam = await db.families.save({ name: familyNameFor([s]), email: emailsOf(s).join(', '), phone: s.parent_phone || '', language: looksVietnamese([s]) ? 'vi' : 'en', notes: '', contacts: [] })
       fid = fam.id
     }
-    await db.students.save({ ...s, family_id: fid })
+    await db.students.patch(s.id, { family_id: fid })
     await refresh()
   })
   const convertCodes = () => run(async () => {
     // Skips a student whose new ID another student already has (shown as a duplicate in the form).
     const taken = new Set(students.map((s) => s.student_code))
     const rows = toConvert.map((s) => ({ ...s, student_code: normalizeCode(s.student_code) })).filter((s) => !taken.has(s.student_code))
-    await db.students.saveMany(rows)
+    await patchStudents(rows.map((s) => [s.id, { student_code: s.student_code }]))
     await refresh()
     toast(t('idsConverted', { n: rows.length }))
   })
@@ -165,7 +176,7 @@ export default function Students() {
       pool.push(row)
       return row
     })
-    await db.students.saveMany(rows)
+    await patchStudents(rows.map((s) => [s.id, { student_code: s.student_code }]))
     await refresh()
     toast(t('idsAssigned', { n: rows.length }))
   })
@@ -180,7 +191,7 @@ export default function Students() {
       roster = JSON.parse(await file.text())
       if (!Array.isArray(roster) || !roster.length || !roster.every((r) => r && typeof r.full_name === 'string' && r.full_name.trim())) throw new Error()
     } catch { toast.error(t('rosterFileBad')); return }
-    const out = []
+    const out = [], changes = []
     let added = 0, updated = 0
     for (const r of roster) {
       const code = normalizeCode(r.student_code)
@@ -194,11 +205,11 @@ export default function Students() {
       if ((existing.address || '').includes('@')) patch.address = r.address
       const bare = (v) => norm(v).replace(/[^\p{L}\p{N}]+/gu, '')
       if (existing.parent_phone && bare(existing.parent_phone) === bare(r.address)) patch.parent_phone = r.parent_phone
-      if (Object.keys(patch).length) { out.push({ ...existing, ...patch }); updated++ }
+      if (Object.keys(patch).length) { changes.push([existing.id, patch]); updated++ }
     }
-    if (!out.length) { toast.info(t('rosterUpToDate')); return }
+    if (!out.length && !changes.length) { toast.info(t('rosterUpToDate')); return }
     if (!confirm(t('rosterConfirm', { added, updated }))) return
-    run(async () => { await db.students.saveMany(out); await refresh(); toast(t('rosterDone', { added, updated })) })
+    run(async () => { await db.students.saveMany(out); await patchStudents(changes); await refresh(); toast(t('rosterDone', { added, updated })) })
   }
   const buildFamilies = () => {
     const { create, attach } = proposeFamilies(students, families)
@@ -209,10 +220,10 @@ export default function Students() {
       const updates = []
       for (const c of create) {
         const fam = await db.families.save({ name: c.name, email: c.email, phone: c.phone, language: c.language, notes: '', contacts: [] })
-        c.studentIds.forEach((id) => updates.push({ ...students.find((s) => s.id === id), family_id: fam.id }))
+        c.studentIds.forEach((id) => updates.push([id, { family_id: fam.id }]))
       }
-      attach.forEach((a) => a.studentIds.forEach((id) => updates.push({ ...students.find((s) => s.id === id), family_id: a.familyId })))
-      await db.students.saveMany(updates)
+      attach.forEach((a) => a.studentIds.forEach((id) => updates.push([id, { family_id: a.familyId }])))
+      await patchStudents(updates)
       await refresh()
       toast(t('familiesBuilt'))
     })
@@ -233,7 +244,7 @@ export default function Students() {
     if (!confirm(t('confirmDeleteFamily', { name: f.name }))) return
     await run(async () => {
       const kids = kidsByFamily[f.id] || []
-      if (kids.length) await db.students.saveMany(kids.map((k) => ({ ...k, family_id: null })))
+      await patchStudents(kids.map((k) => [k.id, { family_id: null }]))
       await db.families.remove(f.id); await refresh(); setEditingFam(null); toast(t('deletedName', { name: f.name }))
     })
   }
@@ -252,6 +263,7 @@ export default function Students() {
     <div className="space-y-5">
       <PageHeader title={tab === 'families' ? t('families') : t('students')}
         subtitle={`${t('studentsCount', { n: counts.active })} ${t('enrolled').toLowerCase()} · ${t('activeFamiliesCount', { n: famCounts.active })}`}>
+        <Link className="btn-secondary" to={`/print/class-lists${level ? `?group=${encodeURIComponent(level)}` : ''}`} title={t('classListsHint')}><Printer size={16} /> {t('classLists')}</Link>
         {canEdit && (
           <Menu label={t('more')} icon={MoreHorizontal} items={[
             { label: t('loadRoster'), icon: ClipboardList, onClick: () => rosterInput.current?.click(), disabled: busy, hint: lang === 'vi' ? 'Chọn private/roster.json để thêm học sinh còn thiếu' : 'Pick private/roster.json to add anyone missing' },
@@ -432,7 +444,7 @@ export default function Students() {
 
       {shown && (
         <StudentModal key={shown.id || 'new'} value={shown} onClose={closeStudent} onSave={saveStudent} onDelete={removeStudent}
-          students={students} families={families} canEdit={canEdit} t={t} lang={lang} />
+          students={students} families={families} schoolYear={fees?.schoolYear} canEdit={canEdit} t={t} lang={lang} />
       )}
       {editingFam && (
         <FamilyModal key={editingFam.id || 'new-family'} value={editingFam} onClose={() => setEditingFam(null)} onSave={saveFamily} onDelete={removeFamily}

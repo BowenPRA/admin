@@ -70,6 +70,48 @@ body {
   box-sizing: border-box;
 }
 
+/* ---------- Printed summaries (components/print/Sheets.jsx and pages/Print*.jsx) ---------- */
+/* A4 sheets of fixed-height blocks; each page sets its own @page and the sheet size. */
+.ps-sheet {
+  position: relative;
+  margin: 0 auto 6mm;
+  padding: 10mm 12mm 8mm;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: white;
+  color: #1f2937;
+  font-size: 8pt;
+  line-height: 1.25;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.12);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* In the components layer, so utility classes on an element (justify-start…) still apply. */
+@layer components {
+  .ps-rule { height: 1.1mm; border-radius: 1mm; background: linear-gradient(90deg, #6f9f2f 0%, #8dc63f 26%, #2196e3 64%, #1a7bc4 100%); }
+  .ps-thead { column-gap: 2mm; padding-bottom: 0.8mm; border-bottom: 0.3mm solid #cbd5e1; font-size: 6.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; }
+  .ps-row { column-gap: 2mm; border-bottom: 0.2mm solid #eef2f6; font-size: 8pt; }
+  .ps-total { border-top: 0.3mm solid #cbd5e1; border-bottom: 0; font-weight: 800; color: #1f2937; }
+  .att-grid { display: grid; border: 0.25mm solid #cbd5e1; border-radius: 1.6mm; overflow: hidden; }
+  .att-gh { display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-bottom: 0.3mm solid #cbd5e1; font-size: 6.5pt; font-weight: 700; line-height: 1.1; color: #475569; text-align: center; }
+  .att-c { display: flex; align-items: center; justify-content: center; min-width: 0; border-bottom: 0.2mm solid #eef2f6; font-size: 7.5pt; white-space: nowrap; }
+  .att-zebra { background: #fafbfc; }
+  .att-tint-low { background: #fffbeb; }
+  .att-tot { border-left: 0.3mm solid #cbd5e1; }
+  .att-week { border-left: 0.25mm solid #d5dde7; }
+  .att-foot { background: #f8fafc; border-top: 0.3mm solid #cbd5e1; border-bottom: 0; font-size: 7pt; }
+  .att-none { background: #eef1f5 !important; }
+  .att-out { background: repeating-linear-gradient(135deg, #dfe5ec 0 0.45mm, #fff 0.45mm 1.3mm) !important; }
+  .att-missed { background: #fffbeb !important; }
+  .att-p { display: inline-block; width: 2mm; height: 2mm; border-radius: 50%; background: #16a34a; }
+  .att-l, .att-a, .att-t { display: inline-flex; align-items: center; justify-content: center; min-width: 3.8mm; height: 3.8mm; padding: 0 0.5mm; border-radius: 0.8mm; font-size: 6.5pt; font-weight: 800; line-height: 1; }
+  .att-l { background: #fde68a; color: #92400e; }
+  .att-a { background: #dc2626; color: #fff; }
+  .att-t { background: #ddd6fe; color: #5b21b6; }
+  .att-u { color: #94a3b8; font-weight: 700; }
+  .att-noted { position: absolute; top: 0.6mm; right: 0.6mm; width: 1mm; height: 1mm; border-radius: 50%; background: #1a7bc4; }
+}
+
 @page { size: A4; margin: 10mm; }
 
 @media print {
@@ -78,4 +120,7 @@ body {
   .page { width: auto; min-height: 0; padding: 0; margin: 0; box-shadow: none; }
   .doc { font-size: 10pt; }
   .doc tr, .doc table { page-break-inside: avoid; break-inside: avoid; }
+  .ps-sheet { margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
+  .ps-sheet:last-child { break-after: auto; page-break-after: auto; }
+  .ps-zoom { zoom: 1 !important; }
 }

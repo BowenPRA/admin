@@ -227,7 +227,8 @@ export const HOMEROOM_PART = '_homeroom'
  * description (writingFor) and appears on at least one of the reports. Done
  * once the note has enough English text, or every report of the group is
  * published. `notes` are the period's adm_course_notes rows.
- *   [{ yearGroup, key, name, note, done, report }]  (report = where to write it: the first unpublished one)
+ *   [{ yearGroup, key, name, note, done, report }]  (report = where to write it: the first
+ *   unpublished one that has the area; a partial-day student's report may not)
  */
 export function descriptionTasks(settings, reports, sections, { subjects = [], notes = [] } = {}) {
   const out = []
@@ -239,7 +240,9 @@ export function descriptionTasks(settings, reports, sections, { subjects = [], n
       if (!subjects.includes(`${key}:${yearGroup}`) || !writingFor(settings, key).description) continue
       const note = notes.find((n) => n.year_group === yearGroup && n.subject_key === key) || null
       const done = rs.every((r) => r.status === 'published') || descriptionDone(settings, note || { subject_key: key }, yearGroup)
-      out.push({ yearGroup, key, name: subjectByKey(settings, key).name, note, done, report: rs.find((r) => r.status !== 'published') || rs[0] })
+      const open = rs.filter((r) => r.status !== 'published')
+      const report = open.find((r) => sections.some((s) => s.report_id === r.id && s.subject_key === key)) || open[0] || rs[0]
+      out.push({ yearGroup, key, name: subjectByKey(settings, key).name, note, done, report })
     }
   }
   return out
@@ -307,10 +310,11 @@ export function cohortAverages(sections, field = 'score_pct') {
   return Object.fromEntries(Object.entries(acc).map(([k, v]) => [k, Math.round(v.sum / v.n)]))
 }
 
-/** "45/50" -> 90; anything else -> null. */
+/** "45/50" -> 90; anything else -> null, as is a score above its total ("45/5" while typing). */
 export function pctFromRaw(raw) {
   const m = String(raw || '').match(/^\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*$/)
-  return m && parseFloat(m[2]) > 0 ? Math.round((parseFloat(m[1]) / parseFloat(m[2])) * 100) : null
+  const pct = m && parseFloat(m[2]) > 0 ? Math.round((parseFloat(m[1]) / parseFloat(m[2])) * 100) : null
+  return pct != null && pct <= 100 ? pct : null
 }
 
 /** A teacher can type N/A as the raw score when a student was not reviewed. */
@@ -368,5 +372,8 @@ export function currentPeriod(settings) {
   const d = new Date()
   const t = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   const ps = settings?.periods || []
-  return ps.find((p) => p.start <= t && t <= p.end) || ps.find((p) => t < p.start) || ps[ps.length - 1] || null
+  // Between two periods it is still the one that just ended (its reports are
+  // being finished), not the next one. Before the year starts, the first.
+  const ended = [...ps].reverse().find((p) => p.end && p.end < t)
+  return ps.find((p) => p.start <= t && t <= p.end) || ended || ps.find((p) => t < p.start) || ps[ps.length - 1] || null
 }

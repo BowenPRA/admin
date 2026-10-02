@@ -157,6 +157,9 @@ async function publish(sb: Db, body: { post_id: string, media: { code: string, i
     if (!(secs >= 10 * 60 && secs <= 30 * 24 * 3600)) throw new Problem('A scheduled post must be between 10 minutes and 30 days from now.')
   }
 
+  // The Page is asked for before the claim: if Facebook cannot be reached, the post is not left claimed.
+  const pg = await page()
+
   // Claim the post so a second click, or a second person, cannot post it twice.
   const since = new Date(Date.now() - SENDING_MS).toISOString()
   const claim = await sb.from('adm_event_posts').update({ facebook: { sending_at: new Date().toISOString(), by: body.by || '' } })
@@ -165,7 +168,6 @@ async function publish(sb: Db, body: { post_id: string, media: { code: string, i
   if (claim.error) throw new Problem(claim.error.message, 500)
   if (!claim.data?.length) throw new Problem('This post is being sent to Facebook already. Wait a few minutes and reload.', 409)
 
-  const pg = await page()
   const params: Record<string, string> = { message: caption, access_token: pg.token }
   media.forEach((m, i) => { params[`attached_media[${i}]`] = JSON.stringify({ media_fbid: m.id }) })
   if (at) { params.published = 'false'; params.scheduled_publish_time = String(at) }
@@ -208,8 +210,8 @@ Deno.serve(async (req) => {
     const key = req.headers.get('apikey') || Deno.env.get('SUPABASE_ANON_KEY') || ''
     const sb = createClient(Deno.env.get('SUPABASE_URL')!, key, { global: { headers: { Authorization: `Bearer ${jwt}` } }, auth: { persistSession: false } })
     const { data: { user } } = await sb.auth.getUser(jwt)
-    // The same rule as adm_is_staff() in supabase/schema.sql: office accounts only.
-    if (!user || !['teacher', 'admin'].includes(user.app_metadata?.role)) throw new Problem('Sign in with an office account to post to Facebook.', 403)
+    // The same rule as adm_is_staff() in supabase/updates-2026-09-15.sql: office accounts only.
+    if (!user || !['super_admin', 'head', 'admin'].includes(user.app_metadata?.role)) throw new Problem('Sign in with an office account to post to Facebook.', 403)
 
     const form = (req.headers.get('content-type') || '').includes('multipart/form-data')
     const body = form ? await req.formData() : await req.json()

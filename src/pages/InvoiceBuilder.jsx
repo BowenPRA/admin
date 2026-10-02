@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Trash2, Plus, ChevronRight, RotateCcw } from 'lucide-react'
-import { db } from '../lib/db'
+import { db, isDuplicate } from '../lib/db'
+import { useToast } from '../lib/toast'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
 import { LEVELS, PROGRAMS, hasProgram, periodInfo, mealRateFor, nextLevel } from '../lib/fees'
@@ -29,23 +30,33 @@ export default function InvoiceBuilder() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const { loading, students, families, fees, calendar, refresh } = useData()
+  const toast = useToast()
   const [inputs, setInputs] = useState(() => blankInputs(uiLang))
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [editId, setEditId] = useState(null)
   const [loadedFrom, setLoadedFrom] = useState(null)
   const [showInactive, setShowInactive] = useState(false)
+  const [issueDate, setIssueDate] = useState(null) // of the invoice being rebuilt
+  const levelPicked = useRef(new Set()) // students whose year was changed on this page
 
   // ?edit=<id> re-opens an existing invoice's options; ?copy=<id> duplicates.
   useEffect(() => {
     const id = params.get('edit') || params.get('copy')
-    if (!id || loadedFrom === id) return
+    if (!id || loadedFrom === id || !fees) return
+    const editing = !!params.get('edit')
     db.invoices.get(id).then((inv) => {
-      if (inv?.inputs) setInputs({ ...blankInputs(inv.lang), ...inv.inputs })
-      if (params.get('edit')) setEditId(id)
+      if (inv?.inputs) {
+        const next = { ...blankInputs(inv.lang), ...inv.inputs }
+        // A due date set by hand on the invoice page is kept through a rebuild; a copy starts from the plan's date.
+        if (!editing) next.dueDate = ''
+        else if (!next.dueDate && inv.due_date && inv.due_date !== smartDueDate(next, fees, inv.issue_date)) next.dueDate = inv.due_date
+        setInputs(next)
+      }
+      if (editing && inv) { setEditId(id); setIssueDate(inv.issue_date || null) }
       setLoadedFrom(id)
-    })
-  }, [params, loadedFrom])
+    }).catch((e) => toast.error(e.message || String(e)))
+  }, [params, loadedFrom, fees]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const famById = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families])
   const set = (patch) => setInputs((s) => ({ ...s, ...patch }))
@@ -63,7 +74,9 @@ export default function InvoiceBuilder() {
   }
   const pickFamily = (f) => {
     const kids = students.filter((s) => s.family_id === f.id && isBillable(s))
-    set({ students: kids.map((s) => ({ student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) })), lang: f.language || inputs.lang })
+    // Children already on the invoice keep the options chosen for them.
+    const kept = Object.fromEntries(inputs.students.map((e) => [e.student.id, e]))
+    set({ students: kids.map((s) => kept[s.id] || { student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) }), lang: f.language || inputs.lang })
   }
   const pickInactiveFamily = async (f) => {
     const kids = students.filter((s) => s.family_id === f.id)
@@ -87,9 +100,10 @@ export default function InvoiceBuilder() {
       await db.students.saveMany(reactivated)
       await refresh()
       set({ students: reactivated.map((s) => ({ student: s, opts: defaultStudentOptions(s, fees, calendar, ctx) })), lang: f.language || inputs.lang })
-    } catch (e) { alert(e.message) } finally { setBusy(false) }
+    } catch (e) { toast.error(e.message || String(e)) } finally { setBusy(false) }
   }
   const setStudentChoice = (studentId, patch) => {
+    if (patch.level) levelPicked.current.add(studentId)
     set({ students: inputs.students.map((e) => (e.student.id === studentId ? withStudentChoice(e, patch, fees) : e)) })
   }
   const setOpts = (id, patch) => set({ students: inputs.students.map((e) => (e.student.id === id ? { ...e, opts: { ...e.opts, ...patch } } : e)) })
@@ -144,23 +158,31 @@ export default function InvoiceBuilder() {
       const row = {
         ...(existing || {}),
         id: existing?.id,
-        number: existing?.number || await db.nextNumber('invoice', fees.schoolYear),
         family_id: famIds[0] || null, family_name: famName,
         student_ids: ordered.map((e) => e.student.id), student_names: names,
         school_year: fees.schoolYear, lang: inputs.lang,
         period_label: inputs.lang === 'vi' ? doc.periodLabelVi : doc.periodLabelEn,
         status: existing?.status || 'draft',
         issue_date: existing?.issue_date || todayISO(),
-        due_date: inputs.dueDate || existing?.due_date || smartDueDate(inputs, fees, existing?.issue_date || todayISO()),
+        due_date: inputs.dueDate || smartDueDate(inputs, fees, existing?.issue_date || todayISO()),
         total: totals.total, paid: existing?.paid || 0,
         inputs, doc, notes: existing?.notes || '',
       }
-      const saved = await db.invoices.save(row)
-      // A level picked on the invoice is the student's level this year: keep the record in step.
-      const moved = inputs.students.map((e) => [students.find((s) => s.id === e.student.id), e.student.level]).filter(([rec, lvl]) => rec && rec.level !== lvl)
-      if (moved.length) { await db.students.saveMany(moved.map(([rec, level]) => ({ ...rec, level }))); await refresh() }
+      // Two people creating invoices at the same moment can be given the same number: the database
+      // refuses the second, which then takes the next one.
+      let saved
+      for (let attempt = 0; ; attempt++) {
+        const number = existing?.number || await db.nextNumber('invoice', fees.schoolYear)
+        try { saved = await db.invoices.save({ ...row, number }); break }
+        catch (e) { if (existing?.number || attempt >= 2 || !isDuplicate(e)) throw e }
+      }
+      // A year picked on this page is the student's year now: keep the record in step. The year an
+      // older invoice was made with is left alone (the student may have moved up since).
+      const moved = inputs.students.filter((e) => levelPicked.current.has(e.student.id))
+        .map((e) => [students.find((s) => s.id === e.student.id), e.student.level]).filter(([rec, lvl]) => rec && lvl && rec.level !== lvl)
+      if (moved.length) { for (const [rec, level] of moved) await db.students.patch(rec.id, { level }); await refresh() }
       navigate(`/invoices/${saved.id}`)
-    } finally { setBusy(false) }
+    } catch (e) { toast.error(e.message || String(e)) } finally { setBusy(false) }
   }
 
   if (loading || !fees || !calendar) return <Spinner />
@@ -171,7 +193,7 @@ export default function InvoiceBuilder() {
 
   const quarterlyLike = inputs.plan === 'quarterly'
   const showTuitionOpts = !['staff', 'trial', 'none'].includes(inputs.plan)
-  const autoDue = smartDueDate(inputs, fees, todayISO())
+  const autoDue = smartDueDate(inputs, fees, issueDate || todayISO())
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_300px]">

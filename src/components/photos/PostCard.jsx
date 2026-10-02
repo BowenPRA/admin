@@ -6,6 +6,7 @@ import { useToast } from '../../lib/toast'
 import { Card, Chip, Field, NumberInput, Select, TextArea, TextInput } from '../ui'
 import { FACEBOOK_PAGE, SHAPES, cropBox, fileKey, fileUrl, postZip, saveBlob } from '../../lib/eventPhotos'
 import { cancelScheduled, isScheduled } from '../../lib/facebook'
+import { isoDate } from '../../lib/money'
 import FacebookPost from './FacebookPost'
 
 const KIND = { recap: 'phPostRecap', spotlight: 'phPostSpotlight', thanks: 'phPostThanks', office: 'phPostOffice' }
@@ -71,12 +72,16 @@ export default function PostCard({ event, post, photos, onPatch, onChanged, onOp
     } catch (e) { toast.error(e.message) } finally { setBusy(false) }
   }
   // The function posts the caption saved in the database, so the box is saved first.
-  const saveBeforeSend = async () => { if (text.trim() !== (post.caption || '').trim()) await onPatch({ caption: text.trim() }) }
+  // If that save fails nothing is sent: Facebook would get the older caption.
+  const saveBeforeSend = async () => {
+    if (text.trim() !== (post.caption || '').trim() && !(await onPatch({ caption: text.trim() }))) throw new Error(t('fbCaptionNotSaved'))
+  }
   const onSent = async (row) => {
     const { saved, save_error: saveError, ...fields } = row
     setSending(false)
-    if (saved) onChanged(fields)
-    else await onPatch(fields) // on Facebook, but the function could not write the record
+    // On Facebook, but the function could not write the record: the browser writes it.
+    // If that fails too, the card still shows what is true, so the post is not sent twice.
+    if (saved || !(await onPatch(fields))) onChanged(fields)
     toast(fields.facebook?.scheduled_for ? t('fbScheduledToast', { date: when(fields.facebook.scheduled_for) }) : t('fbPostedToast'))
     if (saveError && !saved) console.warn('facebook-post could not save the record:', saveError)
   }
@@ -84,8 +89,9 @@ export default function PostCard({ event, post, photos, onPatch, onChanged, onOp
     if (!window.confirm(t('fbCancelConfirm', { date: when(fb.scheduled_for) }))) return
     setCancelling(true)
     try {
-      const { saved, ...fields } = await cancelScheduled(post)
-      if (saved) onChanged(fields); else await onPatch(fields)
+      const { saved, save_error: saveError, ...fields } = await cancelScheduled(post)
+      if (saved || !(await onPatch(fields))) onChanged(fields)
+      if (saveError && !saved) console.warn('facebook-post could not save the record:', saveError)
       toast(t('fbCancelled'))
     } catch (e) { toast.error(e.message) } finally { setCancelling(false) }
   }
@@ -187,7 +193,7 @@ export default function PostCard({ event, post, photos, onPatch, onChanged, onOp
               ? <><span className="text-sm text-slate-600"><CalendarClock size={15} className="mr-1 inline text-pra-blue" />{t('fbScheduledBy', { name: fb.by || post.posted_by || '—', date: when(fb.scheduled_for) })}</span>
                 <button className="btn-ghost text-xs text-red-600 hover:bg-red-50" disabled={cancelling} onClick={cancel}><X size={14} /> {cancelling ? t('fbCancelling') : t('fbCancel')}</button></>
               : posted
-                ? <><span className="text-sm text-slate-600"><Check size={15} className="mr-1 inline text-green-600" />{t(fb ? 'fbPostedBy' : 'phPostedBy', { name: post.posted_by || '—', date: String(post.posted_at || '').slice(0, 10) })}</span>
+                ? <><span className="text-sm text-slate-600"><Check size={15} className="mr-1 inline text-green-600" />{t(fb ? 'fbPostedBy' : 'phPostedBy', { name: post.posted_by || '—', date: day(post.posted_at) })}</span>
                   {fb?.link && <a className="btn-ghost text-xs" href={fb.link} target="_blank" rel="noreferrer"><ExternalLink size={14} /> {t('fbView')}</a>}
                   <button className="btn-ghost text-xs" onClick={backToDraft}><Undo2 size={14} /> {t('phMarkDraft')}</button></>
                 : <button className="btn-ghost text-sm" disabled={locked} title={t('phMarkPostedHint')} onClick={() => onPatch({ status: 'posted', posted_at: new Date().toISOString(), posted_by: displayName || '' })}><Check size={16} /> {t('phMarkPosted')}</button>}
@@ -209,4 +215,6 @@ export default function PostCard({ event, post, photos, onPatch, onChanged, onOp
   )
 }
 
+// The day in this computer's time. The saved time is in UTC, which before 7am in Vietnam is still yesterday.
+const day = (iso) => (String(iso || '').length > 10 ? isoDate(new Date(iso)) : String(iso || ''))
 const when = (iso) => new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
