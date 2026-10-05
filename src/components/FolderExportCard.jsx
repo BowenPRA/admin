@@ -85,7 +85,7 @@ export default function FolderExportCard() {
                 {result.failed.length ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
                 {result.cancelled ? t('folderExportStopped') : t('folderExportDone')} {t('folderExportSummary', { written: result.written, unchanged: result.unchanged })}
               </div>
-              <div className="mt-0.5 text-xs">{t('folderExportCounts', { invoices: result.counts.invoice, reports: result.counts.report, proofs: result.counts.proof, sheets: result.counts.sheet })}</div>
+              <div className="mt-0.5 text-xs">{t('folderExportCounts', { invoices: result.counts.invoice, reports: result.counts.report, proofs: result.counts.proof, enrollments: result.counts.enrollment || 0, sheets: result.counts.sheet })}</div>
               {result.failed.length > 0 && (
                 <details className="mt-1 text-xs"><summary className="cursor-pointer font-semibold">{t('folderExportFailed', { n: result.failed.length })}</summary>
                   <ul className="mt-1 list-disc space-y-0.5 pl-5">{result.failed.map((f) => <li key={f}>{f}</li>)}</ul>

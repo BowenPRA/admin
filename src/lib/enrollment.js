@@ -4,7 +4,7 @@ import { ageOf } from './studentRecords'
 // Enrollment forms: the form on pra.edu.vn/admissions/enroll/ saves each one
 // here itself (supabase/updates-2026-09-30-enrollments.sql). Each row of
 // adm_enrollments has the answers in `data`; ID numbers, documents and the
-// signature are in adm_enrollment_private, which only the super admin can read.
+// signature are in adm_enrollment_private, which office accounts can read.
 // The questions below are the form's, in its order. [English, Vietnamese].
 
 export const ENROLLMENT_SENDER = 'enrollment form'

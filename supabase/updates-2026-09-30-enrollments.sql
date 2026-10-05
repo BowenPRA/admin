@@ -14,9 +14,10 @@
 --                            health answers, photo consent. Office accounts.
 --   adm_enrollment_private   ID / passport numbers, their issue dates and
 --                            places, place of birth, the uploaded documents
---                            and the signature. Super admin only.
+--                            and the signature. Office accounts (super admin
+--                            only until 5 October 2026).
 --   storage: adm-enrollment  the documents themselves (student photo, passport
---                            copies, last report). Super admin only.
+--                            copies, last report). Office accounts.
 --
 -- When a form arrives the child is added to Students as a pending student with
 -- a family, unless a student with the same birthday and first name is already
@@ -105,13 +106,14 @@ create policy super_delete on adm_enrollments for delete to authenticated
   using (adm_role() = 'super_admin');
 
 drop policy if exists super_read on adm_enrollment_private;
-create policy super_read on adm_enrollment_private for select to authenticated
-  using (adm_role() = 'super_admin');
+drop policy if exists office_read on adm_enrollment_private;
+create policy office_read on adm_enrollment_private for select to authenticated
+  using (adm_is_staff());
 
 -- 4. The documents. A private folder: nothing in it has a public link. The
 --    website may add a file to a form that has not been sent yet, under that
---    form's number, and cannot read, replace or remove anything. The super
---    admin opens a file through a short-lived link, and may remove it.
+--    form's number, and cannot read, replace or remove anything. The office
+--    opens a file through a short-lived link; the super admin may remove it.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('adm-enrollment', 'adm-enrollment', false, 10485760,
         array['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'])
@@ -134,7 +136,7 @@ create policy adm_enrollment_upload on storage.objects for insert to anon, authe
 
 drop policy if exists adm_enrollment_open on storage.objects;
 create policy adm_enrollment_open on storage.objects for select to authenticated
-  using (bucket_id = 'adm-enrollment' and adm_role() = 'super_admin');
+  using (bucket_id = 'adm-enrollment' and adm_is_staff());
 
 drop policy if exists adm_enrollment_remove on storage.objects;
 create policy adm_enrollment_remove on storage.objects for delete to authenticated

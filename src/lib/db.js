@@ -409,8 +409,17 @@ export const db = {
       if (hasSupabase && paths.length) throwIf((await supabase.storage.from(ENROLLMENT_BUCKET).remove(paths)).error)
       await A.removeStrict(TABLES.enrollments, id)
     },
-    /** ID numbers, the documents and the signature: a row for the super admin, nothing for anyone else. */
+    /** ID numbers, the documents and the signature: a row for office accounts, nothing for anyone else. */
     private: (id) => enrollmentPrivate(id),
+    /** Every form's private part at once (for the folder export). */
+    allPrivate: () => A.list(TABLES.enrollmentPrivate),
+    /** One document as a file, for the folder export. */
+    async fileBlob(path) {
+      if (!hasSupabase) throw new Error('Enrollment documents are only kept online.')
+      const { data, error } = await supabase.storage.from(ENROLLMENT_BUCKET).download(path)
+      throwIf(error)
+      return data
+    },
     /** Links to a form's documents that work for an hour, by path. The folder is private: nothing in it has a lasting link. */
     async fileUrls(paths) {
       if (!hasSupabase || !paths.length) return {}

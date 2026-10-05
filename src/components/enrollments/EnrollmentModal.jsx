@@ -70,7 +70,7 @@ function YesNoList({ questions, answers, lang }) {
   )
 }
 
-/** ID numbers, documents and the signature. Asked for only when a super admin opens the form. */
+/** ID numbers, documents and the signature. Office accounts only, like the page itself. */
 function PrivatePart({ id, studentName, t, lang }) {
   const [state, setState] = useState(null)
   useEffect(() => {
@@ -234,7 +234,7 @@ export default function EnrollmentModal({ value: e, student, isSuper, onClose, o
         </Section>
 
         <Section title={t('enSecPrivate')} icon={Lock}>
-          {isSuper ? <PrivatePart id={e.id} studentName={e.student_name} t={t} lang={lang} /> : <p className="text-sm text-slate-500">{t('enPrivateHidden')}</p>}
+          <PrivatePart id={e.id} studentName={e.student_name} t={t} lang={lang} />
         </Section>
       </div>
     </Modal>
