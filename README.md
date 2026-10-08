@@ -142,7 +142,7 @@ the SQL editor. It adds `q4_full` to students and the sent-email columns to invo
 |---|---|---|
 | `super_admin` | Bowen | everything |
 | `head` | Seth | everything |
-| `admin` | Yvonne, Hien, Duyen | invoices, students, families, fees, attendance; reports only where the Teachers page gives them a learning area |
+| `admin` | Yvonne, Hien, Duyen, Nga | invoices, students, families, fees, attendance; reports only where the Teachers page gives them a learning area |
 | `teacher` | David, Kiu, Solo, Caleb, Thanh, Tham N, Thắm V | their `learning area : year group` pairs and homeroom parts of reports; attendance for the year groups they teach; students read-only; no invoices |
 
 - **Teachers & classes.** Each teacher's row ticks learning areas per year group

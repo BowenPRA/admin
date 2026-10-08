@@ -19,6 +19,7 @@ const STAFF = [
   { email: 'yvonne@pra.edu.vn', name: 'Yvonne', role: 'admin' },
   { email: 'hien.c@pra.edu.vn', name: 'Hien', role: 'admin' },
   { email: 'duyen.n@pra.edu.vn', name: 'Duyen', role: 'admin' },
+  { email: 'nga.h@pra.edu.vn', name: 'Nga', role: 'admin' }, // accountant, 8 Oct 2026
   { email: 'david@pra.edu.vn', name: 'David', role: 'teacher' },
   { email: 'kiu@pra.edu.vn', name: 'Kiu', role: 'teacher' },
   { email: 'solo@pra.edu.vn', name: 'Solo', role: 'teacher' },
