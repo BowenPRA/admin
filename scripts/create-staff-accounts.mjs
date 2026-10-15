@@ -2,6 +2,8 @@
 //
 //   node scripts/create-staff-accounts.mjs            (asks for the secret key)
 //   node scripts/create-staff-accounts.mjs --dry-run  (shows what would change)
+//   node scripts/create-staff-accounts.mjs --reset tham.n@pra.edu.vn
+//                                    (gives one existing login a new temporary password)
 //
 // The secret key is in Supabase > Project Settings > API Keys > Secret key. It
 // is only used for this run and never saved. Existing accounts keep their
@@ -34,6 +36,9 @@ const STAFF = [
 ]
 
 const dryRun = process.argv.includes('--dry-run')
+const resetAt = process.argv.indexOf('--reset')
+const resetEmail = resetAt > -1 ? (process.argv[resetAt + 1] || '').trim().toLowerCase() : ''
+if (resetAt > -1 && !resetEmail.includes('@')) { console.error('Give the full sign-in email after --reset.'); process.exit(1) }
 
 function envValue(name) {
   if (process.env[name]) return process.env[name]
@@ -72,6 +77,18 @@ for (let page = 1; ; page++) {
   const { users = [] } = await call('GET', `/admin/users?page=${page}&per_page=200`)
   users.forEach((u) => existing.set((u.email || '').toLowerCase(), u))
   if (users.length < 200) break
+}
+
+if (resetEmail) {
+  const u = existing.get(resetEmail)
+  if (!u) { console.error(`There is no login for ${resetEmail}. Check the spelling, or run the script without --reset to create it.`); process.exit(1) }
+  const day = (d) => (d ? d.slice(0, 10) : 'never')
+  console.log(`  ${resetEmail}: role ${u.app_metadata?.role || 'none'}, email confirmed ${day(u.email_confirmed_at)}, last sign-in ${day(u.last_sign_in_at)}${u.banned_until ? `, blocked until ${day(u.banned_until)}` : ''}`)
+  if (dryRun) { console.log('\nDry run: the password was not changed.'); process.exit(0) }
+  const password = tempPassword()
+  await call('PUT', `/admin/users/${u.id}`, { password, email_confirm: true })
+  console.log(`\nNew temporary password (shown once, pass it on privately):\n  ${resetEmail}  ${password}`)
+  process.exit(0)
 }
 
 const created = []
