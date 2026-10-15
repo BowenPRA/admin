@@ -156,7 +156,7 @@ export function defaultStudentOptions(student, fees, calendar, ctx) {
     includePathway: true, // upper secondary: hybrid / independent fee
     includeAcellus: upper, // upper secondary: online (Acellus) fee, on by default (PRA pays on behalf, cash reimbursement)
     extraDiscountPct: 0,
-    meals: true,
+    meals: student.meals !== false, // off for a student marked as not having meals at PRA
     mealDays: period.days,
     mealRate: mealRateFor(student.level, student.program, fees),
     transport: false,

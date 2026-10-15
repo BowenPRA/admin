@@ -268,7 +268,8 @@ const dropStatus = (row) => { const r = { ...row }; delete r.status; return r }
 // value waits for the file. The new-student checklist notices (the row comes back without the
 // column) and says which file to run.
 //   lead_id, onboarding: the same file, Part 2 (the lead a student came from; the checklist's ticks)
-const LATER_COLUMNS = ['end_date', 'lead_id', 'onboarding']
+//   meals: supabase/updates-2026-10-15-parent-groups.sql (meals at PRA: yes, no, or not answered)
+const LATER_COLUMNS = ['end_date', 'lead_id', 'onboarding', 'meals']
 const SOFT_LATER = ['lead_id', 'onboarding']
 const missingLaterColumn = (e) => (/(does not exist|schema cache)/i.test(e?.message || '') && LATER_COLUMNS.find((c) => new RegExp(`['"]${c}['"]`).test(e.message))) || null
 const isBlank = (v) => v == null || v === ''

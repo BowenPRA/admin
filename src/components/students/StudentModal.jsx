@@ -303,6 +303,10 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
             <Checkbox checked={!!s.q4_full} onChange={set('q4_full')} label={t('q4Full')} />
             <Checkbox checked={s.legacy} onChange={set('legacy')} label={t('legacy')} />
           </div>
+          <Field label={t('mealsAtPra')} hint={t('mealsHint')} className="mt-3 sm:max-w-md">
+            <Select value={s.meals === true ? 'yes' : s.meals === false ? 'no' : ''} onChange={(v) => set('meals')(v === 'yes' ? true : v === 'no' ? false : null)}
+              options={[{ value: '', label: t('mealsUnknown') }, { value: 'yes', label: t('mealsYes') }, { value: 'no', label: t('mealsNo') }]} />
+          </Field>
           <Field label={t('notes')} className="mt-3"><TextInput value={s.notes} onChange={set('notes')} /></Field>
         </Section>
       </form>

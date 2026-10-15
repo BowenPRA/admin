@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet, Printer, Copy } from 'lucide-react'
+import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet, Printer, Copy, Utensils } from 'lucide-react'
 import { db } from '../lib/db'
 import { exportStudentList } from '../lib/exportExcel'
 import { useT } from '../lib/i18n'
@@ -25,6 +25,30 @@ const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase()
 const levelIndex = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
 // Sorts S0007 before S0120, and BLE / missing IDs after the S numbers.
 const codeKey = (c) => { const m = normalizeCode(c).match(/^([A-Z]+)(\d+)$/); return m ? `${m[1] === 'S' ? 0 : 1}${m[1]}${m[2].padStart(6, '0')}` : `9${c || ''}` }
+
+// Meals at PRA on the list: Yes / No, marked with one click; amber while nobody has answered.
+function MealsMark({ value, onChange, disabled, t }) {
+  const known = value === true || value === false
+  if (!onChange) {
+    return known ? <span className={`chip ${value ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}`}>{value && <Utensils size={11} className="mr-0.5" />}{t(value ? 'mealsYes' : 'mealsNo')}</span>
+      : <span className="text-xs text-slate-300">—</span>
+  }
+  const option = (v) => {
+    const on = value === v
+    const tone = on ? (v ? 'bg-green-600 text-white' : 'bg-slate-500 text-white') : 'bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-700'
+    return (
+      <button type="button" disabled={disabled} aria-pressed={on} onClick={() => !on && onChange(v)}
+        className={`inline-flex items-center gap-0.5 px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-60 ${tone}`}>
+        {v && <Utensils size={11} />}{t(v ? 'mealsYes' : 'mealsNo')}
+      </button>
+    )
+  }
+  return (
+    <span className={`inline-flex overflow-hidden rounded-full border ${known ? 'border-slate-200' : 'border-amber-300'}`} title={known ? t('mealsAtPra') : t('mealsUnknown')}>
+      {option(true)}{option(false)}
+    </span>
+  )
+}
 
 function SortTh({ col, sort, onSort, children, className = '' }) {
   const active = sort.col === col
@@ -60,6 +84,8 @@ export default function Students() {
   // Home's "finishing this quarter" opens this page as /students?ending=1.
   const [ending, setEnding] = useState(() => params.get('ending') === '1')
   const [missingContact, setMissingContact] = useState(false)
+  // Students still to be answered for meals at PRA (blank until someone says), with Yes/No on each row.
+  const [noMeals, setNoMeals] = useState(false)
   const [sort, setSort] = useState({ col: 'level', dir: 'asc' })
   const [editing, setEditing] = useState(null)
   const [editingFam, setEditingFam] = useState(null)
@@ -79,6 +105,8 @@ export default function Students() {
     students.forEach((s) => { if (s.family_id) (m[s.family_id] ||= []).push(s) })
     return m
   }, [students])
+  // Yes first, then No, then not answered: the order the Meals column sorts in.
+  const mealsRank = (s) => (s.meals === true ? 0 : s.meals === false ? 1 : 2)
   const programName = (id) => { const p = PROGRAMS.find((x) => x.id === id); return p ? (lang === 'vi' ? p.vi : p.en).replace(/ Program$| Pathway$/, '') : id }
 
   const counts = useMemo(() => ({
@@ -107,6 +135,7 @@ export default function Students() {
   const reloadAll = async () => { await refresh(); await sources.reload() }
   const toConvert = useMemo(() => students.filter(needsCodeUpdate), [students])
   const withoutId = useMemo(() => students.filter((s) => !isPast(s) && !s.student_code), [students])
+  const mealsOpen = useMemo(() => students.filter((s) => !isPast(s) && s.meals == null).length, [students])
 
   // The 'past' tab is the 'inactive' status; the other two match it by name.
   const inStatus = (s) => status === 'all' || statusOf(s) === (status === 'past' ? 'inactive' : status)
@@ -119,6 +148,7 @@ export default function Students() {
       .filter((s) => !noFamily || !s.family_id)
       .filter((s) => !ending || finishingIds.has(s.id))
       .filter((s) => !steps || openSteps.has(s.id))
+      .filter((s) => !noMeals || s.meals == null)
       .filter((s) => !needle || norm(`${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''} ${s.level} ${s.student_code} ${normalizeCode(s.student_code)} ${s.class_group}`).includes(needle))
     const dir = sort.dir === 'asc' ? 1 : -1
     const byName = (a, b) => (a.full_name || '').localeCompare(b.full_name || '')
@@ -129,9 +159,10 @@ export default function Students() {
       age: (a, b) => (b.dob || '9999').localeCompare(a.dob || '9999'),
       program: (a, b) => (a.program || '').localeCompare(b.program || '') || byName(a, b),
       family: (a, b) => (famById[a.family_id]?.name || '~').localeCompare(famById[b.family_id]?.name || '~') || byName(a, b),
+      meals: (a, b) => mealsRank(a) - mealsRank(b) || byName(a, b),
     }[sort.col] || byName
     return [...list].sort((a, b) => cmp(a, b) * dir)
-  }, [students, q, status, level, program, noFamily, ending, finishingIds, steps, openSteps, famById, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [students, q, status, level, program, noFamily, ending, finishingIds, steps, openSteps, noMeals, famById, sort]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const famRows = useMemo(() => {
     const needle = norm(q)
@@ -142,8 +173,8 @@ export default function Students() {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [families, kidsByFamily, q, status, missingContact])
 
-  const filtersOn = !!(q || level || program || noFamily || ending || steps || missingContact)
-  const clearFilters = () => { setQ(''); setLevel(''); setProgram(''); setNoFamily(false); toggleEnding(false); toggleSteps(false); setMissingContact(false) }
+  const filtersOn = !!(q || level || program || noFamily || ending || steps || missingContact || noMeals)
+  const clearFilters = () => { setQ(''); setLevel(''); setProgram(''); setNoFamily(false); toggleEnding(false); toggleSteps(false); setMissingContact(false); setNoMeals(false) }
   const onSort = (col) => setSort((s) => (s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' }))
 
   const run = async (fn) => {
@@ -194,12 +225,16 @@ export default function Students() {
         const error = leadError.message || String(leadError)
         toast.error(lead ? t('leadEnrolledFailed', { name: lead.family, error }) : t('leadEnrolledUnread', { name: s.nickname || s.full_name, error }))
       }
-    } catch (e) { toast.error(/partial_from/.test(e.message || '') ? t('partialDaySetup') : /end_date/.test(e.message || '') ? t('endDateSetup') : e.message) }
+    } catch (e) { toast.error(/partial_from/.test(e.message || '') ? t('partialDaySetup') : /end_date/.test(e.message || '') ? t('endDateSetup') : /'meals'/.test(e.message || '') ? t('mealsSetup') : e.message) }
   }
   const removeStudent = async (s) => {
     if (!confirm(t('confirmDeleteStudent', { name: s.full_name }))) return
     await run(async () => { await db.students.remove(s.id); await refresh(); closeStudent(); toast(t('deletedName', { name: s.full_name })) })
   }
+  const setMeals = (s, meals) => run(async () => {
+    try { await db.students.patch(s.id, { meals }) } catch (e) { throw /'meals'/.test(e.message || '') ? new Error(t('mealsSetup')) : e }
+    await refresh()
+  })
   const assignFamily = (s, familyId) => run(async () => {
     let fid = familyId || null
     if (familyId === '__new') {
@@ -386,6 +421,7 @@ export default function Students() {
             {canEdit && <Checkbox checked={noFamily} onChange={setNoFamily} label={t('withoutFamily')} className="px-1" />}
             {(finishing.students.length > 0 || ending) && <Checkbox checked={ending} onChange={toggleEnding} label={`${t('endingFilter')} (${finishing.students.length})`} className="px-1" />}
             {canEdit && (openSteps.size > 0 || steps) && <Checkbox checked={steps} onChange={toggleSteps} label={`${t('stepsFilter')} (${openSteps.size})`} className="px-1" />}
+            {canEdit && (mealsOpen > 0 || noMeals) && <Checkbox checked={noMeals} onChange={setNoMeals} label={`${t('mealsFilter')} (${mealsOpen})`} className="px-1" />}
           </>) : (
             <Checkbox checked={missingContact} onChange={setMissingContact} label={t('missingContact')} className="px-1" />
           )}
@@ -407,6 +443,7 @@ export default function Students() {
                     <SortTh col="code" sort={sort} onSort={onSort} className="pl-4">ID</SortTh>
                     <SortTh col="name" sort={sort} onSort={onSort}>{t('student')}</SortTh>
                     <SortTh col="level" sort={sort} onSort={onSort}>{t('yearGroup')}</SortTh>
+                    <SortTh col="meals" sort={sort} onSort={onSort}>{t('mealsCol')}</SortTh>
                     <SortTh col="age" sort={sort} onSort={onSort} className="hidden md:table-cell">{t('age')}</SortTh>
                     <SortTh col="program" sort={sort} onSort={onSort} className="hidden md:table-cell">{t('program')}</SortTh>
                     <SortTh col="family" sort={sort} onSort={onSort} className="hidden lg:table-cell">{t('family')}</SortTh>
@@ -421,7 +458,7 @@ export default function Students() {
                     return [
                       header && (
                         <tr key={`h-${s.level}`} className="bg-slate-50/80">
-                          <td colSpan={7} className="px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-pra-navy">{s.level || '—'} <span className="font-semibold text-slate-400">· {rows.filter((r) => r.level === s.level).length}</span></td>
+                          <td colSpan={8} className="px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-pra-navy">{s.level || '—'} <span className="font-semibold text-slate-400">· {rows.filter((r) => r.level === s.level).length}</span></td>
                         </tr>
                       ),
                       <tr key={s.id} onClick={() => setEditing({ ...blankStudent(), ...s })}
@@ -449,6 +486,9 @@ export default function Students() {
                           </div>
                         </td>
                         <td className="td whitespace-nowrap">{s.level}{s.class_group && s.class_group !== s.level && <div className="text-xs text-slate-400">{s.class_group}</div>}</td>
+                        <td className="td whitespace-nowrap" onClick={(e) => canEdit && e.stopPropagation()}>
+                          <MealsMark value={s.meals} onChange={canEdit ? (v) => setMeals(s, v) : null} disabled={busy} t={t} />
+                        </td>
                         <td className="td hidden text-slate-500 md:table-cell">{age ?? '—'}</td>
                         <td className="td hidden whitespace-nowrap text-slate-600 md:table-cell">{programName(s.program)}</td>
                         <td className="td hidden min-w-[190px] lg:table-cell" onClick={(e) => canEdit && e.stopPropagation()}>
