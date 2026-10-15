@@ -1,6 +1,5 @@
 import { fmt, fmtDate } from './money'
 import { docTotals } from './pricing'
-import { SENDER } from './gmail'
 import { centerName } from './invoicePdfLayout'
 
 export function invoiceFilename(inv) {
@@ -8,7 +7,13 @@ export function invoiceFilename(inv) {
   return `${inv.number}-${who}.pdf`
 }
 
-/** Default subject + body for emailing an invoice, in the invoice's language. */
+/**
+ * Default subject + body for emailing an invoice, in the invoice's language.
+ * Follows what the office actually sent for Quarters 1 and 2 of 2026-2027:
+ * no "Palm River Academy –" at the start of the subject, the names after a
+ * dash, no invoice number line (it is on the PDF and in the file name) and
+ * no "any questions" line.
+ */
 export function emailTemplate(inv, fees) {
   const vi = inv.lang === 'vi'
   const total = docTotals(inv.doc).total
@@ -16,8 +21,8 @@ export function emailTemplate(inv, fees) {
   const due = fmtDate(inv.due_date, inv.lang)
   const b = fees.bank
   const subject = vi
-    ? `Palm River Academy – Thông báo học phí ${period}, năm học ${inv.school_year} (${inv.student_names})`
-    : `Palm River Academy – Fee announcement for ${period}, academic year ${inv.school_year} (${inv.student_names})`
+    ? `Thông báo học phí ${period}, năm học ${inv.school_year} - ${inv.student_names}`
+    : `Fee announcement for ${period}, academic year ${inv.school_year} - ${inv.student_names}`
   const text = vi
     ? `Kính gửi Quý phụ huynh,
 
@@ -25,7 +30,6 @@ Palm River Academy xin gửi thông báo học phí ${period}, năm học ${inv.
 
 Tổng thanh toán: ${fmt(total)} VNĐ
 Hạn thanh toán: ${due}
-Số hoá đơn: ${inv.number}
 
 Thông tin chuyển khoản:
   Tên chủ tài khoản: ${b.holder}
@@ -33,8 +37,6 @@ Thông tin chuyển khoản:
   Ngân hàng: ${b.branch} (SWIFT: ${b.swift})
 
 Phụ huynh chuyển tiền xong vui lòng chụp ảnh màn hình giao dịch thành công gửi lại cho trung tâm để đối chiếu.
-
-Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ ${SENDER}.
 
 Trân trọng,
 ${centerName(fees.school, true)}`
@@ -44,7 +46,6 @@ Please find attached the fee announcement for ${period}, academic year ${inv.sch
 
 Total payment: ${fmt(total)} VND
 Due date: ${due}
-Invoice number: ${inv.number}
 
 Bank transfer details:
   Account holder: ${b.holder}
@@ -52,8 +53,6 @@ Bank transfer details:
   Bank: ${b.branch} (SWIFT: ${b.swift})
 
 After transferring, please send us a screenshot of the successful payment so we can verify it.
-
-If you have any questions, just reply to this email or write to ${SENDER}.
 
 Kind regards,
 ${centerName(fees.school, false)}`
