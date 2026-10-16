@@ -56,7 +56,7 @@ const tagWord = (tag, lang) => {
   return null
 }
 
-/** What "In this issue" lists: one entry per story, class corner, photo set, quote and Palm Press post. */
+/** What "In this issue" lists: one entry per story, class corner, photo set, quote and Student Blog post. */
 function issueEntries(payload, lang) {
   const out = []
   for (const p of payload.parts || []) {

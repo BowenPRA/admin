@@ -20,7 +20,7 @@ Everything after the editor reads one object, the **payload**. It is built by `b
 | `photos.js` | Uploading, resizing and signing photos; copying album photos in |
 | `pdf.js`, `pdfLayout.js` | The PDF (pdfmake), in Be Vietnam Pro (`public/fonts`, OFL licence in `public/fonts/OFL.txt`); emoji are taken out, the font has none |
 | `email.js` | The email (HTML and plain text), and `chatMessage()`: the short message for Zalo and WhatsApp groups, Vietnamese first |
-| `newIssue.js`, `calendarFeed.js` | Starting next Friday's issue; the academic calendar and The Palm Press posts from pra.edu.vn/data/ |
+| `newIssue.js`, `calendarFeed.js` | Starting next Friday's issue; the academic calendar and the Student Blog posts from pra.edu.vn/data/ |
 | `publish.js` | Publish and take off the website |
 
 The database is `supabase/updates-2026-10-16-newsletter.sql`. The function that starts a website build is `supabase/functions/newsletter-build`.

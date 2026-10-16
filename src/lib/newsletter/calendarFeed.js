@@ -1,4 +1,4 @@
-// The academic calendar and The Palm Press posts, as the website publishes them
+// The academic calendar and the Student Blog posts (The Palm Press until 2026-10-16), as the website publishes them
 // (pra.edu.vn/data/calendar.json and /data/writing.json), so the editor can offer
 // them without anyone typing them again. While the website does not have them
 // yet, or cannot be reached, the copy below (from the 2026-2027 calendar on the
@@ -52,7 +52,7 @@ export function academicCalendar() {
 }
 
 let writingPromise = null
-/** The Palm Press posts, newest first: [{ title, author, url, date, blurb_en, blurb_vi }]. */
+/** The Student Blog posts, newest first: [{ title, author, url, date, blurb_en, blurb_vi }]. */
 export function palmPressPosts() {
   writingPromise ||= fetch(`${SITE}/data/writing.json`, { cache: 'no-cache' })
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))

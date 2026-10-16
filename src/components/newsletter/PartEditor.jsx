@@ -270,7 +270,7 @@ function PressEditor({ part, edit, disabled, L, setText }) {
   return (
     <TwoCols L={L}
       en={<>
-        <label className="block space-y-1"><span className="label !mb-0">{L('Post on The Palm Press', 'Bài trên The Palm Press')}</span>
+        <label className="block space-y-1"><span className="label !mb-0">{L('Post on the Student Blog', 'Bài trên Blog học viên')}</span>
           <select className="input" value={d.url || ''} onChange={(e) => pickPost(e.target.value)} disabled={disabled}>
             <option value="">{L('Choose a post…', 'Chọn bài…')}</option>
             {posts.map((p) => <option key={p.url} value={p.url}>{p.title}{p.author ? ` · ${p.author}` : ''}</option>)}

@@ -101,15 +101,15 @@ export const PART_TYPES = {
     help: 'A set of photos with a heading: an event, a trip, a project.' },
   quote: { label: 'Student quote', icon: 'quote', limits: { text: 280, who: 60 }, photos: 1,
     help: 'A student\'s own words, with their first name and class.' },
-  press: { label: 'From The Palm Press', icon: 'pen-line', limits: { blurb: 200 }, photos: 0,
-    help: 'A link to a post on the student writing blog.' },
+  press: { label: 'From the Student Blog', icon: 'pen-line', limits: { blurb: 200 }, photos: 0,
+    help: 'A link to a post on the Student Blog.' },
   welcome: { label: 'Welcome', icon: 'hand-heart', limits: { body: 300 }, photos: 0, familiesOnly: true,
     help: 'New students this week, by first name and class. Families only: in the email and the PDF, never on the public page.' },
   closing: { label: 'Closing', icon: 'heart', once: true, limits: { body: 300 }, photos: 0,
     help: 'A line to finish. "Warm regards, Palm River Academy English Center" is added by itself.' },
 }
 /** The kinds of part, in Vietnamese (for the editor in Vietnamese). */
-export const PART_LABELS_VI = { opening: 'Mở đầu', dates: 'Ngày cần nhớ', reminders: 'Ghi nhớ', story: 'Mục', class: 'Góc lớp', photos: 'Ảnh', quote: 'Câu nói của học viên', press: 'Từ The Palm Press', welcome: 'Chào mừng', closing: 'Lời kết' }
+export const PART_LABELS_VI = { opening: 'Mở đầu', dates: 'Ngày cần nhớ', reminders: 'Ghi nhớ', story: 'Mục', class: 'Góc lớp', photos: 'Ảnh', quote: 'Câu nói của học viên', press: 'Từ Blog học viên', welcome: 'Chào mừng', closing: 'Lời kết' }
 /** What each kind of part is for, in Vietnamese (PART_TYPES.help is the English). */
 export const PART_HELP_VI = {
   opening: 'Một câu nói tuần này có gì, rồi hai ba câu nữa. Phần này mở đầu email và trang web, và là dòng xem trước trong hộp thư.',
@@ -119,7 +119,7 @@ export const PART_HELP_VI = {
   class: 'Lớp đã làm gì trong tuần, do giáo viên của lớp viết: vài câu, một hai ảnh, từ vựng trong tuần và một câu hỏi để gia đình hỏi con.',
   photos: 'Một bộ ảnh có tiêu đề: một sự kiện, một chuyến đi, một dự án.',
   quote: 'Nguyên văn câu nói của một học viên, kèm tên gọi và lớp.',
-  press: 'Đường dẫn đến một bài trên blog The Palm Press.',
+  press: 'Đường dẫn đến một bài trên Blog học viên.',
   welcome: 'Học viên mới trong tuần, chỉ tên gọi và lớp. Chỉ gửi gia đình: có trong email và PDF, không đăng lên trang web.',
   closing: 'Một câu kết. "Trân trọng, Trung tâm Anh ngữ Palm River Academy" được thêm tự động.',
 }
@@ -151,7 +151,7 @@ export const WORDS = {
     readAll: 'Read the whole newsletter', fromTeacher: 'From {name}', wordsOfWeek: 'Words of the week', askYourChild: 'Ask your child',
     signoff: 'Warm regards,', from: 'Palm River Academy English Center', addToCalendar: 'Add to calendar', off: 'no classes', fees: 'fees',
     readVi: 'Đọc bằng tiếng Việt', pdf: 'PDF', pdfEn: 'PDF in English', pdfVi: 'PDF tiếng Việt', page: 'Page {n} of {total}',
-    welcome: 'Welcome', pressFrom: 'From The Palm Press', by: 'by {name}', attached: 'This issue is attached as a PDF in English and Vietnamese.',
+    welcome: 'Welcome', pressFrom: 'From the Student Blog', by: 'by {name}', attached: 'This issue is attached as a PDF in English and Vietnamese.',
     pastIssues: 'Past issues', english: 'English',
   },
   vi: {
@@ -159,7 +159,7 @@ export const WORDS = {
     readAll: 'Đọc toàn bộ bản tin', fromTeacher: '{name} chia sẻ', wordsOfWeek: 'Từ vựng trong tuần', askYourChild: 'Hỏi con nhé',
     signoff: 'Trân trọng,', from: 'Trung tâm Anh ngữ Palm River Academy', addToCalendar: 'Thêm vào lịch', off: 'nghỉ học', fees: 'học phí',
     readVi: 'Đọc bằng tiếng Việt', pdf: 'PDF', pdfEn: 'PDF in English', pdfVi: 'PDF tiếng Việt', page: 'Trang {n}/{total}',
-    welcome: 'Chào mừng', pressFrom: 'Từ The Palm Press', by: '{name}', attached: 'Bản tin được đính kèm dạng PDF bằng tiếng Anh và tiếng Việt.',
+    welcome: 'Chào mừng', pressFrom: 'Từ Blog học viên', by: '{name}', attached: 'Bản tin được đính kèm dạng PDF bằng tiếng Anh và tiếng Việt.',
     pastIssues: 'Các số trước', english: 'Tiếng Anh',
   },
 }
