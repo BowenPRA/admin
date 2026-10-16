@@ -78,6 +78,8 @@ export function portraitUrl(teacherName) {
 export const HIDDEN_PARTS = ['dates', 'reminders', 'class', 'quote', 'press', 'welcome']
 /** 'full': the email is the whole newsletter (as the Google Doc was). 'short': the first lines of each part with "Read more" links to the page. */
 export const EMAIL_STYLE = 'full'
+/** Photo captions: hidden for now (Bowen, 16 October 2026). true brings back the caption boxes and shows them in the PDF and the email (the website: main.css .nl-nocap). */
+export const SHOW_CAPTIONS = false
 
 /**
  * The kinds of part. `limit` is the soft length (characters) the meter counts

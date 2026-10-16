@@ -7,7 +7,7 @@
 // Vietnamese, as the Google Doc was. 'short': the first lines of each part with
 // "Read more" links to the page.
 
-import { TONES, INK, INK_SOFT, NAVY, SENDER, EMAIL_STYLE, word } from './constants.js'
+import { TONES, INK, INK_SOFT, NAVY, SENDER, EMAIL_STYLE, SHOW_CAPTIONS, word } from './constants.js'
 import { escHtml, plain, plainLines, firstSentence } from './text.js'
 import { pick } from './payload.js'
 import { addDays } from './dates.js'
@@ -89,7 +89,7 @@ function photoGrid(photos, L) {
     const r = p.w && p.h ? p.h / p.w : 0.75
     const alt = t(p.alt, L)
     return `<img src="${esc(publicSrc(p))}" width="${w}" height="${Math.round(w * r)}" alt="${esc(alt)}" style="display:block;width:100%;max-width:${w}px;height:auto;border:0;border-radius:10px;">`
-      + `${alt ? `<p style="margin:6px 0 0;${font(12, 17, { color: INK_SOFT })}">${esc(alt)}</p>` : ''}`
+      + `${alt && SHOW_CAPTIONS ? `<p style="margin:6px 0 0;${font(12, 17, { color: INK_SOFT })}">${esc(alt)}</p>` : ''}`
   }
   if (list.length === 1) return `<div style="margin:6px 0 4px;">${one(list[0], 552)}</div>`
   let out = ''

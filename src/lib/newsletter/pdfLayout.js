@@ -3,7 +3,7 @@
 // node. pdf.js loads the fonts, the logo, the photos and the icons and passes
 // them in; anything missing is left out rather than failing the PDF.
 
-import { EDITIONS, TONES, INK, INK_SOFT, LINE, NAVY, word } from './constants.js'
+import { EDITIONS, TONES, INK, INK_SOFT, LINE, NAVY, SHOW_CAPTIONS, word } from './constants.js'
 import { cleanHtml, decodeEntities } from './text.js'
 import { pick } from './payload.js'
 import { blocks as docParts, splitHeading, splitItem, readDay, sectionKind } from './shape.js'
@@ -295,6 +295,7 @@ export function newsletterPdfDefinition(payload, lang = 'en', { images = {}, ico
     unbreakable: true,
   })
   const caption = (ph) => {
+    if (!SHOW_CAPTIONS) return null
     const c = clean(tx(ph.photo?.alt).text)
     return c ? { text: c, fontSize: 7.6, lineHeight: 1.05, color: INK_SOFT, margin: [0, 4, 0, 0] } : null
   }

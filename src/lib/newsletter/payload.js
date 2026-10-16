@@ -5,7 +5,7 @@
 // photos are not cleared, wording notes, lengths, and where an issue stands.
 // Pure functions, no browser.
 
-import { EDITIONS, PART_TYPES, CLASS_TONES, STORY_TONES, SITE, HIDDEN_PARTS, portraitUrl } from './constants.js'
+import { EDITIONS, PART_TYPES, CLASS_TONES, STORY_TONES, SITE, HIDDEN_PARTS, SHOW_CAPTIONS, portraitUrl } from './constants.js'
 import { cleanHtml, plain, safeUrl, readingMinutes, wordingNotes, firstSentence } from './text.js'
 import { dateRange, timeSpan, longDay, issueLabel, calendarLink } from './dates.js'
 
@@ -48,7 +48,7 @@ function pairs(part) {
     case 'closing': add(plain(e.body), plain(v.body)); break
     default: break
   }
-  ;(d.photos || []).forEach((p) => add(p.en, p.vi))
+  if (SHOW_CAPTIONS) (d.photos || []).forEach((p) => add(p.en, p.vi))
   return out
 }
 

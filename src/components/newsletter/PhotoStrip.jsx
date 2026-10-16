@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, ImagePlus, ShieldAlert, ShieldCheck, X } from 'l
 import { photoLink, dropPhotoFile } from '../../lib/newsletter/photos'
 import { todayHoiAn } from '../../lib/newsletter/dates'
 import { enSnapshot } from '../../lib/newsletter/payload'
+import { SHOW_CAPTIONS } from '../../lib/newsletter/constants'
 import { applyEdit } from '../../lib/newsletter/data'
 import { useL } from './bits'
 import PhotoPicker from './PhotoPicker'
@@ -62,10 +63,11 @@ export default function PhotoStrip({ part, max, edit, issueId, me, canClear, can
                   {L('Checked against the no-photo list', 'Đã đối chiếu danh sách không chụp ảnh')}
                 </label>
               ) : <p className="mt-1.5 text-xs text-amber-800">{L('The office checks it against the no-photo list.', 'Văn phòng sẽ đối chiếu danh sách không chụp ảnh.')}</p>)}
+              {SHOW_CAPTIONS && <>
               <input className="input mt-1.5 !py-1.5 text-xs" value={p.en || ''} disabled={disabled} placeholder={L('Caption (first names only)', 'Chú thích tiếng Anh')} aria-label={L('Caption in English', 'Chú thích tiếng Anh')}
                 onChange={(e) => change(p, { en: e.target.value })} />
               <input className={`input mt-1 !py-1.5 text-xs ${p.en && !p.vi ? '!border-amber-300 !bg-amber-50' : ''}`} value={p.vi || ''} disabled={disabled} placeholder={L('Vietnamese caption', 'Chú thích tiếng Việt')} aria-label={L('Caption in Vietnamese', 'Chú thích tiếng Việt')}
-                onChange={(e) => change(p, { vi: e.target.value })} />
+                onChange={(e) => change(p, { vi: e.target.value })} /></>}
             </div>
           )
         })}
