@@ -145,6 +145,10 @@ function fullSection(payload, lang, tone) {
 
   const closing = (payload.parts || []).find((p) => p.type === 'closing')
   pad(`${closing && plain(t(closing.body, L)) ? bodyHtml(t(closing.body, L)) : ''}<p style="margin:4px 0 0;${font(16, 24)}">${esc(word(L, 'signoff'))}<br><b style="color:${NAVY};">${esc(word(L, 'from'))}</b></p>`, '18px 24px 8px')
+  // The issue's page on pra.edu.vn, in this language.
+  const href = link(payload.url[L] || payload.url.en, 'email')
+  pad(`<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;"><tr><td align="center" bgcolor="${tone.button}" style="background:${tone.button};border-radius:999px;">`
+    + `<a href="${esc(href)}" style="display:inline-block;padding:13px 26px;${font(16, 21, { bold: true, color: '#FFFFFF' })}text-decoration:none;border-radius:999px;">${esc(L === 'vi' ? 'Xem bản tin trên trang web' : 'Read it on the website')}&nbsp;&rarr;</a></td></tr></table>`, '16px 24px 10px')
   return rows.join('\n')
 }
 
@@ -270,7 +274,7 @@ function buildEmail(payload, { logoUrl = 'https://pra.edu.vn/assets/img/logo.png
 <tr><td style="padding:18px 24px 14px;background-color:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
 <td valign="middle"><img src="${esc(logoUrl)}" width="134" height="54" alt="Palm River Academy" style="display:block;width:134px;height:54px;border:0;"></td>
-<td valign="middle" align="right" style="${font(13, 18, { color: EMAIL_STYLE === 'full' ? INK_SOFT : LINK })}">${EMAIL_STYLE === 'full' ? 'Tiếng Việt bên dưới 🇻🇳' : `<a href="${esc(viHref)}" style="color:${LINK};text-decoration:underline;">${esc(word('en', 'readVi'))}</a>`}</td>
+<td valign="middle" align="right" style="${font(13, 18, { color: EMAIL_STYLE === 'full' ? INK_SOFT : LINK })}">${EMAIL_STYLE === 'full' ? `Tiếng Việt bên dưới 🇻🇳<br><a href="${esc(viHref)}" style="color:${LINK};text-decoration:underline;">${esc(word('en', 'readVi'))}</a>` : `<a href="${esc(viHref)}" style="color:${LINK};text-decoration:underline;">${esc(word('en', 'readVi'))}</a>`}</td>
 </tr></table>
 </td></tr>
 <tr><td bgcolor="${band}" style="background:${band};padding:22px 24px 20px;">
@@ -350,6 +354,8 @@ function emailText(payload) {
       if (closing && plain(t(closing.body, L))) line(plainLines(t(closing.body, L)))
       line(word(L, 'signoff'))
       line(word(L, 'from'))
+      line()
+      line(`${L === 'vi' ? 'Xem bản tin trên trang web' : 'Read it on the website'}: ${link(payload.url[L] || payload.url.en, 'email')}`)
       return
     }
     for (const w of (payload.parts || []).filter((p) => p.type === 'welcome')) {
