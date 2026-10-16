@@ -68,6 +68,15 @@ function b64url(bytes) {
  * @param {{to:string, cc?:string, subject:string, text:string, html?:string, attachment?:{filename:string, base64:string}}} m
  */
 export function buildRaw(m) {
+  return b64url(new TextEncoder().encode(buildMime(m)))
+}
+
+/**
+ * The message as MIME text. Besides buildRaw's fields it takes `bcc`, several
+ * `attachments` ([{ filename, base64, type }]) and an empty `to` (a newsletter
+ * goes to its groups in Bcc only).
+ */
+export function buildMime(m) {
   const boundary = `pra${Date.now().toString(36)}`
   const alt = `alt${Date.now().toString(36)}`
   const body = [
@@ -83,29 +92,33 @@ export function buildRaw(m) {
     `--${alt}--`,
     '',
   ]
+  const files = [...(m.attachment ? [m.attachment] : []), ...(m.attachments || [])]
   const lines = [
     `From: Palm River Academy <${SENDER}>`,
-    `To: ${m.to}`,
+    ...(m.to ? [`To: ${m.to}`] : []),
     ...(m.cc ? [`Cc: ${m.cc}`] : []),
+    ...(m.bcc ? [`Bcc: ${m.bcc}`] : []),
     `Subject: ${encHeader(m.subject)}`,
     'MIME-Version: 1.0',
-    ...(m.attachment ? [
+    ...(files.length ? [
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       '',
       `--${boundary}`,
       ...body,
-      `--${boundary}`,
-      `Content-Type: application/pdf; name="${encHeader(m.attachment.filename)}"`,
-      `Content-Disposition: attachment; filename="${encHeader(m.attachment.filename)}"`,
-      'Content-Transfer-Encoding: base64',
-      '',
-      m.attachment.base64.replace(/(.{76})/g, '$1\r\n'),
-      '',
+      ...files.flatMap((f) => [
+        `--${boundary}`,
+        `Content-Type: ${f.type || 'application/pdf'}; name="${encHeader(f.filename)}"`,
+        `Content-Disposition: attachment; filename="${encHeader(f.filename)}"`,
+        'Content-Transfer-Encoding: base64',
+        '',
+        f.base64.replace(/(.{76})/g, '$1\r\n'),
+        '',
+      ]),
       `--${boundary}--`,
       '',
     ] : body),
   ]
-  return b64url(new TextEncoder().encode(lines.join('\r\n')))
+  return lines.join('\r\n')
 }
 
 async function gmailPost(path, body) {
@@ -129,6 +142,28 @@ async function gmailPost(path, body) {
 /** Saves the message to the Drafts folder. Returns { id, messageId, link }. */
 export async function createDraft(m) {
   const d = await gmailPost('drafts', { message: { raw: buildRaw(m) } })
+  return { id: d.id, messageId: d.message?.id, link: draftLink(d.message?.id) }
+}
+
+/**
+ * Saves a large message (a newsletter with its PDFs) to the Drafts folder. The
+ * upload address takes messages up to 35 MB; the plain one above stops near 5 MB.
+ * Returns { id, messageId, link }.
+ */
+export async function createDraftUpload(m) {
+  const tok = await getToken()
+  const res = await fetch('https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts?uploadType=media', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'message/rfc822' },
+    body: new TextEncoder().encode(buildMime(m)),
+  })
+  if (!res.ok) {
+    let msg = `${res.status}`
+    try { msg = (await res.json()).error?.message || msg } catch { /* ignore */ }
+    if (res.status === 401 || res.status === 403) token = null
+    throw new Error(`Gmail: ${msg}`)
+  }
+  const d = await res.json()
   return { id: d.id, messageId: d.message?.id, link: draftLink(d.message?.id) }
 }
 

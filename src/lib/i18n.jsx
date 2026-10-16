@@ -53,6 +53,7 @@ const STRINGS = {
   navOffice: ['Office', 'Văn phòng'],
   navTeaching: ['Teaching', 'Giảng dạy'],
   navOutreach: ['Outreach', 'Truyền thông'],
+  nlNav: ['Newsletter', 'Bản tin'],
   navSetup: ['Setup', 'Thiết lập'],
   reports: ['Progress reports', 'Báo cáo tiến bộ'],
   reportsNav: ['Reports', 'Báo cáo'],

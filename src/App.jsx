@@ -27,6 +27,8 @@ import Leads from './pages/Leads'
 import Enrollments from './pages/Enrollments'
 import Todos from './pages/Todos'
 import PhotoEvent from './pages/photos/PhotoEvent'
+import Newsletters from './pages/newsletter/Newsletters'
+import NewsletterEditor from './pages/newsletter/NewsletterEditor'
 import { DataProvider } from './lib/DataContext'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { Spinner } from './components/ui'
@@ -77,6 +79,8 @@ export default function App() {
           <Route path="/photos" element={<Office><Photos /></Office>} />
           <Route path="/photos/:id" element={<Office><PhotoEvent /></Office>} />
           <Route path="/settings" element={<Office><SettingsPage /></Office>} />
+          <Route path="/newsletter" element={<Newsletters />} />
+          <Route path="/newsletter/:id" element={<NewsletterEditor />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

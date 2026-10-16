@@ -18,6 +18,7 @@ import { teacherDay, todayIndex, isNow, subjectTone } from '../lib/schedule'
 import { currentPeriod, reportWork, studentSections, HOMEROOM_PART, WRITING } from '../lib/report/utils'
 import { Card, StatusChip, Empty, Spinner } from '../components/ui'
 import { WritingTags, WRITING_PARTS } from '../components/report/WritingTags'
+import CornerReminder from '../components/newsletter/CornerReminder'
 
 // The home page. A teacher sees, in this order: today's lessons, then
 // attendance and report writing side by side (each its own card, nothing
@@ -489,6 +490,8 @@ function TeacherHome() {
         ]} />
 
       <TodayCard items={lessons.items} onSchedule={lessons.onSchedule} />
+
+      <CornerReminder />
 
       {!groups.length ? <Empty text={isHead ? '' : t('noClassesToTake')} /> : (
         <>

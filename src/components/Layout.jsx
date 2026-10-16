@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout, Briefcase, Megaphone, FileSignature, FileCheck, BookOpen, ListTodo } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout, Briefcase, Megaphone, FileSignature, FileCheck, BookOpen, ListTodo, Newspaper } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -23,6 +23,8 @@ const NAV = [
     { to: '/reports', icon: ClipboardList, label: 'reportsNav', who: 'all' },
     { to: '/schedule', icon: CalendarDays, label: 'schedule', who: 'all' },
     { to: '/assessments', icon: FileCheck, label: 'asNav', who: 'all' },
+    // Teachers write their class corner here; the office has the Newsletter under Outreach.
+    { to: '/newsletter', icon: Newspaper, label: 'nlNav', who: 'teacher' },
   ] },
   { id: 'office', icon: Briefcase, label: 'navOffice', pages: [
     { to: '/invoices', icon: FileText, label: 'invoices', who: 'office' },
@@ -31,6 +33,7 @@ const NAV = [
   ] },
   { id: 'outreach', icon: Megaphone, label: 'navOutreach', pages: [
     { to: '/photos', icon: Images, label: 'photos', who: 'office' },
+    { to: '/newsletter', icon: Newspaper, label: 'nlNav', who: 'office' },
   ] },
   { id: 'setup', icon: Settings, label: 'navSetup', iconOnly: true, pages: [
     { to: '/settings', icon: Settings, label: 'settings', who: 'office' },
@@ -54,7 +57,7 @@ export default function Layout() {
   const navRef = useRef(null)
   const headerRef = useRef(null)
 
-  const can = { all: true, office: isOffice, head: isHead }
+  const can = { all: true, office: isOffice, head: isHead, teacher: !isOffice }
   const nav = NAV.map((n) => (n.pages ? { ...n, pages: n.pages.filter((p) => can[p.who]) } : n)).filter((n) => (n.pages ? n.pages.length : can[n.who || 'all']))
   const group = nav.find((n) => n.pages?.length > 1 && n.pages.some((p) => under(pathname, p.to)))
   const last = readLast()
