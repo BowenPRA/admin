@@ -397,9 +397,13 @@ export function newsletterPdfDefinition(payload, lang = 'en', { images = {}, ico
     }
   }
 
-  /** Keep a part on one page when it is short; otherwise keep its heading with its first lines. */
+  /**
+   * Keep a part on one page only when it is small; otherwise keep its heading with its
+   * first lines and let the rest run on (each row of photos still stays whole). Keeping
+   * bigger parts whole pushed them to the next page and left half a page empty.
+   */
   const keepTogether = (head, blocks, estimate) => {
-    if (estimate < 360) return [{ stack: [...head, ...blocks], unbreakable: true }]
+    if (estimate < 170) return [{ stack: [...head, ...blocks], unbreakable: true }]
     const [first, ...rest] = blocks
     return [{ stack: [...head, ...(first ? [first] : [])], unbreakable: true }, ...rest]
   }
