@@ -4,8 +4,9 @@
 // them in; anything missing is left out rather than failing the PDF.
 
 import { EDITIONS, TONES, INK, INK_SOFT, LINE, NAVY, word } from './constants.js'
-import { decodeEntities } from './text.js'
+import { cleanHtml, decodeEntities } from './text.js'
 import { pick } from './payload.js'
+import { blocks as docParts, splitHeading, splitItem, readDay, sectionKind } from './shape.js'
 
 /** The Be Vietnam Pro files (public/fonts) the PDF uses. */
 export const FONT_FILES = [
@@ -29,7 +30,7 @@ export const PDF_FONTS = {
 }
 
 /** Icons the layout draws itself, besides each part's own (lucide names). */
-export const LAYOUT_ICONS = ['book-open', 'images', 'users', 'check', 'arrow-right', 'message-circle-question', 'pen-line', 'hand-heart']
+export const LAYOUT_ICONS = ['book-open', 'images', 'users', 'check', 'arrow-right', 'message-circle-question', 'pen-line', 'hand-heart', 'calendar-days', 'pin']
 
 /** Words the PDF needs that constants.js WORDS does not have (yet). */
 const MORE_WORDS = {
@@ -43,9 +44,9 @@ const PAGE_W = 595.28
 const ML = 50, MR = 50, MT = 56, MB = 58
 const W = PAGE_W - ML - MR
 /** The cover photo's frame: full width, at most this tall (pdf.js crops a focused cover to it). */
-export const COVER_FRAME = { width: W, maxHeight: 220 }
+export const COVER_FRAME = { width: W, maxHeight: 196 }
 const GAP = 10 // between photos in a row
-const PART_GAP = 20 // above each part
+const PART_GAP = 17 // above each part
 
 // The website's palm frond (pra-website src/assets/img/frond.svg), drawn faintly on page 1.
 const FROND = 'M84 514.2Q61.8 475.2 14.7 486Q36.9 499.5 84 514.2ZM95.9 483.3Q61.5 435.2 3.4 444.8Q37.8 457.8 95.9 483.3ZM109.9 452.2Q83.6 385.6 24 377.8Q50.4 406.3 109.9 452.2ZM128.8 416.5Q108.5 357.2 55.3 354.8Q75.5 376.8 128.8 416.5ZM145.3 389.4Q126 327.1 74.1 318.8Q93.3 344.8 145.3 389.4ZM167.6 357.1Q142.8 292.7 91.1 284.6Q115.8 307.2 167.6 357.1ZM190.5 328Q172.2 252 124 235.1Q142.3 263.5 190.5 328ZM212.1 303.5Q203.8 230.4 163.4 218Q171.7 239.6 212.1 303.5ZM235.1 280Q231.3 202.7 198.7 175Q202.5 208.6 235.1 280ZM256.5 260.3Q249.4 177.1 213.6 145.4Q220.7 183.5 256.5 260.3ZM284.2 237.4Q271.8 149.4 233.1 115.1Q245.5 156.1 284.2 237.4ZM313.1 216.3Q309.4 148.1 281.8 121.5Q285.4 152.9 313.1 216.3ZM344.5 196Q359.7 131 347.6 100.9Q332.4 130.5 344.5 196ZM371.7 180.7Q389.9 115.9 384.9 89.9Q366.7 114 371.7 180.7ZM405.4 164.2Q420 111.1 405.4 94.4Q390.8 111.1 405.4 164.2ZM433.7 152.3Q455.6 108.4 454.5 85.4Q432.6 104.1 433.7 152.3ZM470.7 139.5Q492.6 105.7 487.7 91.7Q465.8 100.6 470.7 139.5ZM507.6 129.5Q525.8 113.9 520 105.6Q501.8 107.5 507.6 129.5ZM537.1 123.5Q558 107.2 557.7 97.5Q536.7 98.6 537.1 123.5ZM76.8 561.8L84.7 533.6L94 505.9L104.6 478.8L116.6 452.3L129.9 426.5L144.3 401.4L159.9 377L176.7 353.5L194.5 330.8L213.4 309L233.3 288.1L254.1 268.2L275.8 249.3L298.3 231.4L321.7 214.7L345.8 199.2L370.6 184.8L396.1 171.7L422.2 159.8L448.8 149.3L476 140.2L503.6 132.5L531.7 126.2L560.2 121.5L559.8 118.5L531.1 122.8L502.7 128.7L474.7 136L447.2 144.8L420.1 154.9L393.6 166.5L367.7 179.3L342.4 193.4L317.7 208.8L293.8 225.3L270.7 243L248.4 261.8L227 281.7L206.5 302.6L187 324.4L168.5 347.2L151.1 370.9L134.7 395.5L119.6 420.8L105.7 446.9L93.1 473.8L81.7 501.3L71.8 529.5L63.2 558.2ZM84.1 514.1Q161.2 504.4 219.7 499.6Q142.6 471.7 84.1 514.1ZM95.7 483.7Q169.3 488.7 230.7 494.5Q157 454.2 95.7 483.7ZM111.2 449.6Q194.9 462.2 271.1 482.1Q187.3 428.4 111.2 449.6ZM126.5 420.5Q221.2 429.6 308.1 458Q213.4 398.7 126.5 420.5ZM148.3 384.7Q248.9 398.2 342.8 425.6Q242.2 364.4 148.3 384.7ZM163.4 362.7Q273.7 372.7 375.9 405.7Q265.6 339.2 163.4 362.7ZM189.7 328.9Q305.8 351.5 419.4 396.6Q303.2 321.5 189.7 328.9ZM213.7 301.8Q344.8 350.1 478.3 433.8Q347.1 317 213.7 301.8ZM233.9 281.2Q361.2 328.2 490.3 419Q363.1 299.6 233.9 281.2ZM264.3 253.6Q393.7 301.6 525.8 383.8Q396.4 271.5 264.3 253.6ZM284.5 237.2Q402.2 296.5 525.3 393.4Q407.6 266.7 284.5 237.2ZM311.3 217.5Q427.5 274.9 550 355.8Q433.7 244.6 311.3 217.5ZM343.3 196.8Q435.5 245.2 533.6 307.3Q441.5 216.1 343.3 196.8ZM371.2 181Q456.9 236.7 549.5 320.7Q463.7 215.1 371.2 181ZM407.1 163.4Q480.5 215.7 561.2 291.9Q487.8 194.6 407.1 163.4ZM438.7 150.4Q499.1 205.2 570 277.2Q509.6 182.3 438.7 150.4ZM470.4 139.6Q520.5 199.5 583.6 277.8Q533.5 179.6 470.4 139.6ZM507.9 129.4Q530.3 164.9 566 199Q543.6 144.6 507.9 129.4ZM536.6 123.6Q555.1 158.2 587.8 191.3Q569.2 140.6 536.6 123.6Z'
@@ -300,12 +301,12 @@ export function newsletterPdfDefinition(payload, lang = 'en', { images = {}, ico
   const figure = (ph, width, height, opts) => ({ stack: [picture(ph, width, height, opts), caption(ph)].filter(Boolean), width, unbreakable: true })
 
   /** Photos in rows of equal 4:3 frames, each row kept on one page. */
-  const photoRows = (list, { cols, bg, margin = [0, 10, 0, 0] } = {}) => {
+  const photoRows = (list, { cols, bg, margin = [0, 10, 0, 0], maxH = Infinity } = {}) => {
     const ps = list.map(photoOf).filter(Boolean)
     if (!ps.length) return []
     const n = Math.min(cols || (ps.length <= 3 ? ps.length : ps.length === 4 ? 2 : ps.length <= 6 ? 3 : 4), ps.length)
     const cw = (W - GAP * (n - 1)) / n
-    const ch = Math.round(cw * (n === 1 ? Math.min(0.62, ps[0].ratio) : 0.75))
+    const ch = Math.round(Math.min(maxH, cw * (n === 1 ? Math.min(0.62, ps[0].ratio) : 0.75)))
     const rows = []
     for (let i = 0; i < ps.length; i += n) {
       const row = ps.slice(i, i + n).map((ph) => figure(ph, cw, ch, { bg }))
@@ -368,7 +369,7 @@ export function newsletterPdfDefinition(payload, lang = 'en', { images = {}, ico
       const ph = Math.round(Math.max(110, Math.min(250, pw * ps[0].ratio)))
       return [{ columns: [{ width: '*', stack: blocks.length ? blocks : [{ text: '' }] }, figure(ps[0], pw, ph, { bg })], columnGap: 18 }]
     }
-    return [...blocks, ...photoRows(photos, { bg, cols })]
+    return [...blocks, ...photoRows(photos, { bg, cols, maxH: 128 })]
   }
 
   /** An arrow (Be Vietnam Pro has no "→"), drawn from the lucide icon. */
@@ -408,6 +409,180 @@ export function newsletterPdfDefinition(payload, lang = 'en', { images = {}, ico
     return [{ stack: [...head, ...(first ? [first] : [])], unbreakable: true }, ...rest]
   }
   const estimateText = (chars, width = W, size = 10) => Math.ceil((chars * size * 0.52) / width) * size * 1.5
+
+  // ------------------------------------------------------------ sections written as in the Google Doc
+  // shape.js reads each section the way the web page does; these draw the same looks for print:
+  // a class with its small headings as cards, dates as calendar leaves, a short list as a checklist.
+
+  /** A colour between two hex colours (0 = a, 1 = b). */
+  const mix = (a, b, k) => {
+    const x = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+    const [p, q] = [x(a), x(b)]
+    return `#${p.map((v, i) => Math.round(v + (q[i] - v) * k).toString(16).padStart(2, '0')).join('')}`
+  }
+  const tags = (html) => clean(String(html || '').replace(/<[^>]+>/g, ''))
+  /** One line of the office's HTML as text runs (bold, italics, links). */
+  const runsOf = (html, t, size) => htmlBlocks(`<p>${html}</p>`, { link: t.ink, marker: t.main, size })[0]?.text || []
+  /** A list whose lines start with a word in bold ("Phonics: …"): that word as a chip, then the rest. */
+  const labelRows = (items, t, size, bg) => items.map((it, i) => {
+    const x = splitItem(it)
+    return {
+      text: [{ text: `\u00A0${tags(x.label)}\u00A0`, font: F.strong, bold: true, color: t.ink, background: bg }, { text: '\u00A0\u00A0' }, ...runsOf(x.rest, t, size)],
+      fontSize: size, lineHeight: 1.24, margin: [0, i ? 4 : 0, 0, 0],
+    }
+  })
+  /** A section's text: small headings, paragraphs and lists (a list of labels as chips). */
+  const docBlocks = (bs, t, { size, chipBg } = {}) => {
+    const out = []
+    let html = ''
+    const flush = () => {
+      if (!html) return
+      const got = htmlBlocks(html, { link: t.ink, marker: t.main, size })
+      html = ''
+      if (got.length) { const l = got[got.length - 1]; got[got.length - 1] = { ...l, margin: [...l.margin.slice(0, 3), 6] }; out.push(...got) }
+    }
+    for (const b of bs) {
+      if (b.kind === 'sub') { flush(); out.push({ text: tags(b.html), font: F.strong, bold: true, fontSize: (size || 10.2) + 1.1, color: NAVY, margin: [0, out.length ? 4 : 0, 0, 3] }) }
+      else if (b.kind === 'ul' && b.items.length && b.items.every((it) => splitItem(it).label)) { flush(); out.push({ stack: labelRows(b.items, t, size || 9.8, chipBg || t.pale), margin: [0, 1, 0, 6] }) }
+      else html += b.kind === 'ul' ? `<ul>${b.items.map((it) => `<li>${it}</li>`).join('')}</ul>` : `<p>${b.html}</p>`
+    }
+    flush()
+    if (out.length) { const l = out[out.length - 1]; out[out.length - 1] = { ...l, margin: [...(l.margin || [0, 0, 0, 0]).slice(0, 3), 0] } }
+    return out
+  }
+  const partsOf = (p) => docParts(cleanHtml(tx(p.body).text))
+
+  /** A class: its band (title and theme), its small headings as cards, two side by side, then its photos. */
+  const classSection = (p, t) => {
+    const hx = tx(p.heading), b = tx(p.body)
+    const h = splitHeading(hx.text)
+    const intro = [], cards = []
+    for (const x of partsOf(p)) {
+      if (x.kind === 'sub') cards.push({ head: x.html, bs: [] })
+      else if (cards.length) cards[cards.length - 1].bs.push(x)
+      else intro.push(x)
+    }
+    const band = box([{
+      columns: [
+        { ...(badge(p.icon && p.icon !== 'book-open' ? p.icon : 'users', t, 30, '#FFFFFF') || { text: '' }), width: 30 },
+        {
+          width: '*',
+          stack: [
+            { text: [{ text: clean(h.title) }, ...enTag(hx.english || b.english)], font: F.strong, bold: true, fontSize: 15.5, lineHeight: 1, color: t.ink },
+            ...(h.sub ? [{ text: clean(h.sub), font: F.strong, fontSize: 10.2, color: NAVY, margin: [0, 3, 0, 0] }] : []),
+          ],
+          margin: [0, h.sub ? 1 : 8, 0, 0],
+        },
+      ],
+      columnGap: 11,
+    }], { fill: t.pale, padX: 12, padY: 10, r: 9, margin: [0, 0, 0, 2] })
+    const soft = mix(t.pale, '#FFFFFF', 0.45)
+    const cw = (W - GAP) / 2
+    const long = (c) => c.bs.some((x) => x.kind === 'ul') || c.bs.reduce((n, x) => n + tags(x.html || (x.items || []).join(' ')).length, 0) > 430
+    const card = (c, width) => {
+      const list = c.bs.some((x) => x.kind === 'ul')
+      return box([
+        { text: tags(c.head), font: F.strong, bold: true, fontSize: 10.6, color: NAVY, margin: [0, 0, 0, 4] },
+        ...docBlocks(c.bs, t, { size: 9.5, chipBg: '#FFFFFF' }),
+      ], { fill: list ? t.pale : soft, width, padX: 11, padY: 9, r: 7 })
+    }
+    const rows = []
+    for (let i = 0; i < cards.length; i++) {
+      const c = cards[i], n = cards[i + 1]
+      if (long(c) || !n || long(n)) rows.push({ ...card(c, W), margin: [0, 8, 0, 0], unbreakable: true })
+      else { rows.push({ columns: [{ width: cw, ...card(c, cw) }, { width: cw, ...card(n, cw) }], columnGap: GAP, margin: [0, 8, 0, 0], unbreakable: true }); i++ }
+    }
+    const introBlocks = intro.length ? [{ stack: docBlocks(intro, t, { size: 9.8 }), margin: [0, 8, 0, 0] }] : []
+    // The photos as a strip under the cards, not a full-height row: the cards are the reading.
+    return [{ stack: [band, ...introBlocks, ...rows.slice(0, 1)], unbreakable: true }, ...rows.slice(1), ...photoRows(p.photos || [], { maxH: 116, margin: [0, 8, 0, 0] })]
+  }
+
+  /** The heading of a boxed section: its icon on a white badge, its title. */
+  const boxHead = (p, t, icon) => {
+    const hx = tx(p.heading)
+    return heading(splitHeading(hx.text).title, { icon, t, english: hx.english || tx(p.body).english, size: 13.2 })
+  }
+
+  /** A list of dates: each a small calendar leaf, what happens, and the day as written. */
+  const datesSection = (p, t) => {
+    const enItems = docParts(cleanHtml(p.body?.en)).filter((x) => x.kind === 'ul').flatMap((x) => x.items)
+    let k = 0
+    const inner = []
+    for (const x of partsOf(p)) {
+      if (x.kind !== 'ul') { inner.push({ stack: docBlocks([x], t, { size: 9.6 }), margin: [0, 8, 0, 0] }); continue }
+      const rows = x.items.map((it, i) => {
+        const item = splitItem(it)
+        const en = splitItem(enItems[k] || '')
+        k += 1
+        const day = readDay(en.label, payload.date) || readDay(item.label, payload.date)
+        const off = /no classes|closed/i.test(tags(enItems[k - 1] || it))
+        const d = day ? new Date(`${day.iso}T00:00:00Z`) : null
+        const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+        const band = off ? TONES.coral.main : t.main
+        const dayText = day?.end ? `${d.getUTCDate()}–${new Date(`${day.end}T00:00:00Z`).getUTCDate()}` : d ? String(d.getUTCDate()) : ''
+        const leaf = d ? {
+          stack: [
+            { canvas: [
+              { type: 'rect', x: 0, y: 0, w: 34, h: 31, r: 4, color: '#FFFFFF', lineColor: t.edge, lineWidth: 0.8 },
+              { type: 'rect', x: 0, y: 0, w: 34, h: 10, r: 4, color: band },
+              { type: 'rect', x: 0, y: 5, w: 34, h: 5, color: band },
+            ] },
+            { text: L === 'vi' ? `TH ${d.getUTCMonth() + 1}` : MON[d.getUTCMonth()], color: '#FFFFFF', font: F.strong, bold: true, fontSize: 6, characterSpacing: 0.5, alignment: 'center', margin: [0, -29.6, 0, 0] },
+            { text: dayText, color: NAVY, font: F.strong, bold: true, fontSize: day.end ? 9 : 12.5, alignment: 'center', lineHeight: 1, margin: [0, day.end ? 5 : 3, 0, 0] },
+          ],
+          width: 34,
+        } : { text: '' }
+        const top = i ? 5 : 0
+        return [
+          { ...leaf, margin: [0, top, 0, 5] },
+          {
+            stack: [
+              { text: runsOf(item.rest || item.label, t, 10), fontSize: 10, lineHeight: 1.12, color: INK },
+              {
+                text: [
+                  ...(item.rest && item.label ? [{ text: `\u00A0${tags(item.label)}\u00A0`, font: F.strong, bold: true, color: t.ink, background: '#FFFFFF' }] : []),
+                  ...(off ? [{ text: `   ${upper(word(L, 'off'))}`, font: F.strong, bold: true, fontSize: 6.6, characterSpacing: 0.8, color: TONES.coral.ink }] : []),
+                ],
+                fontSize: 8.4, margin: [0, 3, 0, 0],
+              },
+            ],
+            margin: [0, top + 1, 0, 5],
+          },
+        ]
+      })
+      inner.push({
+        table: { widths: [34, '*'], body: rows, dontBreakRows: true },
+        layout: {
+          hLineWidth: (i, node) => (i === 0 || i === node.table.body.length ? 0 : 0.6), vLineWidth: () => 0, hLineColor: () => t.edge,
+          paddingLeft: (i) => (i ? 12 : 0), paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0,
+        },
+        margin: [0, 8, 0, 0],
+      })
+    }
+    return [box([boxHead(p, t, 'calendar-days'), ...inner], { fill: t.pale, padX: 14, padY: 12, keep: k <= 8 }), ...photoRows(p.photos || [])]
+  }
+
+  /** A short list (family reminders): a green box with a tick by each line. */
+  const checkSection = (p) => {
+    const g = TONES.green
+    const all = partsOf(p)
+    const list = all.find((x) => x.kind === 'ul')
+    const notes = all.filter((x) => x !== list)
+    const tick = iconSvg('check', '#FFFFFF')
+    const tickOn = tick && tick.replace('<g fill="none"', `<circle cx="12" cy="12" r="12" fill="${g.ink}"/><g transform="translate(5 5) scale(0.58)" fill="none"`).replace('stroke-width="2.2"', 'stroke-width="3.4"')
+    const rows = (list?.items || []).map((it, i) => {
+      const x = splitItem(it)
+      return {
+        columns: [
+          tickOn ? { svg: tickOn, width: 13, height: 13, margin: [0, 1, 0, 0] } : { text: '✓', width: 13, color: g.ink },
+          { text: [...(x.label ? [{ text: `${tags(x.label)}: `, font: F.strong, bold: true, color: g.ink }] : []), ...runsOf(x.rest, g, 10.2)], fontSize: 10.2, lineHeight: 1.14, width: '*' },
+        ],
+        columnGap: 8,
+        margin: [0, i ? 7 : 2, 0, 0],
+      }
+    })
+    return [box([boxHead(p, g, p.icon && p.icon !== 'book-open' ? p.icon : 'pin'), ...(notes.length ? [{ stack: docBlocks(notes, g, { size: 9.8 }), margin: [0, 4, 0, 4] }] : []), ...rows], { fill: g.pale, padX: 14, padY: 12, keep: true }), ...photoRows(p.photos || [])]
+  }
 
   // ------------------------------------------------------------ page 1: nameplate
 
@@ -556,14 +731,20 @@ export function newsletterPdfDefinition(payload, lang = 'en', { images = {}, ico
     const t = TONES[p.tone] || tone
     const block = []
 
-    if (p.type === 'story') {
+    const kind = p.type === 'story' ? sectionKind(p, payload.date) : ''
+    if (kind === 'class') block.push(...classSection(p, t))
+    else if (kind === 'dates') block.push(...datesSection(p, t))
+    else if (kind === 'checklist') block.push(...checkSection(p))
+    else if (p.type === 'story') {
       const h = tx(p.heading), b = tx(p.body)
-      const blocks = htmlBlocks(b.text, { link: t.ink, marker: t.main })
+      const hs = splitHeading(h.text)
+      const blocks = docBlocks(partsOf(p), t)
       const btn = buttonLine(p.button, t)
-      const head = [heading(h.text, { icon: p.icon || 'book-open', t, english: h.english || b.english })]
+      const head = [heading(hs.title, { icon: p.icon || 'book-open', t, english: h.english || b.english })]
+      if (hs.sub) head.push({ text: clean(hs.sub), font: F.strong, fontSize: 10.4, color: t.ink, margin: [31, -2, 0, 4] })
       const when = clean(tx(p.when).text)
       if (when) head.push({ text: when, font: F.strong, bold: true, fontSize: 9.4, color: green.ink, margin: [31, -1, 0, 6] })
-      else head[0] = { ...head[0], margin: [0, 0, 0, 7] }
+      else head[head.length - 1] = { ...head[head.length - 1], margin: [...(head[head.length - 1].margin || [0, 0, 0, 0]).slice(0, 3), 7] }
       const nPhotos = (p.photos || []).filter((x) => photoOf(x)).length
       const est = 40 + estimateText(lengthOf(b.text), nPhotos === 1 ? W * 0.6 : W) + (nPhotos > 1 ? 150 : 0)
       const body = textWithPhotos([...blocks, ...(btn ? [btn] : [])], p.photos)
