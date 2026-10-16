@@ -44,7 +44,7 @@ const PAGE_W = 595.28
 const ML = 50, MR = 50, MT = 56, MB = 58
 const W = PAGE_W - ML - MR
 /** The cover photo's frame: full width, at most this tall (pdf.js crops a focused cover to it). */
-export const COVER_FRAME = { width: W, maxHeight: 196 }
+export const COVER_FRAME = { width: W, maxHeight: 240 }
 const GAP = 10 // between photos in a row
 const PART_GAP = 17 // above each part
 
@@ -369,7 +369,7 @@ export function newsletterPdfDefinition(payload, lang = 'en', { images = {}, ico
       const ph = Math.round(Math.max(110, Math.min(250, pw * ps[0].ratio)))
       return [{ columns: [{ width: '*', stack: blocks.length ? blocks : [{ text: '' }] }, figure(ps[0], pw, ph, { bg })], columnGap: 18 }]
     }
-    return [...blocks, ...photoRows(photos, { bg, cols, maxH: 128 })]
+    return [...blocks, ...photoRows(photos, { bg, cols, maxH: 200 })]
   }
 
   /** An arrow (Be Vietnam Pro has no "→"), drawn from the lucide icon. */
@@ -494,7 +494,7 @@ export function newsletterPdfDefinition(payload, lang = 'en', { images = {}, ico
     }
     const introBlocks = intro.length ? [{ stack: docBlocks(intro, t, { size: 9.8 }), margin: [0, 8, 0, 0] }] : []
     // The photos as a strip under the cards, not a full-height row: the cards are the reading.
-    return [{ stack: [band, ...introBlocks, ...rows.slice(0, 1)], unbreakable: true }, ...rows.slice(1), ...photoRows(p.photos || [], { maxH: 116, margin: [0, 8, 0, 0] })]
+    return [{ stack: [band, ...introBlocks, ...rows.slice(0, 1)], unbreakable: true }, ...rows.slice(1), ...photoRows(p.photos || [], { maxH: 190, margin: [0, 8, 0, 0] })]
   }
 
   /** The heading of a boxed section: its icon on a white badge, its title. */
