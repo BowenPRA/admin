@@ -4,6 +4,8 @@
 
 /** Where the public pages are. */
 export const SITE = 'https://pra.edu.vn'
+/** The website's preview page, which draws an issue The Current sends it (VITE_NL_PREVIEW_URL points a test copy at a local build). */
+export const PREVIEW_PAGE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_NL_PREVIEW_URL) || `${SITE}/newsletter/preview/`
 
 /**
  * The two newsletters. `groups` are the Google Groups the email goes to (BCC);

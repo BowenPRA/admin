@@ -16,6 +16,7 @@ import { blankPart, classCorner, positionBetween } from '../../lib/newsletter/ne
 import { Modal, Spinner, Menu } from '../../components/ui'
 import { useL, Note } from '../../components/newsletter/bits'
 import { useIssue } from '../../components/newsletter/useIssue'
+import { useFullPreview } from '../../components/newsletter/useFullPreview'
 import PartEditor from '../../components/newsletter/PartEditor'
 import NeedToKnow from '../../components/newsletter/NeedToKnow'
 import Preview from '../../components/newsletter/Preview'
@@ -80,6 +81,8 @@ function IssueEditor({ id }) {
   const [viShown, setViShown] = useState(() => new Set())
 
   const payloads = useMemo(() => (issue ? previewPayloads(issue, parts) : null), [issue, parts, iss.photoTick]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The real web page in its own tab, kept up to date while it is open.
+  const openFull = useFullPreview(payloads?.pub)
 
   // When the last part gets its Vietnamese, the translator's To-Do moves to "To check" by itself.
   const needViNow = issue ? issueChecks(issue, parts).needVi.length : -1
@@ -331,14 +334,14 @@ function IssueEditor({ id }) {
         </div>
 
         <aside className="hidden min-w-0 xl:sticky xl:top-24 xl:block">
-          {payloads && <Preview payload={payloads.pub} families={payloads.fam} L={L} />}
+          {payloads && <Preview payload={payloads.pub} families={payloads.fam} L={L} onFull={openFull} />}
         </aside>
       </div>
 
       {/* Below 1280 px the preview opens on top of the page. */}
       {previewOpen && payloads && (
         <Modal open wide onClose={() => setPreviewOpen(false)} title={L('Preview', 'Xem trước')} subtitle={L('How families will see this issue', 'Gia đình sẽ thấy số này như thế nào')}>
-          <Preview payload={payloads.pub} families={payloads.fam} L={L} />
+          <Preview payload={payloads.pub} families={payloads.fam} L={L} onFull={openFull} />
         </Modal>
       )}
       {publishing && <PublishPanel open onClose={() => setPublishing(false)} issue={issue} parts={parts} onIssue={iss.replaceIssue} flush={iss.flush} refresh={iss.refresh} L={L} toast={toast} />}

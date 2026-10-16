@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarPlus, Check, Clock, Download, LoaderCircle, Maximize2, MessageCircleQuestion, Quote } from 'lucide-react'
-import { TONES, word } from '../../lib/newsletter/constants'
+import { CalendarPlus, Check, Clock, Download, ExternalLink, LoaderCircle, Maximize2, MessageCircleQuestion, Quote } from 'lucide-react'
+import { TONES, PREVIEW_PAGE, word } from '../../lib/newsletter/constants'
 import { pick } from '../../lib/newsletter/payload'
 import { cleanHtml } from '../../lib/newsletter/text'
 import { Segmented } from '../ui'
@@ -203,8 +203,40 @@ function PdfPreview({ p, lang, L }) {
   )
 }
 
+/**
+ * The website tab: the real page (pra.edu.vn/newsletter/preview/, drawn by the website's own
+ * code) at the width of a phone, sent the issue as it changes. If the website cannot be
+ * reached (no internet, or the page is not on the website yet) the simple preview shows instead.
+ */
+function SitePreview({ p, lang, L }) {
+  const frame = useRef(null)
+  const [ready, setReady] = useState(false)
+  const [gone, setGone] = useState(false)
+  const origin = new URL(PREVIEW_PAGE).origin
+  useEffect(() => {
+    const on = (e) => { if (frame.current && e.source === frame.current.contentWindow && e.data?.type === 'nl-preview-ready') setReady(true) }
+    window.addEventListener('message', on)
+    const t = setTimeout(() => setGone(true), 9000)
+    return () => { window.removeEventListener('message', on); clearTimeout(t) }
+  }, [])
+  useEffect(() => {
+    if (!ready) return undefined
+    const t = setTimeout(() => { try { frame.current?.contentWindow?.postMessage({ type: 'nl-preview', issue: p, lang, force: true }, origin) } catch { /* reloading */ } }, 250)
+    return () => clearTimeout(t)
+  }, [ready, p, lang, origin])
+  if (gone && !ready) {
+    return (
+      <div>
+        <p className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{L('The website could not be reached, so this is a simpler preview. "Full page" shows the real page once you are online.', 'Không kết nối được trang web nên đây là bản xem trước đơn giản. "Toàn trang" sẽ hiện trang thật khi có mạng.')}</p>
+        <WebPreview p={p} lang={lang} />
+      </div>
+    )
+  }
+  return <iframe ref={frame} title={L('The page on pra.edu.vn', 'Trang trên pra.edu.vn')} src={`${PREVIEW_PAGE}?embed=1`} className="block h-[calc(100vh-11rem)] min-h-[520px] w-full border-0" />
+}
+
 /** The preview beside the editor: website, email or PDF, in English or Vietnamese. */
-export default function Preview({ payload, families, L }) {
+export default function Preview({ payload, families, L, onFull }) {
   const [kind, setKind] = useState('web')
   const [lang, setLang] = useState('en')
   return (
@@ -212,13 +244,14 @@ export default function Preview({ payload, families, L }) {
       <div className="flex flex-wrap items-center gap-2">
         <Segmented value={kind} onChange={setKind} options={[{ value: 'web', label: L('Website', 'Trang web') }, { value: 'email', label: 'Email' }, { value: 'pdf', label: 'PDF' }]} />
         {kind !== 'email' && <Segmented value={lang} onChange={setLang} options={[{ value: 'en', label: 'EN' }, { value: 'vi', label: 'VI' }]} />}
+        {onFull && <button type="button" className="btn-secondary ml-auto !px-3 !py-1.5 text-sm" onClick={() => onFull(lang)} aria-label={L('Full page preview', 'Xem toàn trang')} title={L('The page as families will see it on pra.edu.vn, in a new tab. It updates as you edit.', 'Trang web như gia đình sẽ thấy trên pra.edu.vn, trong thẻ mới. Tự cập nhật khi bạn sửa.')}><ExternalLink size={15} />{L('Full page', 'Toàn trang')}</button>}
       </div>
       <div className="max-h-[calc(100vh-9rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white">
-        {kind === 'web' && <WebPreview p={payload} lang={lang} />}
+        {kind === 'web' && <SitePreview p={payload} lang={lang} L={L} />}
         {kind === 'email' && <EmailPreview p={families} />}
         {kind === 'pdf' && <PdfPreview p={payload} lang={lang} L={L} />}
       </div>
-      <p className="text-xs text-slate-400">{kind === 'web' ? L('Close to the real page. Families-only parts are not shown here.', 'Gần giống trang thật. Phần chỉ gửi gia đình không hiện ở đây.') : kind === 'email' ? L('The email families get: Need to know in full, the rest one tap away.', 'Email gia đình nhận: phần Cần biết đầy đủ, phần còn lại bấm để xem.') : L('The PDF attached to the email and linked on the page.', 'PDF đính kèm email và có trên trang web.')}</p>
+      <p className="text-xs text-slate-400">{kind === 'web' ? L('The page on pra.edu.vn as a phone shows it. "Full page" opens it full size in a new tab.', 'Trang trên pra.edu.vn như trên điện thoại. "Toàn trang" mở cỡ lớn trong thẻ mới.') : kind === 'email' ? L('The email families get: Need to know in full, the rest one tap away.', 'Email gia đình nhận: phần Cần biết đầy đủ, phần còn lại bấm để xem.') : L('The PDF attached to the email and linked on the page.', 'PDF đính kèm email và có trên trang web.')}</p>
     </div>
   )
 }
