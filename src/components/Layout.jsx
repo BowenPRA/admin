@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout, Briefcase, Megaphone, FileSignature, FileCheck, BookOpen, ListTodo, Newspaper } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronDown, Eye, Images, Sprout, Briefcase, Megaphone, FileSignature, FileCheck, BookOpen, BookMarked, ListTodo, Newspaper } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -38,6 +38,7 @@ const NAV = [
   { id: 'setup', icon: Settings, label: 'navSetup', iconOnly: true, pages: [
     { to: '/settings', icon: Settings, label: 'settings', who: 'office' },
     { to: '/teachers', icon: GraduationCap, label: 'teachers', who: 'head' },
+    { to: '/handbook', icon: BookMarked, label: 'handbookNav', who: 'office' },
   ] },
 ]
 const under = (pathname, to) => pathname === to || pathname.startsWith(`${to}/`)

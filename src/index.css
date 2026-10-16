@@ -112,6 +112,33 @@ body {
   .att-noted { position: absolute; top: 0.6mm; right: 0.6mm; width: 1mm; height: 1mm; border-radius: 50%; background: #1a7bc4; }
 }
 
+/* ---------- The admin handbook (pages/Handbook.jsx, Markdown in src/handbook/) ---------- */
+@layer components {
+  .hb-prose { @apply text-[15px] leading-relaxed text-slate-700; }
+  .hb-prose > :first-child { margin-top: 0; }
+  .hb-prose h2 { @apply mb-3 mt-10 border-b border-slate-200 pb-1.5 text-xl font-black tracking-tight text-slate-800; scroll-margin-top: calc(var(--header-h, 56px) + 16px); }
+  .hb-prose h3 { @apply mb-2 mt-7 text-base font-bold text-slate-800; scroll-margin-top: calc(var(--header-h, 56px) + 16px); }
+  .hb-prose h4 { @apply mb-1.5 mt-5 text-[13px] font-bold uppercase tracking-wide text-slate-600; scroll-margin-top: calc(var(--header-h, 56px) + 16px); }
+  .hb-prose p { @apply my-3; }
+  .hb-prose ul { @apply my-3 list-disc pl-6; }
+  .hb-prose ol { @apply my-3 list-decimal pl-6; }
+  .hb-prose li { @apply my-1 pl-0.5; }
+  .hb-prose li > ul, .hb-prose li > ol { @apply my-1; }
+  .hb-prose li > p { @apply my-1; }
+  .hb-prose a { @apply font-semibold text-pra-blue underline decoration-pra-sky/60 underline-offset-2 hover:text-pra-navy; }
+  .hb-prose strong { @apply font-bold text-slate-900; }
+  .hb-prose code { @apply rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[13px] text-slate-800; }
+  .hb-prose pre { @apply my-4 overflow-x-auto rounded-xl bg-slate-900 p-4 text-[13px] leading-relaxed text-slate-100; }
+  .hb-prose pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .hb-prose blockquote { @apply my-4 rounded-r-xl border-l-4 border-pra-sky bg-sky-50 px-4 py-3 text-slate-700; }
+  .hb-prose blockquote p { @apply my-1; }
+  .hb-prose table { @apply my-4 block w-full overflow-x-auto text-sm; border-collapse: collapse; }
+  .hb-prose th { @apply border-b-2 border-slate-300 bg-slate-50 px-3 py-2 text-left font-bold text-slate-700; }
+  .hb-prose td { @apply border-b border-slate-200 px-3 py-2 align-top; }
+  .hb-prose hr { @apply my-8 border-slate-200; }
+  .hb-prose img { @apply my-4 max-w-full rounded-xl border border-slate-200; }
+}
+
 @page { size: A4; margin: 10mm; }
 
 @media print {
@@ -123,4 +150,13 @@ body {
   .ps-sheet { margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
   .ps-sheet:last-child { break-after: auto; page-break-after: auto; }
   .ps-zoom { zoom: 1 !important; }
+  /* The handbook prints as plain text: no card, every chapter on a new page. */
+  .hb-chapter { border: 0 !important; box-shadow: none !important; padding: 0 !important; break-before: page; page-break-before: always; }
+  .hb-chapter:first-child { break-before: auto; page-break-before: auto; }
+  .hb-prose { font-size: 10.5pt; color: #111; }
+  .hb-prose h2, .hb-prose h3, .hb-prose h4 { break-after: avoid; page-break-after: avoid; }
+  .hb-prose table, .hb-prose pre, .hb-prose blockquote, .hb-prose li { break-inside: avoid; page-break-inside: avoid; }
+  .hb-prose pre { background: #f1f5f9 !important; color: #111 !important; border: 1px solid #cbd5e1; }
+  .hb-prose a { color: #1a7bc4; text-decoration: none; }
+  .hb-prose a[href^='http']::after { content: ' (' attr(href) ')'; font-size: 9pt; color: #64748b; }
 }

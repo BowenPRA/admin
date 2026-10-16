@@ -27,6 +27,7 @@ import Leads from './pages/Leads'
 import Enrollments from './pages/Enrollments'
 import Todos from './pages/Todos'
 import PhotoEvent from './pages/photos/PhotoEvent'
+import Handbook from './pages/Handbook'
 import Newsletters from './pages/newsletter/Newsletters'
 import NewsletterEditor from './pages/newsletter/NewsletterEditor'
 import { DataProvider } from './lib/DataContext'
@@ -81,6 +82,8 @@ export default function App() {
           <Route path="/settings" element={<Office><SettingsPage /></Office>} />
           <Route path="/newsletter" element={<Newsletters />} />
           <Route path="/newsletter/:id" element={<NewsletterEditor />} />
+          <Route path="/handbook" element={<Office><Handbook /></Office>} />
+          <Route path="/handbook/:chapter" element={<Office><Handbook /></Office>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
