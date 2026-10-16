@@ -2,8 +2,12 @@
 // phones; a plain-text part; the subject) and as a short message for the
 // parents' chat groups. Pure functions, made from the families payload
 // (README.md). Emoji stay as staff typed them.
+//
+// EMAIL_STYLE 'full' (now): the whole newsletter is in the email, English then
+// Vietnamese, as the Google Doc was. 'short': the first lines of each part with
+// "Read more" links to the page.
 
-import { TONES, INK, INK_SOFT, NAVY, SENDER, word } from './constants.js'
+import { TONES, INK, INK_SOFT, NAVY, SENDER, EMAIL_STYLE, word } from './constants.js'
 import { escHtml, plain, plainLines, firstSentence } from './text.js'
 import { pick } from './payload.js'
 import { addDays } from './dates.js'
@@ -34,9 +38,10 @@ function publicSrc(photo, big = false) {
   return /^https?:\/\//i.test(s) && !/\/object\/sign\//.test(s) ? s : ''
 }
 
-/** The small HTML of a body with the inline styles mail needs. */
+/** The small HTML of a body with the inline styles mail needs. A paragraph all in bold is a small heading. */
 function bodyHtml(html, { size = 16, line = 25 } = {}) {
   return String(html || '')
+    .replace(/<p><b>((?:(?!<\/?(?:p|b)>).)*)<\/b><\/p>/g, (m, inner, at) => `<p style="margin:${at ? 20 : 0}px 0 6px;${font(size + 1, line - 2, { bold: true, color: NAVY })}">${inner}</p>`)
     .replace(/<p>/g, `<p style="margin:0 0 12px;${font(size, line)}">`)
     .replace(/<ul>/g, `<ul style="margin:0 0 12px;padding:0 0 0 22px;${font(size, line)}">`)
     .replace(/<li>/g, '<li style="margin:0 0 4px;">')
@@ -76,8 +81,76 @@ function issueEntries(payload, lang) {
   return out
 }
 
+/** Photos for the full email: one across, or two side by side, each with its caption. */
+function photoGrid(photos, L) {
+  const list = (photos || []).filter((p) => publicSrc(p))
+  if (!list.length) return ''
+  const one = (p, w) => {
+    const r = p.w && p.h ? p.h / p.w : 0.75
+    const alt = t(p.alt, L)
+    return `<img src="${esc(publicSrc(p))}" width="${w}" height="${Math.round(w * r)}" alt="${esc(alt)}" style="display:block;width:100%;max-width:${w}px;height:auto;border:0;border-radius:10px;">`
+      + `${alt ? `<p style="margin:6px 0 0;${font(12, 17, { color: INK_SOFT })}">${esc(alt)}</p>` : ''}`
+  }
+  if (list.length === 1) return `<div style="margin:6px 0 4px;">${one(list[0], 552)}</div>`
+  let out = ''
+  for (let i = 0; i < list.length; i += 2) {
+    const a = list[i], b = list[i + 1]
+    out += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 4px;"><tr>`
+      + `<td width="50%" valign="top" style="padding-right:6px;">${one(a, 270)}</td>`
+      + `<td width="50%" valign="top" style="padding-left:6px;">${b ? one(b, 270) : ''}</td></tr></table>`
+  }
+  return out
+}
+
+/** One language's whole newsletter, as the Google Doc was: opening, every section in full, the closing and the sign-off. */
+function fullSection(payload, lang, tone) {
+  const L = lang === 'vi' ? 'vi' : 'en'
+  const rows = []
+  const pad = (html, p = '0 24px') => rows.push(`<tr><td style="padding:${p};">${html}</td></tr>`)
+  const h2 = (text) => `<h2 style="margin:0 0 10px;${font(21, 28, { bold: true, color: NAVY })}">${esc(text)}</h2>`
+
+  const lead = t(payload.opening?.lead, L)
+  const body = t(payload.opening?.body, L)
+  if (lead || plain(body)) pad(`${lead ? `<p style="margin:0 0 8px;${font(18, 25, { bold: true, color: NAVY })}">${esc(lead)}</p>` : ''}${bodyHtml(body)}`, '24px 24px 4px')
+
+  // Dates and reminders, when they are shown (HIDDEN_PARTS).
+  const dates = payload.need?.dates || []
+  const reminders = (payload.need?.reminders || []).filter((r) => t(r, L).trim())
+  if (dates.length || reminders.length) {
+    let inner = ''
+    if (dates.length) inner += `<p style="margin:0 0 6px;${font(17, 24, { bold: true, color: NAVY })}">${esc(word(L, 'dates'))}</p><ul style="margin:0 0 8px;padding:0 0 0 22px;${font(15, 22)}">${dates.map((d) => `<li style="margin:0 0 4px;"><b style="color:${NAVY};">${esc(t(d.date, L))}${d.time ? `, ${esc(t(d.time, L))}` : ''}:</b> ${esc(t(d.what, L))}</li>`).join('')}</ul>`
+    if (reminders.length) inner += `<p style="margin:0 0 6px;${font(17, 24, { bold: true, color: NAVY })}">${esc(word(L, 'reminders'))}</p><ul style="margin:0;padding:0 0 0 22px;${font(15, 22)}">${reminders.map((r) => `<li style="margin:0 0 4px;">${esc(t(r, L))}</li>`).join('')}</ul>`
+    pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="${tone.pale}" style="background:${tone.pale};border-radius:12px;padding:16px 20px;">${inner}</td></tr></table>`, '18px 24px 4px')
+  }
+
+  for (const p of payload.parts || []) {
+    if (p.type === 'story') {
+      const when = t(p.when, L)
+      const button = p.button ? `<p style="margin:4px 0 0;"><a href="${esc(p.button.url)}" style="display:inline-block;padding:10px 20px;border-radius:999px;background:${tone.button};${font(15, 20, { bold: true, color: '#FFFFFF' })}text-decoration:none;">${esc(t(p.button.label, L))}&nbsp;&rarr;</a></p>` : ''
+      pad(`${h2(t(p.heading, L))}${when ? `<p style="margin:-4px 0 10px;${font(14, 20, { bold: true, color: tone.ink })}">${esc(when)}</p>` : ''}${bodyHtml(t(p.body, L))}${photoGrid(p.photos, L)}${button}`, '22px 24px 2px')
+    } else if (p.type === 'photos') {
+      pad(`${t(p.heading, L) ? h2(t(p.heading, L)) : ''}${photoGrid(p.photos, L)}`, '22px 24px 2px')
+    } else if (p.type === 'class') {
+      const who = p.teacher?.name ? word(L, 'fromTeacher', { name: p.teacher.name }) : ''
+      pad(`${h2(p.class)}${who ? `<p style="margin:-4px 0 10px;${font(14, 20, { color: INK_SOFT })}">${esc(who)}</p>` : ''}${bodyHtml(t(p.body, L))}${photoGrid(p.photos, L)}`, '22px 24px 2px')
+    } else if (p.type === 'quote') {
+      pad(`<p style="margin:0;${font(18, 26, { color: NAVY, extra: 'font-style:italic;' })}">“${esc(plain(t(p.text, L)))}”</p>${t(p.who, L) ? `<p style="margin:4px 0 0;${font(14, 20, { color: INK_SOFT })}">— ${esc(t(p.who, L))}</p>` : ''}`, '22px 24px 2px')
+    } else if (p.type === 'press') {
+      pad(`${h2(`${word(L, 'pressFrom')}: ${p.title}`)}${t(p.blurb, L) ? `<p style="margin:0 0 8px;${font(16, 24)}">${esc(t(p.blurb, L))}</p>` : ''}<a href="${esc(p.url)}" style="${font(15, 20, { bold: true, color: LINK })}">${esc(word(L, 'readMore'))}&nbsp;&rarr;</a>`, '22px 24px 2px')
+    } else if (p.type === 'welcome') {
+      const names = (p.names || []).map((n) => `<b style="color:${NAVY};">${esc(n.name)}</b>${n.class ? ` (${esc(n.class)})` : ''}`).join(', ')
+      pad(`${h2(t(p.heading, L) || word(L, 'welcome'))}${bodyHtml(t(p.body, L))}${names ? `<p style="margin:0;${font(16, 24)}">${names}</p>` : ''}`, '22px 24px 2px')
+    }
+  }
+
+  const closing = (payload.parts || []).find((p) => p.type === 'closing')
+  pad(`${closing && plain(t(closing.body, L)) ? bodyHtml(t(closing.body, L)) : ''}<p style="margin:4px 0 0;${font(16, 24)}">${esc(word(L, 'signoff'))}<br><b style="color:${NAVY};">${esc(word(L, 'from'))}</b></p>`, '18px 24px 8px')
+  return rows.join('\n')
+}
+
 /** One language's part of the email: opening, need to know, welcome, in this issue, closing, button. */
 function section(payload, lang, tone) {
+  if (EMAIL_STYLE === 'full') return fullSection(payload, lang, tone)
   const L = lang === 'vi' ? 'vi' : 'en'
   const rows = []
   const pad = (html, p = '0 24px') => rows.push(`<tr><td style="padding:${p};">${html}</td></tr>`)
@@ -197,7 +270,7 @@ function buildEmail(payload, { logoUrl = 'https://pra.edu.vn/assets/img/logo.png
 <tr><td style="padding:18px 24px 14px;background-color:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
 <td valign="middle"><img src="${esc(logoUrl)}" width="134" height="54" alt="Palm River Academy" style="display:block;width:134px;height:54px;border:0;"></td>
-<td valign="middle" align="right" style="${font(13, 18, { color: LINK })}"><a href="${esc(viHref)}" style="color:${LINK};text-decoration:underline;">${esc(word('en', 'readVi'))}</a></td>
+<td valign="middle" align="right" style="${font(13, 18, { color: EMAIL_STYLE === 'full' ? INK_SOFT : LINK })}">${EMAIL_STYLE === 'full' ? 'Tiếng Việt bên dưới 🇻🇳' : `<a href="${esc(viHref)}" style="color:${LINK};text-decoration:underline;">${esc(word('en', 'readVi'))}</a>`}</td>
 </tr></table>
 </td></tr>
 <tr><td bgcolor="${band}" style="background:${band};padding:22px 24px 20px;">
@@ -259,6 +332,26 @@ function emailText(payload) {
         for (const r of reminders) line(`- ${t(r, L)}`)
       }
     }
+    if (EMAIL_STYLE === 'full') {
+      for (const p of payload.parts || []) {
+        if (p.type === 'closing') continue
+        const head = p.type === 'class' ? p.class : p.type === 'press' ? `${word(L, 'pressFrom')}: ${p.title}` : t(p.heading, L) || (p.type === 'welcome' ? word(L, 'welcome') : '')
+        line()
+        if (head) line(head)
+        if (p.type === 'story' && t(p.when, L)) line(t(p.when, L))
+        if (p.body) line(plainLines(t(p.body, L)))
+        if (p.type === 'quote') line(`"${plain(t(p.text, L))}"${t(p.who, L) ? ` (${t(p.who, L)})` : ''}`)
+        if (p.type === 'press') line(p.url)
+        if (p.type === 'welcome' && (p.names || []).length) line(p.names.map((n) => `${n.name}${n.class ? ` (${n.class})` : ''}`).join(', '))
+        if (p.button) line(`${t(p.button.label, L)}: ${p.button.url}`)
+      }
+      const closing = (payload.parts || []).find((p) => p.type === 'closing')
+      line()
+      if (closing && plain(t(closing.body, L))) line(plainLines(t(closing.body, L)))
+      line(word(L, 'signoff'))
+      line(word(L, 'from'))
+      return
+    }
     for (const w of (payload.parts || []).filter((p) => p.type === 'welcome')) {
       const names = (w.names || []).map((n) => `${n.name}${n.class ? ` (${n.class})` : ''}`).join(', ')
       line()
@@ -283,7 +376,7 @@ function emailText(payload) {
 
   line(t(payload.edition_name, 'en'))
   line(`${t(payload.label, 'en')} · ${t(payload.day, 'en')}`)
-  line(`${word('en', 'readVi')}: ${link(payload.url.vi, 'email')}`)
+  line(EMAIL_STYLE === 'full' ? 'Tiếng Việt bên dưới' : `${word('en', 'readVi')}: ${link(payload.url.vi, 'email')}`)
   line()
   half('en')
   line()

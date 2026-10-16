@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Check, Newspaper, PencilLine } from 'lucide-react'
 import { useAuth } from '../../lib/AuthContext'
 import { listIssues, listParts } from '../../lib/newsletter/data'
-import { EDITIONS } from '../../lib/newsletter/constants'
+import { EDITIONS, HIDDEN_PARTS } from '../../lib/newsletter/constants'
 import { enDay, todayHoiAn } from '../../lib/newsletter/dates'
 import { plain } from '../../lib/newsletter/text'
 import { ownsCorner } from './status'
@@ -20,6 +20,8 @@ export default function CornerReminder() {
   const [rows, setRows] = useState([])
   useEffect(() => {
     let on = true
+    // While class corners are hidden, teachers have nothing to write.
+    if (HIDDEN_PARTS.includes('class')) return undefined
     ;(async () => {
       try {
         const today = todayHoiAn()

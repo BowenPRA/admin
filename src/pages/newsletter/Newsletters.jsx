@@ -4,7 +4,7 @@ import { CalendarDays, Check, ChevronRight, CircleDot, Eye, Globe, Newspaper, Pe
 import { useAuth } from '../../lib/AuthContext'
 import { useData } from '../../lib/DataContext'
 import { useToast } from '../../lib/toast'
-import { EDITIONS, TONES } from '../../lib/newsletter/constants'
+import { EDITIONS, HIDDEN_PARTS, TONES } from '../../lib/newsletter/constants'
 import { issueChecks, statusOf, sortParts } from '../../lib/newsletter/payload'
 import { plain } from '../../lib/newsletter/text'
 import { listIssues, listParts, listViews, sumViews, createIssue } from '../../lib/newsletter/data'
@@ -94,7 +94,7 @@ function OfficeList() {
                 <span className="grid h-9 w-9 place-items-center rounded-lg" style={{ background: TONES[ed.tone].pale, color: TONES[ed.tone].ink }}><Newspaper size={18} /></span>
                 <div className="min-w-0 flex-1"><b className="block text-slate-800">{L(ed.name.en, ed.name.vi)}</b><span className="text-xs text-slate-500">{longDay(friday, lang)} · {L('not started yet', 'chưa bắt đầu')}</span></div>
               </div>
-              <p className="text-sm text-slate-600">{L('Starting it now gives every class an empty corner, so teachers can write theirs during the week. Reminders and dates come from last week and the calendar.', 'Bắt đầu ngay để mỗi lớp có một góc lớp trống, giáo viên viết trong tuần. Ghi nhớ và ngày tháng lấy từ tuần trước và lịch năm học.')}</p>
+              <p className="text-sm text-slate-600">{HIDDEN_PARTS.includes('class') ? L('It starts with an opening, one section and the closing, as in the Google Doc. Add a section for each heading.', 'Số mới gồm phần mở đầu, một mục và lời kết, như trong Google Doc. Thêm một mục cho mỗi tiêu đề.') : L('Starting it now gives every class an empty corner, so teachers can write theirs during the week. Reminders and dates come from last week and the calendar.', 'Bắt đầu ngay để mỗi lớp có một góc lớp trống, giáo viên viết trong tuần. Ghi nhớ và ngày tháng lấy từ tuần trước và lịch năm học.')}</p>
               <div className="flex flex-wrap items-center gap-2">
                 <button type="button" className="btn-primary" disabled={!!starting} onClick={() => startNow(ed)}><Plus size={16} />{starting === ed.id ? L('Starting…', 'Đang tạo…') : L(`Start ${enDay(friday)}`, `Bắt đầu số ${longDay(friday, 'vi')}`)}</button>
                 <button type="button" className="btn-ghost text-sm" disabled={!!starting} onClick={() => setCreating(true)}>{L('Other options…', 'Tuỳ chọn khác…')}</button>
@@ -148,12 +148,12 @@ function WeekCard({ issue, parts, L, lang }) {
   const c = issueChecks(issue, parts)
   const corners = cornerCount(parts)
   const steps = [
-    { done: corners.total === 0 || corners.done === corners.total, text: L(`Class corners: ${corners.done} of ${corners.total}`, `Góc lớp: ${corners.done}/${corners.total}`), sub: corners.missing.length ? corners.missing.join(', ') : '' },
+    !HIDDEN_PARTS.includes('class') && { done: corners.total === 0 || corners.done === corners.total, text: L(`Class corners: ${corners.done} of ${corners.total}`, `Góc lớp: ${corners.done}/${corners.total}`), sub: corners.missing.length ? corners.missing.join(', ') : '' },
     { done: issue.status !== 'draft', text: L('English done', 'Xong tiếng Anh'), sub: c.noOpening ? L('no opening yet', 'chưa có mở đầu') : '' },
     { done: issue.status !== 'draft' && !c.needVi.length, text: L(c.needVi.length ? `Vietnamese: ${c.needVi.length} part${c.needVi.length > 1 ? 's' : ''} left` : 'Vietnamese', c.needVi.length ? `Tiếng Việt: còn ${c.needVi.length} phần` : 'Tiếng Việt') },
     { done: issue.status === 'published', text: L('Published', 'Đã đăng'), sub: st === 'changed' ? L('changed since', 'đã sửa sau đó') : '' },
     { done: !!issue.email?.saved_at, text: L('Email draft saved: send at 16:30', 'Đã lưu thư nháp: gửi lúc 16:30') },
-  ]
+  ].filter(Boolean)
   return (
     <Link to={`/newsletter/${issue.id}`} className="card block p-4 hover:border-pra-sky">
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -230,6 +230,7 @@ function TeacherList() {
     return () => { on = false }
   }, [])
   if (!state) return <Spinner />
+  if (HIDDEN_PARTS.includes('class')) return <div className="space-y-5"><PageHeader title={L('Newsletter', 'Bản tin')} /><Empty text={L('The office writes the newsletter for now. Nothing to do here.', 'Hiện văn phòng viết bản tin. Bạn không cần làm gì ở đây.')} /></div>
   const rows = state.issues.map((i) => ({ i, mine: sortParts(state.parts.filter((p) => p.newsletter_id === i.id && ownsCorner(p, me) && !p.data?.skip)) })).filter((r) => r.mine.length)
   return (
     <div className="space-y-5">

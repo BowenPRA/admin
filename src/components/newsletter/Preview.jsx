@@ -7,7 +7,9 @@ import { Segmented } from '../ui'
 import { NlIcon } from './icons'
 
 const tone = (k) => TONES[k] || TONES.blue
-const Html = ({ html, className = '' }) => <div className={`[&_a]:text-[#116DFF] [&_a]:underline [&_li]:my-0.5 [&_p:last-child]:mb-0 [&_p]:mb-3 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 ${className}`} dangerouslySetInnerHTML={{ __html: cleanHtml(html) }} />
+// A paragraph all in bold shows as a small heading, as on the page and in the email.
+const subheads = (html) => cleanHtml(html).replace(/<p><b>((?:(?!<\/?(?:p|b)>).)*)<\/b><\/p>/g, '<h4>$1</h4>')
+const Html = ({ html, className = '' }) => <div className={`[&_a]:text-[#116DFF] [&_a]:underline [&_h4:first-child]:mt-0 [&_h4]:mb-1.5 [&_h4]:mt-5 [&_h4]:text-[17px] [&_h4]:font-bold [&_h4]:text-[#0E2A5C] [&_li]:my-0.5 [&_p:last-child]:mb-0 [&_p]:mb-3 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 ${className}`} dangerouslySetInnerHTML={{ __html: subheads(html) }} />
 /** A field in one language, with a small "English" tag when the Vietnamese is not written yet. */
 function T({ v, lang, as: As = 'span', className = '', html = false }) {
   const p = pick(v, lang)
@@ -71,7 +73,7 @@ export function WebPreview({ p, lang = 'en' }) {
           const t = tone(x.tone)
           if (x.type === 'story') return (
             <section key={x.id} className="space-y-2.5">
-              <div className="flex items-center gap-3"><span className="grid h-10 w-10 flex-none place-items-center rounded-full" style={{ background: t.pale, color: t.main }}><NlIcon name={x.icon} size={20} /></span><T v={x.heading} lang={lang} as="h2" className="text-lg font-semibold leading-snug text-[#0E2A5C]" /></div>
+              <div className="flex items-center gap-3">{!x.emoji_heading && <span className="grid h-10 w-10 flex-none place-items-center rounded-full" style={{ background: t.pale, color: t.main }}><NlIcon name={x.icon} size={20} /></span>}<T v={x.heading} lang={lang} as="h2" className="text-lg font-semibold leading-snug text-[#0E2A5C]" /></div>
               {pick(x.when, lang).text && <p className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: TONES.green.pale, color: TONES.green.ink }}><Clock size={13} /><T v={x.when} lang={lang} /></p>}
               <T v={x.body} lang={lang} html />
               {x.photos.length > 0 && <div className={`grid gap-3 ${x.photos.length === 1 ? 'grid-cols-1' : x.photos.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>{x.photos.map((ph, i) => <Photo key={i} p={ph} lang={lang} square={x.photos.length > 1} />)}</div>}
@@ -99,7 +101,7 @@ export function WebPreview({ p, lang = 'en' }) {
           }
           if (x.type === 'photos') return (
             <section key={x.id} className="space-y-3">
-              <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full" style={{ background: t.pale, color: t.main }}><NlIcon name={x.icon} size={20} /></span><T v={x.heading} lang={lang} as="h2" className="text-lg font-semibold text-[#0E2A5C]" /></div>
+              <div className="flex items-center gap-3">{!x.emoji_heading && <span className="grid h-10 w-10 place-items-center rounded-full" style={{ background: t.pale, color: t.main }}><NlIcon name={x.icon} size={20} /></span>}<T v={x.heading} lang={lang} as="h2" className="text-lg font-semibold text-[#0E2A5C]" /></div>
               <div className="grid grid-cols-2 gap-4 px-1 pt-2">{x.photos.map((ph, i) => (
                 <figure key={i} className="relative bg-white p-1.5 pb-2 shadow-[0_8px_22px_rgba(14,42,92,.16)]" style={{ transform: `rotate(${i % 2 ? 1.2 : -1.4}deg)` }}>
                   <span className="absolute -top-2 left-1/2 h-4 w-14 -translate-x-1/2 -rotate-3 bg-[#FFC857]/70" />

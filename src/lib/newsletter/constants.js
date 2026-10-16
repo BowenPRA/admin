@@ -68,6 +68,16 @@ export function portraitUrl(teacherName) {
 }
 
 /**
+ * Hidden for now (Bowen, 16 October 2026): the newsletter follows the office's Google
+ * Doc, an opening, sections and a closing, and the email carries all of it. These
+ * kinds of part are not offered, not made for a new issue, and left out of the
+ * email, the page and the PDF; their code stays, to bring back by emptying this list.
+ */
+export const HIDDEN_PARTS = ['dates', 'reminders', 'class', 'quote', 'press', 'welcome']
+/** 'full': the email is the whole newsletter (as the Google Doc was). 'short': the first lines of each part with "Read more" links to the page. */
+export const EMAIL_STYLE = 'full'
+
+/**
  * The kinds of part. `limit` is the soft length (characters) the meter counts
  * against; past it the meter turns amber, nothing is cut. `photos` is the most
  * photos the part holds. `once` parts appear once per issue, in a fixed place.
@@ -79,8 +89,8 @@ export const PART_TYPES = {
     help: 'Tick the dates from the academic calendar, or add one for this issue. The app writes the dates in both languages.' },
   reminders: { label: 'Reminders', icon: 'pin', once: true, limits: { item: 140 }, photos: 0,
     help: 'Things to bring, pay or send. Short lines. "Every week" ones carry over to next week\'s issue.' },
-  story: { label: 'Story', icon: 'book-open', limits: { heading: 70, when: 60, body: 900 }, photos: 3,
-    help: 'A heading, a few short paragraphs and up to three photos. The first sentence is what the email shows.' },
+  story: { label: 'Section', icon: 'book-open', limits: { heading: 90, when: 60, body: 2500 }, photos: 3,
+    help: 'A heading (an emoji first, as in the Google Doc, is fine), then the text: paste it from the Doc. A line in bold on its own becomes a small heading; bullets, bold and links are kept. Up to three photos.' },
   class: { label: 'Class corner', icon: 'users', limits: { body: 700, ask: 140, word: 30 }, photos: 4, words: 8,
     help: 'What the class did this week, by its teacher: a few sentences, a photo or two, the words of the week and one question families can ask at home.' },
   photos: { label: 'Photos', icon: 'images', limits: { heading: 60 }, photos: 8,
@@ -95,13 +105,13 @@ export const PART_TYPES = {
     help: 'A line to finish. "Warm regards, Palm River Academy English Center" is added by itself.' },
 }
 /** The kinds of part, in Vietnamese (for the editor in Vietnamese). */
-export const PART_LABELS_VI = { opening: 'Mở đầu', dates: 'Ngày cần nhớ', reminders: 'Ghi nhớ', story: 'Bài viết', class: 'Góc lớp', photos: 'Ảnh', quote: 'Câu nói của học viên', press: 'Từ The Palm Press', welcome: 'Chào mừng', closing: 'Lời kết' }
+export const PART_LABELS_VI = { opening: 'Mở đầu', dates: 'Ngày cần nhớ', reminders: 'Ghi nhớ', story: 'Mục', class: 'Góc lớp', photos: 'Ảnh', quote: 'Câu nói của học viên', press: 'Từ The Palm Press', welcome: 'Chào mừng', closing: 'Lời kết' }
 /** What each kind of part is for, in Vietnamese (PART_TYPES.help is the English). */
 export const PART_HELP_VI = {
   opening: 'Một câu nói tuần này có gì, rồi hai ba câu nữa. Phần này mở đầu email và trang web, và là dòng xem trước trong hộp thư.',
   dates: 'Đánh dấu những ngày từ lịch năm học, hoặc thêm ngày cho số này. Ngày tháng được viết sẵn bằng hai thứ tiếng.',
   reminders: 'Những thứ cần mang, cần đóng hoặc gửi lại. Mỗi việc một dòng ngắn. Dòng "hằng tuần" sẽ tự chuyển sang số tuần sau.',
-  story: 'Một tiêu đề, vài đoạn ngắn và tối đa ba ảnh. Câu đầu tiên là phần email sẽ hiện.',
+  story: 'Một tiêu đề (có thể bắt đầu bằng emoji như trong Google Doc), rồi nội dung: dán từ Doc. Dòng in đậm đứng riêng sẽ thành tiêu đề nhỏ; giữ gạch đầu dòng, chữ đậm và liên kết. Tối đa ba ảnh.',
   class: 'Lớp đã làm gì trong tuần, do giáo viên của lớp viết: vài câu, một hai ảnh, từ vựng trong tuần và một câu hỏi để gia đình hỏi con.',
   photos: 'Một bộ ảnh có tiêu đề: một sự kiện, một chuyến đi, một dự án.',
   quote: 'Nguyên văn câu nói của một học viên, kèm tên gọi và lớp.',
@@ -110,7 +120,7 @@ export const PART_HELP_VI = {
   closing: 'Một câu kết. "Trân trọng, Trung tâm Anh ngữ Palm River Academy" được thêm tự động.',
 }
 /** Parts Seth adds with "+ Add", in the order the menu shows them. */
-export const ADDABLE = ['story', 'class', 'photos', 'quote', 'press', 'welcome']
+export const ADDABLE = ['story', 'class', 'photos', 'quote', 'press', 'welcome'].filter((t) => !HIDDEN_PARTS.includes(t))
 
 /** Icons a story or a photo set can wear (lucide names). Emoji are not used: they do not print in a PDF. */
 export const STORY_ICONS = [

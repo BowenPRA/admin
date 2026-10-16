@@ -5,7 +5,7 @@
 // photos are not cleared, wording notes, lengths, and where an issue stands.
 // Pure functions, no browser.
 
-import { EDITIONS, PART_TYPES, CLASS_TONES, STORY_TONES, SITE, portraitUrl } from './constants.js'
+import { EDITIONS, PART_TYPES, CLASS_TONES, STORY_TONES, SITE, HIDDEN_PARTS, portraitUrl } from './constants.js'
 import { cleanHtml, plain, safeUrl, readingMinutes, wordingNotes, firstSentence } from './text.js'
 import { dateRange, timeSpan, longDay, issueLabel, calendarLink } from './dates.js'
 
@@ -14,6 +14,10 @@ const str = (s) => String(s ?? '').trim()
 const bi = (en, vi) => ({ en: str(en), vi: str(vi) })
 const byPos = (a, b) => (a.pos ?? 0) - (b.pos ?? 0) || String(a.id).localeCompare(String(b.id))
 /** The short id a part has on the page (#s-1a2b3c4d). */
+/** A heading that starts with an emoji (as the Google Doc's do): the page then shows no icon beside it. */
+export const LEAD_EMOJI = /^(\p{Extended_Pictographic}|\p{Regional_Indicator})/u
+/** The parts that are shown: the kinds in HIDDEN_PARTS stay in the database but out of every view. */
+export const shownParts = (parts) => (parts || []).filter((p) => !HIDDEN_PARTS.includes(p.type))
 export const anchorId = (partId) => String(partId || '').replace(/-/g, '').slice(-8)
 
 /** A part's list entries ({ id: entry }) as an array in their order. */
@@ -113,7 +117,7 @@ export const photoCleared = (p) => !!p?.cleared
  * Everything Publish and the editor's summary need to know about an issue.
  */
 export function issueChecks(issue, parts) {
-  const live = parts.filter((p) => !skipped(p))
+  const live = shownParts(parts).filter((p) => !skipped(p))
   const counted = live.filter((p) => !['none', 'empty'].includes(viState(p).kind))
   const needVi = counted.filter((p) => ['missing', 'changed'].includes(viState(p).kind))
   const photos = photosIn(live, issue)
@@ -163,8 +167,9 @@ export function statusOf(issue, parts) {
 /** A subject line from what the issue says: "The Palm River Post: Showcase moved to Thursday · Quarter Two tuition". */
 export function suggestSubject(issue, parts) {
   const ed = EDITIONS[issue.edition] || EDITIONS.post
-  const heads = sortParts(parts).filter((p) => p.type === 'story' && str(p.data?.en?.heading)).map((p) => str(p.data.en.heading).replace(/[.!:—-]+$/, '').replace(/\s+[—-]\s+.*$/, ''))
-  const open = str(sortParts(parts).find((p) => p.type === 'opening')?.data?.en?.heading).replace(/[.!]+$/, '')
+  const bare = (s) => str(s).replace(LEAD_EMOJI, '').trim()
+  const heads = sortParts(parts).filter((p) => p.type === 'story' && str(p.data?.en?.heading)).map((p) => bare(p.data.en.heading).replace(/[.!:—-]+$/, '').replace(/\s+[—-]\s+.*$/, ''))
+  const open = bare(sortParts(parts).find((p) => p.type === 'opening')?.data?.en?.heading).replace(/[.!]+$/, '')
   const bits = heads.length ? heads : open ? [open] : []
   let line = `${ed.name.en}: ${bits[0] || issueLabel(issue, 'en')}`
   for (const b of bits.slice(1)) { if ((`${line} · ${b}`).length > 80) break; line += ` · ${b}` }
@@ -183,8 +188,9 @@ export const pageUrls = (slug) => ({ en: `${SITE}/newsletter/${slug}/`, vi: `${S
  * @param {(photo:object) => ({ src:string, small?:string } | null)} opts.photo  where each photo can be loaded from
  * @param {{ en?:string, vi?:string }} [opts.pdf]  the PDFs' public addresses, once published
  */
-export function buildPayload(issue, parts, { audience = 'public', photo = () => null, pdf = {}, publishedAt = null } = {}) {
+export function buildPayload(issue, parts0, { audience = 'public', photo = () => null, pdf = {}, publishedAt = null } = {}) {
   const ed = EDITIONS[issue.edition] || EDITIONS.post
+  const parts = shownParts(parts0)
   const ordered = sortParts(parts)
   const photoOut = (p) => {
     if (!p) return null
@@ -216,7 +222,7 @@ export function buildPayload(issue, parts, { audience = 'public', photo = () => 
     if (p.type === 'story') {
       if (!str(e.heading) && !plain(e.body)) continue
       const url = safeUrl(d.button_url)
-      out.push({ type: 'story', id, icon: d.icon || 'book-open', tone: STORY_TONES[tone++ % STORY_TONES.length], heading: bi(e.heading, v.heading), when: bi(e.when, v.when), body: html('body'), photos,
+      out.push({ type: 'story', id, icon: d.icon || 'book-open', emoji_heading: LEAD_EMOJI.test(str(e.heading)), tone: STORY_TONES[tone++ % STORY_TONES.length], heading: bi(e.heading, v.heading), when: bi(e.when, v.when), body: html('body'), photos,
         button: url && str(e.button_label) ? { label: bi(e.button_label, v.button_label), url } : null })
     } else if (p.type === 'class') {
       if (!plain(e.body) && !photos.length) continue
@@ -225,7 +231,7 @@ export function buildPayload(issue, parts, { audience = 'public', photo = () => 
         body: html('body'), photos, words: wordsOf(p).filter((w) => str(w.en)).map((w) => bi(w.en, w.vi)), ask: str(e.ask) ? bi(e.ask, v.ask) : null })
     } else if (p.type === 'photos') {
       if (!photos.length) continue
-      out.push({ type: 'photos', id, icon: d.icon || 'images', tone: STORY_TONES[tone++ % STORY_TONES.length], heading: bi(e.heading, v.heading), photos })
+      out.push({ type: 'photos', id, icon: d.icon || 'images', emoji_heading: LEAD_EMOJI.test(str(e.heading)), tone: STORY_TONES[tone++ % STORY_TONES.length], heading: bi(e.heading, v.heading), photos })
     } else if (p.type === 'quote') {
       if (!str(e.text)) continue
       out.push({ type: 'quote', id, text: bi(e.text, v.text), who: bi(e.who, v.who), photo: photos[0] || null })

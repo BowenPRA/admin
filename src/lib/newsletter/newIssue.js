@@ -3,8 +3,10 @@
 // week is left out again; everything else starts empty, the closing words too,
 // since they usually speak of that week) or from nothing. Every class of the
 // newsletter gets its corner. The dates come from the academic calendar.
+// While the kinds in HIDDEN_PARTS are hidden, an issue starts as the Google Doc
+// did: an opening, one section and the closing.
 
-import { EDITIONS } from './constants.js'
+import { EDITIONS, HIDDEN_PARTS } from './constants.js'
 import { addDays, fridayOf, quarterWeek, slugFor, todayHoiAn } from './dates.js'
 import { itemsOf, sortParts } from './payload.js'
 import { upcoming } from './calendarFeed.js'
@@ -73,14 +75,15 @@ export function newIssue({ edition, date, from, last, calendar, events = [], sch
     return corner
   })
 
+  const shown = HIDDEN_PARTS.includes('class') ? [] : corners
   const parts = [
     { type: 'dates', position: POS.dates, data: { items } },
     { type: 'reminders', position: POS.reminders, data: { items: reminders } },
     { type: 'opening', position: POS.opening, data: { en: { heading: '', body: '' }, vi: { heading: '', body: '' } } },
-    ...corners.map((c, i) => ({ ...c, position: POS.first + i * POS.step })),
-    { type: 'story', position: POS.first + corners.length * POS.step, data: { icon: 'book-open', en: { heading: '', when: '', body: '' }, vi: { heading: '', when: '', body: '' }, photos: [] } },
+    ...shown.map((c, i) => ({ ...c, position: POS.first + i * POS.step })),
+    { type: 'story', position: POS.first + shown.length * POS.step, data: { icon: 'book-open', en: { heading: '', when: '', body: '' }, vi: { heading: '', when: '', body: '' }, photos: [] } },
     { type: 'closing', position: POS.closing, data: { en: { body: '' }, vi: { body: '' } } },
-  ]
+  ].filter((p) => !HIDDEN_PARTS.includes(p.type))
   return { issue, parts }
 }
 

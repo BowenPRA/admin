@@ -113,6 +113,8 @@ function htmlBlocks(html, { link = TONES.blue.ink, marker = TONES.blue.main, siz
     if (live.length) {
       const node = { text: live, ...(size ? { fontSize: size } : {}) }
       if (list) list.push({ ...node, margin: [0, 0, 0, 2] })
+      // A paragraph all in bold is a small heading, as in the Google Doc.
+      else if (live.every((r) => r.bold || r.text === '\n')) out.push({ ...node, fontSize: (size || 10) + 1.2, color: NAVY, margin: [0, out.length ? 5 : 0, 0, 3] })
       else out.push({ ...node, margin: [0, 0, 0, 6] })
     }
     runs = null

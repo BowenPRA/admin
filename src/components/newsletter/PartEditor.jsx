@@ -71,7 +71,7 @@ export default function PartEditor({ part, issue, edit, me, L, office, canEdit, 
       <TwoCols L={L}
         en={<>{label(L('Heading', 'Tiêu đề'))}{input('en', 'heading', L('e.g. Quarter One Academic Showcase', 'VD: Academic Showcase Quý 1'), { lead: true, limit: lim.heading })}
           {label(L('Date and time line', 'Dòng ngày giờ'), L('optional', 'không bắt buộc'))}{input('en', 'when', L('e.g. Thursday 15 October · 3:30–4:15 PM', 'VD: Thứ Năm 15/10 · 15:30–16:15'), { limit: lim.when })}
-          {label(L('Text', 'Nội dung'), L('The first sentence is what the email shows', 'Câu đầu tiên sẽ hiện trong email'))}{rich('en', 'body', L('Write here, or paste from a Google Doc: bold, bullets and links are kept.', 'Viết ở đây, hoặc dán từ Google Doc: giữ chữ đậm, gạch đầu dòng và liên kết.'), { limit: lim.body, minHeight: 120 })}
+          {label(L('Text', 'Nội dung'), L('Paste from the Doc: a line in bold on its own is a small heading', 'Dán từ Doc: dòng in đậm đứng riêng là tiêu đề nhỏ'))}{rich('en', 'body', L('Write here, or paste from a Google Doc: bold, bullets and links are kept.', 'Viết ở đây, hoặc dán từ Google Doc: giữ chữ đậm, gạch đầu dòng và liên kết.'), { limit: lim.body, minHeight: 120 })}
           {label(L('Button', 'Nút bấm'), L('optional, e.g. "Sign up" with a link', 'không bắt buộc, VD: "Đăng ký" kèm liên kết'))}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1.4fr]">
             <input className="input" value={en.button_label || ''} onChange={(e) => setText('en', 'button_label', e.target.value)} placeholder={L('Button words', 'Chữ trên nút')} disabled={disabled} />

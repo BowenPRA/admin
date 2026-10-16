@@ -6,7 +6,7 @@ import { useData } from '../../lib/DataContext'
 import { useToast } from '../../lib/toast'
 import { db } from '../../lib/db'
 import { OFFICE_ACCOUNTS } from '../../data/staff'
-import { EDITIONS, PART_TYPES, PART_LABELS_VI as VI_LABELS, PART_HELP_VI, ADDABLE, TONES } from '../../lib/newsletter/constants'
+import { EDITIONS, PART_TYPES, PART_LABELS_VI as VI_LABELS, PART_HELP_VI, ADDABLE, HIDDEN_PARTS, TONES } from '../../lib/newsletter/constants'
 import { issueChecks, statusOf, suggestSubject, viState, sortParts } from '../../lib/newsletter/payload'
 import { longDay, issueLabel } from '../../lib/newsletter/dates'
 import { photoLink, dropPhotoFile } from '../../lib/newsletter/photos'
@@ -105,7 +105,8 @@ function IssueEditor({ id }) {
   const ed = EDITIONS[issue.edition] || EDITIONS.post
   const status = statusOf(issue, parts)
   const c = issueChecks(issue, parts)
-  const sorted = sortParts(parts)
+  // Kinds of part hidden for now (HIDDEN_PARTS) stay in the database but are not shown or edited.
+  const sorted = sortParts(parts.filter((p) => !HIDDEN_PARTS.includes(p.type)))
   const dates = sorted.find((p) => p.type === 'dates')
   const reminders = sorted.find((p) => p.type === 'reminders')
   const opening = sorted.find((p) => p.type === 'opening')
@@ -120,7 +121,7 @@ function IssueEditor({ id }) {
   const upToDate = counted - c.needVi.length
   const suggestion = suggestSubject(issue, parts)
   const subject = issue.settings?.subject || ''
-  const corners = cornerCount(parts)
+  const corners = cornerCount(sorted)
   const outlineParts = [dates, reminders, opening, ...movable, closing].filter(Boolean).filter(visible)
 
   const saveFolded = (next) => { setFolded(next); try { localStorage.setItem(foldKey, JSON.stringify([...next])) } catch { /* ignore */ } }
@@ -184,7 +185,7 @@ function IssueEditor({ id }) {
   const hideTips = () => { setTips(false); try { localStorage.setItem('pra-newsletter-tips', 'off') } catch { /* ignore */ } }
 
   const usedClasses = new Set(parts.filter((p) => p.type === 'class').map((p) => p.data?.class_key))
-  const freeClasses = (schedule?.classes || []).filter((cl) => !usedClasses.has(cl.key))
+  const freeClasses = HIDDEN_PARTS.includes('class') ? [] : (schedule?.classes || []).filter((cl) => !usedClasses.has(cl.key))
   const addRow = (i) => office && (addAt === i ? (
     <div className="modal-in space-y-2 rounded-xl border border-pra-blue bg-white p-3">
       <div className="text-xs font-semibold text-slate-500">{L('Add a part here:', 'Thêm một phần ở đây:')}</div>
@@ -393,9 +394,9 @@ function ReadTips({ L, onHide }) {
       <div className="min-w-0 flex-1">
         <b className="text-slate-800">{L('What gets a newsletter read', 'Điều gì khiến bản tin được đọc')}</b>
         <ul className="mt-1 list-disc space-y-0.5 pl-5">
-          <li>{L('Every class corner with a photo: parents read for their own child first.', 'Góc lớp nào cũng có ảnh: phụ huynh đọc phần của con mình trước tiên.')}</li>
-          <li>{L('What families must do goes in Need to know, never only in a story.', 'Việc gia đình cần làm phải nằm trong phần Cần biết, đừng chỉ để trong bài viết.')}</li>
-          <li>{L('Short parts. The email shows the first sentence of each: make it the point.', 'Viết ngắn. Email chỉ hiện câu đầu tiên của mỗi phần: hãy viết ý chính ở đó.')}</li>
+          <li>{L('One section per heading of the Google Doc: paste the heading, then the text. Bold, bullets and links are kept.', 'Mỗi tiêu đề trong Google Doc là một mục: dán tiêu đề, rồi nội dung. Chữ đậm, gạch đầu dòng và liên kết được giữ nguyên.')}</li>
+          <li>{L('A photo in each section that has one: parents look at the pictures first.', 'Mục nào có ảnh thì thêm ảnh: phụ huynh xem ảnh trước tiên.')}</li>
+          <li>{L('What families must do (bring, pay, sign up) in a section of its own, as a short bullet list.', 'Việc gia đình cần làm (mang, đóng tiền, đăng ký) để trong một mục riêng, thành danh sách ngắn.')}</li>
           <li>{L('A subject line that says what is inside, and a cover photo.', 'Tiêu đề email nói rõ nội dung, và có ảnh bìa.')}</li>
           <li>{L('After publishing, paste "Copy for chat groups" into the class chats.', 'Sau khi đăng, dán "Sao chép cho nhóm chat" vào các nhóm lớp.')}</li>
         </ul>
