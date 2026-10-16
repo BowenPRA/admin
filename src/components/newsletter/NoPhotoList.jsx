@@ -7,11 +7,17 @@ import { photoSrc } from '../../lib/report/photo'
 import { Avatar } from '../ui'
 import { useL } from './bits'
 
-let cache = null
-/** Enrolled students whose enrollment form says photos are for private use only. */
+let cache = null // { at, ids }
+/**
+ * Enrolled students whose enrollment form says photos are for private use only.
+ * Read again after five minutes; a failed read is never kept, and throws.
+ */
 async function privateIds() {
-  cache ||= db.enrollments.list().then((rows) => new Set(rows.filter((e) => e.photo_consent === 'private' && e.student_id).map((e) => e.student_id))).catch(() => new Set())
-  return cache
+  if (cache && Date.now() - cache.at < 5 * 60 * 1000) return cache.ids
+  const rows = await db.enrollments.list()
+  const ids = new Set(rows.filter((e) => e.photo_consent === 'private' && e.student_id).map((e) => e.student_id))
+  cache = { at: Date.now(), ids }
+  return ids
 }
 
 /**
@@ -23,7 +29,16 @@ export default function NoPhotoList({ compact = false }) {
   const { L } = useL()
   const { students } = useData()
   const [ids, setIds] = useState(null)
-  useEffect(() => { privateIds().then(setIds) }, [])
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { let on = true; privateIds().then((x) => on && setIds(x)).catch(() => on && setFailed(true)); return () => { on = false } }, [])
+  if (failed) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50/60 p-3 text-sm text-red-800">
+        <div className="flex items-center gap-2 font-bold"><EyeOff size={15} />{L('The no-photo list could not be loaded', 'Không tải được danh sách không chụp ảnh')}</div>
+        <p className="mt-1 text-xs">{L('Do not tick photos as checked until it shows: reload the page, or ask the office who said no to photos.', 'Đừng đánh dấu ảnh đã kiểm cho đến khi danh sách hiện ra: hãy tải lại trang, hoặc hỏi văn phòng.')}</p>
+      </div>
+    )
+  }
   if (!ids) return null
   const list = students.filter((s) => ids.has(s.id) && isEnrolled(s)).sort((a, b) => String(a.class_group || a.level).localeCompare(String(b.class_group || b.level)))
   return (

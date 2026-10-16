@@ -86,7 +86,12 @@ export function quarterWeek(iso, calendar) {
 export const yearShort = (schoolYear) => String(schoolYear || '').replace(/^(\d{4})-\d{2}(\d{2})$/, '$1-$2')
 
 /** The issue's address on the website: '2026-27-q1-week-10' or '2026-27-q1-week-10-early-years'. */
-export const slugFor = ({ edition, school_year, quarter, week }) => `${yearShort(school_year)}-q${quarter}-week-${week}${EDITIONS[edition]?.slugSuffix || ''}`
+// A special issue on another day than Friday gets its day in the address too, so it can sit beside that week's regular issue.
+export const slugFor = ({ edition, school_year, quarter, week, issue_date }) => {
+  const d = issue_date ? toDate(String(issue_date).slice(0, 10)) : null
+  const day = d && d.getUTCDay() !== 5 ? `-${MON[d.getUTCMonth()].toLowerCase()}-${d.getUTCDate()}` : ''
+  return `${yearShort(school_year)}-q${quarter}-week-${week}${day}${EDITIONS[edition]?.slugSuffix || ''}`
+}
 
 /** "Quarter 1 · Week 10" / "Quý 1 · Tuần 10". */
 export const issueLabel = ({ quarter, week }, lang) => (lang === 'vi' ? `Quý ${quarter} · Tuần ${week}` : `Quarter ${quarter} · Week ${week}`)

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, EyeOff, Plus, Trash2, Users, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, EyeOff, Plus, Trash2, Users, X } from 'lucide-react'
 import { applyEdit } from '../../lib/newsletter/data'
-import { PART_TYPES, PART_LABELS_VI as VI_LABELS, STORY_ICONS, CLASS_TONES, TONES, portraitUrl } from '../../lib/newsletter/constants'
+import { PART_TYPES, PART_LABELS_VI as VI_LABELS, PART_HELP_VI, STORY_ICONS, CLASS_TONES, TONES, portraitUrl } from '../../lib/newsletter/constants'
+import { safeUrl } from '../../lib/newsletter/text'
+import { partState, partSummary } from './EditorBits'
 import { enSnapshot, viState, notesFor, wordsOf } from '../../lib/newsletter/payload'
 import { diffWords, fixQuy } from '../../lib/newsletter/text'
 import { palmPressPosts } from '../../lib/newsletter/calendarFeed'
@@ -18,7 +20,7 @@ const nid = () => Math.random().toString(36).slice(2, 8)
  * families only, move, remove), the English and the Vietnamese side by side, its
  * photos, and under it the wording notes and what changed in the English.
  */
-export default function PartEditor({ part, issue, edit, me, L, office, canEdit, onMove, onRemove, onPatch, first, last, canSeeAlbums }) {
+export default function PartEditor({ part, issue, edit, me, L, office, canEdit, onMove, onRemove, onPatch, first, last, canSeeAlbums, open = true, onToggle, keyInUse }) {
   const T = PART_TYPES[part.type] || {}
   const d = part.data || {}
   const en = d.en || {}, vi = d.vi || {}
@@ -53,7 +55,7 @@ export default function PartEditor({ part, issue, edit, me, L, office, canEdit, 
   const fixAll = () => {
     const edits = []
     for (const f of VI_TEXT_FIELDS) if (vi[f] && fixQuy(vi[f]) !== vi[f]) edits.push([['vi', f], fixQuy(vi[f])])
-    if ((d.photos || []).some((p) => p.vi && fixQuy(p.vi) !== p.vi)) edits.push([['photos'], d.photos.map((p) => ({ ...p, vi: fixQuy(p.vi) }))])
+    for (const p of d.photos || []) if (p.id && p.vi && fixQuy(p.vi) !== p.vi) edits.push([['photos', `@${p.id}`, 'vi'], fixQuy(p.vi)])
     for (const w of wordsOf(part)) if (w.vi && fixQuy(w.vi) !== w.vi) edits.push([['words', w.id, 'vi'], fixQuy(w.vi)])
     if (edits.length) edit(part.id, edits)
   }
@@ -73,13 +75,15 @@ export default function PartEditor({ part, issue, edit, me, L, office, canEdit, 
           {label(L('Button', 'Nút bấm'), L('optional, e.g. "Sign up" with a link', 'không bắt buộc, VD: "Đăng ký" kèm liên kết'))}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1.4fr]">
             <input className="input" value={en.button_label || ''} onChange={(e) => setText('en', 'button_label', e.target.value)} placeholder={L('Button words', 'Chữ trên nút')} disabled={disabled} />
-            <input className="input" value={d.button_url || ''} onChange={(e) => edit(part.id, [['button_url'], e.target.value])} placeholder="https://…" disabled={disabled} />
-          </div></>}
+            <input className={`input ${d.button_url && !safeUrl(d.button_url) ? '!border-amber-300 !bg-amber-50/60' : ''}`} value={d.button_url || ''} onChange={(e) => edit(part.id, [['button_url'], e.target.value])} placeholder="https://…" disabled={disabled} />
+          </div>
+          {d.button_url && !safeUrl(d.button_url) && <p className="text-xs font-semibold text-amber-700">{L('The link must start with https:// (copy it from the address bar of the browser). Until then the button is left out.', 'Liên kết phải bắt đầu bằng https:// (sao chép từ thanh địa chỉ trình duyệt). Khi chưa đúng, nút sẽ không hiện.')}</p>}
+          {!!en.button_label && !d.button_url && <p className="text-xs text-amber-700">{L('Add the link, or the button is left out.', 'Hãy thêm liên kết, nếu không nút sẽ không hiện.')}</p>}</>}
         vi={<>{label(L('Heading', 'Tiêu đề'))}{input('vi', 'heading', '', { lead: true, limit: lim.heading })}{label(L('Date and time line', 'Dòng ngày giờ'))}{input('vi', 'when', '', { limit: lim.when })}
           {label(L('Text', 'Nội dung'))}{rich('vi', 'body', '', { limit: lim.body, minHeight: 120 })}
           {label(L('Button words', 'Chữ trên nút'))}{input('vi', 'button_label', '')}</>} />
       <div className="border-t border-slate-100 p-4">{label(L('Photos', 'Ảnh'), L(`up to ${T.photos}; one sits beside the text`, `tối đa ${T.photos}; một ảnh sẽ nằm cạnh chữ`))}
-        <div className="mt-2"><PhotoStrip part={part} max={T.photos} edit={edit} issueId={issue.id} me={me} canClear={office} canSeeAlbums={canSeeAlbums} disabled={disabled} /></div></div>
+        <div className="mt-2"><PhotoStrip keyInUse={keyInUse} part={part} max={T.photos} edit={edit} issueId={issue.id} me={me} canClear={office} canSeeAlbums={canSeeAlbums} disabled={disabled} /></div></div>
     </>
   } else if (part.type === 'class') {
     body = d.skip ? <p className="p-4 text-sm text-slate-500">{L('No corner for this class this week. It is left out of the email, the page and the PDF.', 'Tuần này không có góc lớp này. Phần này sẽ không có trong email, trang web và PDF.')}</p> : <>
@@ -92,20 +96,20 @@ export default function PartEditor({ part, issue, edit, me, L, office, canEdit, 
         <WordList part={part} edit={edit} disabled={disabled} L={L} />
       </div>
       <div className="border-t border-slate-100 p-4">{label(L('Photos', 'Ảnh'), L(`up to ${T.photos}`, `tối đa ${T.photos}`))}
-        <div className="mt-2"><PhotoStrip part={part} max={T.photos} edit={edit} issueId={issue.id} me={me} canClear={office} canSeeAlbums={canSeeAlbums} disabled={disabled} /></div></div>
+        <div className="mt-2"><PhotoStrip keyInUse={keyInUse} part={part} max={T.photos} edit={edit} issueId={issue.id} me={me} canClear={office} canSeeAlbums={canSeeAlbums} disabled={disabled} /></div></div>
     </>
   } else if (part.type === 'photos') {
     body = <>
       <TwoCols L={L} en={<>{label(L('Heading', 'Tiêu đề'))}{input('en', 'heading', L('e.g. Water Play', 'VD: Chơi nước'), { lead: true, limit: lim.heading })}</>}
         vi={<>{label(L('Heading', 'Tiêu đề'))}{input('vi', 'heading', '', { lead: true, limit: lim.heading })}</>} />
-      <div className="border-t border-slate-100 p-4"><PhotoStrip part={part} max={T.photos} edit={edit} issueId={issue.id} me={me} canClear={office} canSeeAlbums={canSeeAlbums} disabled={disabled} /></div>
+      <div className="border-t border-slate-100 p-4"><PhotoStrip keyInUse={keyInUse} part={part} max={T.photos} edit={edit} issueId={issue.id} me={me} canClear={office} canSeeAlbums={canSeeAlbums} disabled={disabled} /></div>
     </>
   } else if (part.type === 'quote') {
     body = <>
       <TwoCols L={L}
         en={<>{label(L('What they said', 'Câu nói'), L('their own words', 'nguyên văn'))}{input('en', 'text', L('"I learned that…"', '"Con học được rằng…"'), { limit: lim.text })}{label(L('Who', 'Ai'), L('first name and class', 'tên và lớp'))}{input('en', 'who', L('e.g. Amada, Year 7', 'VD: Amada, lớp 7'), { limit: lim.who })}</>}
         vi={<>{label(L('What they said', 'Câu nói'))}{input('vi', 'text', '', { limit: lim.text })}{label(L('Who', 'Ai'))}{input('vi', 'who', '')}</>} />
-      <div className="border-t border-slate-100 p-4"><PhotoStrip part={part} max={1} edit={edit} issueId={issue.id} me={me} canClear={office} canSeeAlbums={canSeeAlbums} disabled={disabled} /></div>
+      <div className="border-t border-slate-100 p-4"><PhotoStrip keyInUse={keyInUse} part={part} max={1} edit={edit} issueId={issue.id} me={me} canClear={office} canSeeAlbums={canSeeAlbums} disabled={disabled} /></div>
     </>
   } else if (part.type === 'press') {
     body = <PressEditor part={part} edit={edit} disabled={disabled} L={L} setText={setText} />
@@ -126,7 +130,8 @@ export default function PartEditor({ part, issue, edit, me, L, office, canEdit, 
   const movable = !T.once
   return (
     <section id={`part-${part.id}`} className={`card overflow-hidden ${part.type === 'class' ? 'border-l-[6px]' : ''}`} style={tone ? { borderLeftColor: tone.main } : undefined}>
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-white px-3 py-2.5">
+      <div className={`flex flex-wrap items-center gap-2 bg-white px-3 py-2.5 ${open ? 'border-b border-slate-100' : ''}`}>
+        {onToggle && <button type="button" onClick={onToggle} className="-ml-1 grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-expanded={open} aria-label={open ? L('Fold this part', 'Thu gọn phần này') : L('Open this part', 'Mở phần này')}>{open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</button>}
         {['story', 'photos'].includes(part.type) && !disabled ? (
           <div className="relative">
             <button type="button" onClick={() => setIconOpen((v) => !v)} className="grid h-9 w-9 place-items-center rounded-lg border border-sky-100 bg-sky-50 text-pra-blue hover:border-pra-blue" title={L('Change the icon', 'Đổi biểu tượng')}><NlIcon name={d.icon || T.icon} /></button>
@@ -135,7 +140,7 @@ export default function PartEditor({ part, issue, edit, me, L, office, canEdit, 
         ) : part.type === 'class' ? (
           <Avatar src={portraitUrl(d.teacher)} name={d.teacher || d.class} size={36} />
         ) : <span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-500"><NlIcon name={T.icon} /></span>}
-        <div className="min-w-0">
+        <div className={`min-w-0 ${onToggle ? 'cursor-pointer' : ''}`} onClick={onToggle}>
           <div className="font-bold text-slate-800">{part.type === 'class' ? <>{d.class} <span className="font-normal text-slate-500">· {L('class corner', 'góc lớp')}</span></> : L(T.label, VI_LABELS[part.type])}</div>
           {part.type === 'class' && <div className="text-xs text-slate-500">{d.teacher ? L(`Written by ${d.teacher}, or the office`, `Do ${d.teacher} hoặc văn phòng viết`) : L('No class teacher set', 'Chưa có giáo viên chủ nhiệm')}{part.updated_by ? ` · ${L('last change', 'sửa lần cuối')}: ${part.updated_by.split('@')[0]}` : ''}</div>}
         </div>
@@ -159,8 +164,15 @@ export default function PartEditor({ part, issue, edit, me, L, office, canEdit, 
           </span>
         )}
       </div>
-      {body}
-      {(vs.kind === 'changed' || notes.length > 0) && (
+      {!open && (
+        <button type="button" onClick={onToggle} className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2 text-left text-sm text-slate-500 hover:bg-slate-50">
+          <span className="min-w-0 flex-1 truncate">{partSummary(part) || <i>{L('Nothing written yet', 'Chưa viết gì')}</i>}</span>
+          <span className="flex-none text-xs font-semibold text-slate-400">{partState(part, L).text}</span>
+        </button>
+      )}
+      {open && T.help && <p className="px-4 pt-3 text-xs leading-relaxed text-slate-500">{L(T.help, PART_HELP_VI[part.type])}</p>}
+      {open && body}
+      {open && (vs.kind === 'changed' || notes.length > 0) && (
         <div className="space-y-2 border-t border-slate-100 bg-white p-3">
           {vs.kind === 'changed' && part.type !== 'dates' && part.type !== 'reminders' && (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[13px] leading-relaxed text-slate-700">

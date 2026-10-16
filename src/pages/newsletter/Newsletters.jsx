@@ -8,19 +8,13 @@ import { EDITIONS, TONES } from '../../lib/newsletter/constants'
 import { issueChecks, statusOf, sortParts } from '../../lib/newsletter/payload'
 import { plain } from '../../lib/newsletter/text'
 import { listIssues, listParts, listViews, sumViews, createIssue } from '../../lib/newsletter/data'
-import { issueLabel, longDay, todayHoiAn, enDay } from '../../lib/newsletter/dates'
+import { issueLabel, longDay, todayHoiAn, enDay, fridayOf } from '../../lib/newsletter/dates'
 import { academicCalendar } from '../../lib/newsletter/calendarFeed'
 import { newIssue, nextFreeFriday } from '../../lib/newsletter/newIssue'
 import { Empty, Modal, PageHeader, Segmented, Spinner } from '../../components/ui'
 import { useL } from '../../components/newsletter/bits'
 import { StatusChips, ownsCorner } from '../../components/newsletter/status'
-
-/** Class corners written, of those planned: { done, total, missing: [class names] }. */
-function cornerCount(parts) {
-  const cs = parts.filter((p) => p.type === 'class' && !p.data?.skip)
-  const done = cs.filter((p) => (p.data?.en?.body || '').replace(/<[^>]+>/g, '').trim().length > 20)
-  return { done: done.length, total: cs.length, missing: cs.filter((p) => !done.includes(p)).map((p) => p.data?.class) }
-}
+import { cornerCount } from '../../components/newsletter/EditorBits'
 
 export default function Newsletters() {
   const { isOffice } = useAuth()
@@ -35,6 +29,7 @@ function OfficeList() {
   const [state, setState] = useState(null)
   const [filter, setFilter] = useState('all')
   const [creating, setCreating] = useState(false)
+  const [starting, setStarting] = useState('')
 
   useEffect(() => {
     let on = true
@@ -63,6 +58,19 @@ function OfficeList() {
   const upcoming = state.issues.filter((i) => i.issue_date >= today).sort((a, b) => a.issue_date.localeCompare(b.issue_date))
   const nextFriday = upcoming[0]?.issue_date
   const thisWeek = nextFriday ? upcoming.filter((i) => i.issue_date === nextFriday) : []
+  // The coming Friday: each newsletter not started for it yet gets a card that starts it in one click.
+  const friday = fridayOf(today)
+  const notStarted = Object.values(EDITIONS).filter((ed) => !state.issues.some((i) => i.edition === ed.id && String(i.issue_date).slice(0, 10) === friday))
+  const start = async (opts) => {
+    try {
+      const last = state.issues.filter((i) => i.edition === opts.edition && i.issue_date < opts.date).sort((a, b) => b.issue_date.localeCompare(a.issue_date))[0]
+      const [lastParts, events] = await Promise.all([last ? listParts(last.id) : [], academicCalendar()])
+      const { issue, parts } = newIssue({ ...opts, last: last ? { issue: last, parts: lastParts } : null, calendar, events, schedule, teachers })
+      const made = await createIssue(issue, parts)
+      navigate(`/newsletter/${made.issue.id}`)
+    } catch (e) { toast.error(e.message || String(e)) }
+  }
+  const startNow = async (ed) => { setStarting(ed.id); await start({ edition: ed.id, date: friday, from: 'last' }); setStarting('') }
   const byQuarter = []
   for (const i of issues) {
     const k = `${i.school_year} · ${L(`Quarter ${i.quarter}`, `Quý ${i.quarter}`)}`
@@ -77,9 +85,22 @@ function OfficeList() {
       </PageHeader>
       {state.error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{state.error}</div>}
 
-      {thisWeek.length > 0 && (
+      {!state.error && (thisWeek.length > 0 || notStarted.length > 0) && (
         <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {thisWeek.map((i) => <WeekCard key={i.id} issue={i} parts={partsOf.get(i.id) || []} L={L} lang={lang} />)}
+          {notStarted.map((ed) => (
+            <div key={ed.id} className="card flex flex-col gap-3 border-dashed p-4">
+              <div className="flex items-center gap-2">
+                <span className="grid h-9 w-9 place-items-center rounded-lg" style={{ background: TONES[ed.tone].pale, color: TONES[ed.tone].ink }}><Newspaper size={18} /></span>
+                <div className="min-w-0 flex-1"><b className="block text-slate-800">{L(ed.name.en, ed.name.vi)}</b><span className="text-xs text-slate-500">{longDay(friday, lang)} · {L('not started yet', 'chưa bắt đầu')}</span></div>
+              </div>
+              <p className="text-sm text-slate-600">{L('Starting it now gives every class an empty corner, so teachers can write theirs during the week. Reminders and dates come from last week and the calendar.', 'Bắt đầu ngay để mỗi lớp có một góc lớp trống, giáo viên viết trong tuần. Ghi nhớ và ngày tháng lấy từ tuần trước và lịch năm học.')}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className="btn-primary" disabled={!!starting} onClick={() => startNow(ed)}><Plus size={16} />{starting === ed.id ? L('Starting…', 'Đang tạo…') : L(`Start ${enDay(friday)}`, `Bắt đầu số ${longDay(friday, 'vi')}`)}</button>
+                <button type="button" className="btn-ghost text-sm" disabled={!!starting} onClick={() => setCreating(true)}>{L('Other options…', 'Tuỳ chọn khác…')}</button>
+              </div>
+            </div>
+          ))}
         </section>
       )}
 
@@ -98,7 +119,7 @@ function OfficeList() {
                 return (
                   <li key={i.id}>
                     <Link to={`/newsletter/${i.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-slate-100 px-4 py-3 hover:bg-sky-50/50 sm:flex-nowrap">
-                      <span className="chip flex-none" style={{ background: TONES[EDITIONS[i.edition].tone].pale, color: TONES[EDITIONS[i.edition].tone].ink }}>{EDITIONS[i.edition].short}</span>
+                      <span className="chip w-28 flex-none justify-center" style={{ background: TONES[EDITIONS[i.edition].tone].pale, color: TONES[EDITIONS[i.edition].tone].ink }}>{EDITIONS[i.edition].short}</span>
                       <span className="min-w-0 flex-1">
                         <b className="block text-slate-800">{issueLabel(i, lang)}</b>
                         <span className="text-xs text-slate-500">{longDay(i.issue_date, lang)}{i.settings?.subject ? ` · ${i.settings.subject}` : ''}</span>
@@ -115,15 +136,7 @@ function OfficeList() {
         ))}
       </div>
 
-      {creating && <NewIssueModal L={L} issues={state.issues} onClose={() => setCreating(false)} onCreate={async (opts) => {
-        try {
-          const last = state.issues.filter((i) => i.edition === opts.edition && i.issue_date < opts.date).sort((a, b) => b.issue_date.localeCompare(a.issue_date))[0]
-          const [lastParts, events] = await Promise.all([last ? listParts(last.id) : [], academicCalendar()])
-          const { issue, parts } = newIssue({ ...opts, last: last ? { issue: last, parts: lastParts } : null, calendar, events, schedule, teachers })
-          const made = await createIssue(issue, parts)
-          navigate(`/newsletter/${made.issue.id}`)
-        } catch (e) { toast.error(e.message || String(e)) }
-      }} />}
+      {creating && <NewIssueModal L={L} issues={state.issues} onClose={() => setCreating(false)} onCreate={start} />}
     </div>
   )
 }

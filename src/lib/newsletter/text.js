@@ -19,35 +19,76 @@ export const safeUrl = (u) => {
   return /^(https?:\/\/|mailto:|tel:)/i.test(s) ? s : ''
 }
 
+// Text between tags: a "<" or ">" that is not one of ours, or an "&" that starts no entity, is written out as a character.
+const escText = (t) => t.replace(/&(?!(#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&nbsp;|\u00a0/g, ' ')
+const INLINE = new Set(['b', 'i', 'a'])
+
 /**
  * Keeps only paragraphs, bold, italics, bullet lists, line breaks and links (http, mail, phone).
  * Every other tag goes, its words stay; attributes go except a link's address.
+ * It reads the HTML piece by piece and writes it out again, so nothing it did not
+ * write itself can reach the page as a tag: whatever is pasted or saved, the
+ * result is safe to put into a page as HTML.
  */
 export function cleanHtml(html) {
-  let s = String(html || '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(script|style|head|title|xml)\b[\s\S]*?<\/\1>/gi, '')
-  s = s.replace(/<\/?([a-z][a-z0-9]*)\b([^>]*)>/gi, (m, tag, attrs) => {
-    const t = ALLOWED[tag.toLowerCase()]
-    if (!t) return ''
-    const closing = m.startsWith('</')
-    if (t === 'br') return '<br>'
-    if (closing) return `</${t}>`
-    if (t === 'a') {
-      const href = safeUrl((attrs.match(/href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i) || [])[2] ?? '')
-      return href ? `<a href="${escHtml(href)}">` : '<a>'
+  const src = String(html || '')
+    .replace(/<!--[\s\S]*?(-->|$)/g, '')
+    .replace(/<(script|style|head|title|xml|template|iframe|object|svg|math)\b[\s\S]*?(<\/\1\s*>|$)/gi, '')
+  let out = ''
+  const stack = [] // open tags: p, ul, li, b, i, a, or 'a0' (a link with no address: its words only)
+  const has = (t) => stack.includes(t)
+  const inBlock = () => has('p') || has('li')
+  const close = (t) => { // closes t and everything opened inside it
+    if (!has(t)) return
+    while (stack.length) { const x = stack.pop(); if (x !== 'a0') out += `</${x}>`; if (x === t) break }
+  }
+  const openP = () => { if (has('ul')) { if (!has('li')) { stack.push('li'); out += '<li>' } } else { stack.push('p'); out += '<p>' } }
+  const text = (t) => {
+    if (!t) return
+    if (!inBlock()) { if (!t.trim()) return; openP() }
+    out += escText(t)
+  }
+  const re = /<(\/?)([a-z][a-z0-9]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/gi
+  let last = 0, m
+  while ((m = re.exec(src))) {
+    text(src.slice(last, m.index))
+    last = re.lastIndex
+    const t = ALLOWED[m[2].toLowerCase()]
+    if (!t) continue
+    if (t === 'br') { if (inBlock()) out += '<br>'; continue }
+    if (m[1] === '/') {
+      if (t === 'a') {
+        if (stack.lastIndexOf('a0') > stack.lastIndexOf('a')) stack.splice(stack.lastIndexOf('a0'), 1)
+        else close('a')
+      } else if (t !== 'p' || !has('li')) close(t)
+      continue
     }
-    return `<${t}>`
-  })
-  // Links with no address keep their words only; empty paragraphs and stray spaces go.
-  s = s.replace(/<a>([\s\S]*?)<\/a>/g, '$1')
-    .replace(/<p>(\s|&nbsp;|<br>)*<\/p>/g, '')
-    .replace(/<li>\s*<p>([\s\S]*?)<\/p>\s*<\/li>/g, '<li>$1</li>')
-    .replace(/&nbsp;/g, ' ')
-    .trim()
-  // Loose text with no paragraph around it becomes one.
-  if (s && !/^<(p|ul)>/.test(s)) s = `<p>${s}</p>`.replace(/<p>(<ul>[\s\S]*<\/ul>)<\/p>/, '$1')
-  return s
+    if (t === 'p') { // a paragraph inside a bullet is a line break; one after another closes the last
+      if (has('li')) { if (!out.endsWith('<li>')) out += '<br>' } else { close('p'); if (!has('ul')) { stack.push('p'); out += '<p>' } }
+      continue
+    }
+    if (t === 'ul') { if (!has('ul')) { close('p'); stack.push('ul'); out += '<ul>' } continue }
+    if (t === 'li') { close('li'); if (!has('ul')) { close('p'); stack.push('ul'); out += '<ul>' } stack.push('li'); out += '<li>'; continue }
+    if (INLINE.has(t)) {
+      if (!inBlock()) openP()
+      if (t === 'a') {
+        const hm = m[3].match(/href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i) || []
+        const href = safeUrl(hm[1] ?? hm[2] ?? hm[3] ?? '')
+        if (href && !has('a')) { stack.push('a'); out += `<a href="${escHtml(href)}">` } else stack.push('a0')
+      } else if (!has(t)) { stack.push(t); out += `<${t}>` }
+    }
+  }
+  text(src.slice(last))
+  while (stack.length) { const x = stack.pop(); if (x !== 'a0') out += `</${x}>` }
+  // Empty bold, links, paragraphs, bullets and lists go, and line breaks at the start or end of a paragraph.
+  let prev
+  do {
+    prev = out
+    out = out.replace(/<(b|i)>\s*<\/\1>/g, '').replace(/<a href="[^"]*">\s*<\/a>/g, '')
+      .replace(/<(p|li)>(\s|<br>)*<\/\1>/g, '').replace(/<ul>\s*<\/ul>/g, '')
+      .replace(/(<(p|li)>)(\s|<br>)+/g, '$1').replace(/(\s|<br>)+(<\/(p|li)>)/g, '$2')
+  } while (out !== prev)
+  return out.trim()
 }
 
 /** The words of some HTML, on one line. */

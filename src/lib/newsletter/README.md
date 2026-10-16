@@ -6,7 +6,7 @@ Two newsletters go to families every Friday: **The Palm River Post** (all famili
 - **two PDFs:** English and Vietnamese, A4;
 - **a Gmail draft in admin@:** the groups in BCC and both PDFs attached. The office sends it.
 
-Everything after the editor reads one object, the **payload**. It is built by `buildPayload()` in `payload.js`. The website gets the public payloads from the database: `adm_newsletters_public()`, which returns the `published` column of each published issue. The PDF and the email are made in the browser from the families payload (the same object, plus the families-only parts).
+Everything after the editor reads one object, the **payload**. It is built by `buildPayload()` in `payload.js`. The website gets the public payloads from the database: `adm_newsletters_public()`, which returns the `published` column of each published issue. The email is made in the browser from the families payload (the same object, plus the families-only parts). The two PDFs are made from the public payload, because the website links to them: families-only parts are in the email text only.
 
 ## Files
 

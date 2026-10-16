@@ -63,7 +63,7 @@ export function viState(part) {
     if (!its.length) return { kind: part.type === 'dates' ? 'ok' : 'empty' }
     const miss = its.filter((it) => !str(it.vi)).length
     if (miss) return { kind: 'missing', n: miss }
-    const ch = its.filter((it) => (it.vi_from ?? null) !== str(it.en)).length
+    const ch = its.filter((it) => str(it.vi_from) !== str(it.en)).length
     return ch ? { kind: 'changed', n: ch } : { kind: 'ok' }
   }
   const ps = pairs(part)
@@ -131,8 +131,19 @@ export function issueChecks(issue, parts) {
 }
 
 /** A short fingerprint of what an issue says, to tell whether it has changed since it was published. */
+/**
+ * JSON with every object's keys in order, so the same content always gives the
+ * same string (the database hands objects back with their keys in its own order).
+ */
+export function stable(x) {
+  if (x === undefined) return 'null'
+  if (x === null || typeof x !== 'object') return JSON.stringify(x)
+  if (Array.isArray(x)) return `[${x.map(stable).join(',')}]`
+  return `{${Object.keys(x).filter((k) => x[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${stable(x[k])}`).join(',')}}`
+}
+
 export function fingerprint(issue, parts) {
-  const s = JSON.stringify([issue.edition, issue.issue_date, issue.settings?.subject || '', issue.settings?.cover || null,
+  const s = stable([issue.edition, issue.issue_date, issue.settings?.subject || '', issue.settings?.cover || null,
     sortParts(parts).map((p) => [p.id, p.type, p.public !== false, p.data])])
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0 }

@@ -4,7 +4,7 @@ import { gmailConfigured } from '../../lib/gmail'
 import { EDITIONS, SOURCES } from '../../lib/newsletter/constants'
 import { issueChecks, statusOf, anchorId } from '../../lib/newsletter/payload'
 import { publishIssue, unpublishIssue, saveEmailDraft, readyGmail, pageIsLive, startBuild, previewPayloads, publishedFamilies } from '../../lib/newsletter/publish'
-import { listViews, sumViews } from '../../lib/newsletter/data'
+import { getIssue, listParts, listViews, sumViews } from '../../lib/newsletter/data'
 import { Modal } from '../ui'
 
 const STEPS = ['photos', 'pdf', 'save', 'build', 'email']
@@ -14,7 +14,7 @@ const STEPS = ['photos', 'pdf', 'save', 'build', 'email']
  * then the links, the email draft, the chat message, whether the page is live,
  * and how often it has been read. Also "Take off the website".
  */
-export default function PublishPanel({ open, onClose, issue, parts, onIssue, flush, L, toast }) {
+export default function PublishPanel({ open, onClose, issue, parts, onIssue, flush, refresh = () => {}, L, toast }) {
   const c = issueChecks(issue, parts)
   const status = statusOf(issue, parts)
   const published = issue.status === 'published'
@@ -29,12 +29,13 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
   useEffect(() => () => clearInterval(timer.current), [])
   useEffect(() => { if (open && published) listViews([issue.slug]).then((rows) => setViews(sumViews(rows, issue.slug))) }, [open, published, issue.slug])
 
-  const watchLive = () => {
+  // The page counts as live once it links to this round's PDFs (on a republish the old page is there already).
+  const watchLive = (round) => {
     clearInterval(timer.current)
     setLive('waiting')
     const started = Date.now()
     timer.current = setInterval(async () => {
-      if (await pageIsLive(issue.slug)) { setLive('live'); clearInterval(timer.current) } else if (Date.now() - started > 8 * 60 * 1000) { setLive('slow'); clearInterval(timer.current) }
+      if (await pageIsLive(issue.slug, 'en', round ? `/r${round}-` : '')) { setLive('live'); clearInterval(timer.current) } else if (Date.now() - started > 8 * 60 * 1000) { setLive('slow'); clearInterval(timer.current) }
     }, 20000)
   }
 
@@ -49,15 +50,17 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
       await flush()
       const result = await publishIssue(issue, parts, { onStep: (step, detail) => { setRun((r) => { const d = new Set(r.done); STEPS.slice(0, STEPS.indexOf(step)).forEach((s) => d.add(s)); return { ...r, step, detail, done: d } }) } })
       onIssue(result.issue)
+      refresh()
       let email = null
       if (gmail) {
         setRun((r) => ({ ...r, step: 'email', done: new Set([...r.done, 'photos', 'pdf', 'save', 'build']) }))
         try { email = await saveEmailDraft(result.issue, result.fam, result.pdfs); onIssue(email.issue) } catch (e) { email = { error: e.message } }
       }
       setRun((r) => ({ ...r, step: '', done: new Set(STEPS), result: { ...result, email } }))
-      if (!result.build?.error && !result.build?.skipped) watchLive()
+      if (!result.build?.error && !result.build?.skipped) watchLive(result.issue.publish_count)
     } catch (e) {
       setRun((r) => ({ ...r, error: e.message || String(e) }))
+      refresh()
     }
   }
 
@@ -66,9 +69,12 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
     setBusy('email')
     try {
       await readyGmail()
-      const r = await saveEmailDraft(issue, publishedFamilies(issue, parts))
+      // From the database as it is now, so the email is the published issue exactly.
+      const [fresh, ps] = await Promise.all([getIssue(issue.id), listParts(issue.id)])
+      if (statusOf(fresh, ps) === 'changed') throw new Error(L('Someone changed the issue since it was published. Publish the changes first, so the email matches the page.', 'Có người đã sửa số này sau khi đăng. Hãy đăng phần đã sửa trước, để email khớp với trang web.'))
+      const r = await saveEmailDraft(fresh, publishedFamilies(fresh, ps))
       onIssue(r.issue)
-      toast(L('Email draft saved in admin@ Gmail', 'Đã lưu thư nháp trong Gmail admin@'))
+      toast(r.draft.replaced ? L('The email draft in admin@ Gmail is updated (the old copy is replaced).', 'Đã cập nhật thư nháp trong Gmail admin@ (thay bản cũ).') : L('Email draft saved in admin@ Gmail', 'Đã lưu thư nháp trong Gmail admin@'))
     } catch (e) { toast.error(e.message) } finally { setBusy('') }
   }
   const doChat = async () => {
@@ -86,7 +92,7 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
   }
   const doBuild = async () => {
     setBusy('build')
-    try { await startBuild(); watchLive(); toast(L('The website is being built again.', 'Trang web đang được cập nhật.')) } catch (e) { toast.error(e.message) } finally { setBusy('') }
+    try { await startBuild(); watchLive(issue.publish_count); toast(L('The website is being built again.', 'Trang web đang được cập nhật.')) } catch (e) { toast.error(e.message) } finally { setBusy('') }
   }
 
   const stepLabel = {
@@ -147,7 +153,7 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
           {(!published || status === 'changed') && (
             <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[13px] text-slate-700">
               <div className="flex gap-2"><Globe size={15} className="mt-0.5 flex-none text-slate-500" /><span>{L('Website:', 'Trang web:')} <code className="code break-all">{url.en}</code> {L('and the Vietnamese page', 'và trang tiếng Việt')}</span></div>
-              <div className="flex gap-2"><FileText size={15} className="mt-0.5 flex-none text-slate-500" /><span>{L('Two PDFs (English and Vietnamese), on the page and attached to the email.', 'Hai file PDF (tiếng Anh và tiếng Việt), trên trang web và đính kèm email.')}</span></div>
+              <div className="flex gap-2"><FileText size={15} className="mt-0.5 flex-none text-slate-500" /><span>{L('Two PDFs (English and Vietnamese), on the page and attached to the email.', 'Hai file PDF (tiếng Anh và tiếng Việt), trên trang web và đính kèm email.')}{parts.some((p) => p.public === false) && ` ${L('Families-only parts are in the email text only: not on the page, not in the PDFs.', 'Phần chỉ gửi gia đình chỉ có trong nội dung email: không có trên trang web và trong PDF.')}`}</span></div>
               <div className="flex gap-2"><Mail size={15} className="mt-0.5 flex-none text-slate-500" /><span>{gmailConfigured ? L(`Email draft in admin@ Gmail: Bcc ${ed.groups.join(', ')}. The office sends it, or schedules it for Friday 16:30.`, `Thư nháp trong Gmail admin@: Bcc ${ed.groups.join(', ')}. Văn phòng gửi hoặc hẹn giờ gửi lúc 16:30 thứ Sáu.`) : L('Gmail is not connected in this copy of The Current, so the email is not saved as a draft.', 'Bản The Current này chưa kết nối Gmail nên không lưu thư nháp được.')}</span></div>
             </div>
           )}

@@ -23,7 +23,7 @@ export default function CornerReminder() {
     ;(async () => {
       try {
         const today = todayHoiAn()
-        const issues = (await listIssues()).filter((i) => i.issue_date >= today && i.status !== 'published').slice(0, 6)
+        const issues = (await listIssues()).filter((i) => i.issue_date >= today && i.status !== 'published').sort((a, b) => a.issue_date.localeCompare(b.issue_date)).slice(0, 6)
         if (!issues.length) return
         const parts = await listParts(issues.map((i) => i.id))
         const out = []

@@ -39,13 +39,16 @@ export function RichText({ value, onChange, placeholder = '', disabled = false, 
   const last = useRef(value || '')
   const [linking, setLinking] = useState(null) // { range, url }
 
-  useLayoutEffect(() => { if (ref.current) ref.current.innerHTML = value || '' }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // What is stored is cleaned again before it goes into the page: nothing saved some other way can run here.
+  useLayoutEffect(() => { if (ref.current) ref.current.innerHTML = cleanHtml(value) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!focused.current && ref.current && (value || '') !== last.current) { ref.current.innerHTML = value || ''; last.current = value || '' }
+    if (!focused.current && ref.current && (value || '') !== last.current) { ref.current.innerHTML = cleanHtml(value); last.current = value || '' }
   }, [value])
 
+  // Saves only a real change: clicking into a box and out again changes nothing.
   const emit = () => {
     const html = cleanHtml(ref.current.innerHTML)
+    if (html === cleanHtml(last.current)) return
     last.current = html
     onChange(html)
   }
@@ -117,7 +120,7 @@ export function ViChip({ state, L }) {
   if (state.kind === 'ok') return <span className="chip bg-green-100 text-green-800"><Check size={12} className="mr-1" />{L('Vietnamese up to date', 'Tiếng Việt đã cập nhật')}</span>
   if (state.kind === 'missing') return <span className="chip bg-amber-100 text-amber-800"><Languages size={12} className="mr-1" />{L('Vietnamese missing', 'Thiếu tiếng Việt')}{state.n > 1 ? ` · ${state.n}` : ''}</span>
   if (state.kind === 'changed') return <span className="chip bg-amber-100 text-amber-800"><PencilLine size={12} className="mr-1" />{L('English changed since translated', 'Tiếng Anh đã sửa sau khi dịch')}</span>
-  if (state.kind === 'empty') return <span className="chip bg-slate-100 text-slate-500">{L('Not written yet', 'Chưa viết')}</span>
+  if (state.kind === 'empty') return <span className="chip bg-slate-100 text-slate-500" title={L('Empty parts are left out of the email, the page and the PDF', 'Phần trống sẽ không có trong email, trang web và PDF')}>{L('Empty: left out', 'Trống: không đưa vào')}</span>
   return null
 }
 

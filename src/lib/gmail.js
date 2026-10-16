@@ -76,6 +76,9 @@ export function buildRaw(m) {
  * `attachments` ([{ filename, base64, type }]) and an empty `to` (a newsletter
  * goes to its groups in Bcc only).
  */
+// Base64 in lines of 76 characters, as mail expects.
+const wrap76 = (b64) => b64.replace(/(.{76})/g, '$1\r\n')
+
 export function buildMime(m) {
   const boundary = `pra${Date.now().toString(36)}`
   const alt = `alt${Date.now().toString(36)}`
@@ -86,9 +89,9 @@ export function buildMime(m) {
     'Content-Type: text/plain; charset="UTF-8"',
     'Content-Transfer-Encoding: base64',
     '',
-    btoa(unescape(encodeURIComponent(m.text))),
+    wrap76(btoa(unescape(encodeURIComponent(m.text)))),
     '',
-    ...(m.html ? [`--${alt}`, 'Content-Type: text/html; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', btoa(unescape(encodeURIComponent(m.html))), ''] : []),
+    ...(m.html ? [`--${alt}`, 'Content-Type: text/html; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', wrap76(btoa(unescape(encodeURIComponent(m.html)))), ''] : []),
     `--${alt}--`,
     '',
   ]
@@ -111,7 +114,7 @@ export function buildMime(m) {
         `Content-Disposition: attachment; filename="${encHeader(f.filename)}"`,
         'Content-Transfer-Encoding: base64',
         '',
-        f.base64.replace(/(.{76})/g, '$1\r\n'),
+        wrap76(f.base64),
         '',
       ]),
       `--${boundary}--`,
@@ -148,15 +151,20 @@ export async function createDraft(m) {
 /**
  * Saves a large message (a newsletter with its PDFs) to the Drafts folder. The
  * upload address takes messages up to 35 MB; the plain one above stops near 5 MB.
- * Returns { id, messageId, link }.
+ * With `replaceId` the draft saved before is replaced, so only one stays in Drafts;
+ * if it is gone (sent or deleted) a new one is made.
+ * Returns { id, messageId, link, replaced }.
  */
-export async function createDraftUpload(m) {
+export async function createDraftUpload(m, replaceId = '') {
   const tok = await getToken()
-  const res = await fetch('https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts?uploadType=media', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'message/rfc822' },
-    body: new TextEncoder().encode(buildMime(m)),
-  })
+  const body = new TextEncoder().encode(buildMime(m))
+  const send = (method, url) => fetch(url, { method, headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'message/rfc822' }, body })
+  if (replaceId) {
+    const up = await send('PUT', `https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts/${encodeURIComponent(replaceId)}?uploadType=media`)
+    if (up.ok) { const d = await up.json(); return { id: d.id, messageId: d.message?.id, link: draftLink(d.message?.id), replaced: true } }
+    if (up.status === 401 || up.status === 403) { token = null; throw new Error(`Gmail: ${up.status}`) }
+  }
+  const res = await send('POST', 'https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts?uploadType=media')
   if (!res.ok) {
     let msg = `${res.status}`
     try { msg = (await res.json()).error?.message || msg } catch { /* ignore */ }
@@ -164,7 +172,7 @@ export async function createDraftUpload(m) {
     throw new Error(`Gmail: ${msg}`)
   }
   const d = await res.json()
-  return { id: d.id, messageId: d.message?.id, link: draftLink(d.message?.id) }
+  return { id: d.id, messageId: d.message?.id, link: draftLink(d.message?.id), replaced: false }
 }
 
 /** Opens a draft in Gmail, signed in as the sending account. */

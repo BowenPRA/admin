@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarDays, CalendarPlus, Pin, Plus, Repeat, X } from 'lucide-react'
+import { CalendarDays, CalendarPlus, ChevronDown, ChevronRight, Pin, Plus, Repeat, X } from 'lucide-react'
 import { academicCalendar, upcoming } from '../../lib/newsletter/calendarFeed'
 import { addDays, dateRange, timeSpan } from '../../lib/newsletter/dates'
 import { itemsOf, viState } from '../../lib/newsletter/payload'
@@ -14,29 +14,31 @@ const TAG_LABEL = { off: ['no classes', 'nghỉ học', 'bg-rose-100 text-rose-8
  * this issue) and the reminders. Always first in the email, the page and the
  * PDF, whatever order the other parts are in.
  */
-export default function NeedToKnow({ dates, reminders, issue, edit, disabled, L, lang }) {
+export default function NeedToKnow({ dates, reminders, issue, edit, disabled, L, lang, open = true, onToggle }) {
   return (
-    <section className="card overflow-hidden">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-gradient-to-r from-sky-50 to-white px-4 py-3">
+    <section className="card overflow-hidden" id={dates ? `part-${dates.id}` : undefined}>
+      <div className={`flex flex-wrap items-center gap-2 bg-gradient-to-r from-sky-50 to-white px-4 py-3 ${open ? 'border-b border-slate-100' : ''}`}>
+        {onToggle && <button type="button" onClick={onToggle} className="-ml-2 grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-white hover:text-slate-700" aria-expanded={open} aria-label={open ? L('Fold', 'Thu gọn') : L('Open', 'Mở')}>{open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</button>}
         <span className="grid h-9 w-9 place-items-center rounded-lg bg-pra-blue text-white"><Pin size={18} /></span>
         <div><div className="font-bold text-slate-800">{L('Need to know', 'Cần biết')}</div><div className="text-xs text-slate-500">{L('First in the email, the page and the PDF. Families who read nothing else read this.', 'Luôn ở đầu email, trang web và PDF. Gia đình không đọc gì khác cũng sẽ đọc phần này.')}</div></div>
       </div>
-      <div className="grid grid-cols-1 2xl:grid-cols-[1.25fr_1fr]">
+      {open && <div className="grid grid-cols-1 2xl:grid-cols-[1.25fr_1fr]">
         {dates && <Dates part={dates} issue={issue} edit={edit} disabled={disabled} L={L} lang={lang} />}
         {reminders && <Reminders part={reminders} edit={edit} disabled={disabled} L={L} />}
-      </div>
+      </div>}
     </section>
   )
 }
 
 function Dates({ part, issue, edit, disabled, L, lang }) {
-  const items = itemsOf(part).sort((a, b) => a.iso.localeCompare(b.iso) || (a.pos ?? 0) - (b.pos ?? 0))
+  // A date with no day (half-made, or left by a save that landed after it was removed) goes last instead of breaking the page.
+  const items = itemsOf(part).sort((a, b) => String(a.iso || '9999').localeCompare(String(b.iso || '9999')) || (a.pos ?? 0) - (b.pos ?? 0))
   const [cal, setCal] = useState([])
   useEffect(() => { academicCalendar().then(setCal) }, [])
   const have = new Set(items.map((i) => i.cal).filter(Boolean))
   const more = upcoming(cal, issue.issue_date, 120).filter((e) => !have.has(e.id))
   const set = (it, fields) => edit(part.id, Object.entries(fields).map(([k, v]) => [['items', it.id, k], v]))
-  const setVi = (it, v) => edit(part.id, [[['items', it.id, 'vi'], v], [['items', it.id, 'vi_from'], it.en || '']])
+  const setVi = (it, v) => edit(part.id, [[['items', it.id, 'vi'], v], [['items', it.id, 'vi_from'], String(it.en || '').trim()]])
   const add = (fields) => edit(part.id, [['items', nid()], { on: true, pos: items.length, t1: '', t2: '', en: '', vi: '', tag: '', ...fields }], { now: true })
   const vs = viState(part)
   return (
@@ -94,10 +96,10 @@ function Dates({ part, issue, edit, disabled, L, lang }) {
 function Reminders({ part, edit, disabled, L }) {
   const items = itemsOf(part)
   const lim = PART_TYPES.reminders.limits.item
-  const set = (it, k, v) => edit(part.id, k === 'vi' ? [[['items', it.id, 'vi'], v], [['items', it.id, 'vi_from'], it.en || '']] : [['items', it.id, k], v])
+  const set = (it, k, v) => edit(part.id, k === 'vi' ? [[['items', it.id, 'vi'], v], [['items', it.id, 'vi_from'], String(it.en || '').trim()]] : [['items', it.id, k], v])
   const vs = viState(part)
   return (
-    <div className="min-w-0 space-y-2 border-t border-slate-100 p-4 2xl:border-l 2xl:border-t-0">
+    <div id={`part-${part.id}`} className="min-w-0 space-y-2 border-t border-slate-100 p-4 2xl:border-l 2xl:border-t-0">
       <div className="flex items-center gap-2"><Pin size={15} className="text-pra-green" /><span className="label !mb-0">{L('Remember', 'Ghi nhớ')}</span><ViChip state={vs} L={L} /></div>
       <p className="text-xs text-slate-500">{L('Things to bring, pay or send back. One short line each.', 'Những thứ cần mang, cần đóng hoặc gửi lại. Mỗi việc một dòng ngắn.')}</p>
       <ul className="space-y-2">

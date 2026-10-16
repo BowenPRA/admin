@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarPlus, Check, Clock, Download, Maximize2, MessageCircleQuestion, Quote } from 'lucide-react'
+import { CalendarPlus, Check, Clock, Download, LoaderCircle, Maximize2, MessageCircleQuestion, Quote } from 'lucide-react'
 import { TONES, word } from '../../lib/newsletter/constants'
 import { pick } from '../../lib/newsletter/payload'
+import { cleanHtml } from '../../lib/newsletter/text'
 import { Segmented } from '../ui'
 import { NlIcon } from './icons'
 
 const tone = (k) => TONES[k] || TONES.blue
-const Html = ({ html, className = '' }) => <div className={`[&_a]:text-[#116DFF] [&_a]:underline [&_li]:my-0.5 [&_p:last-child]:mb-0 [&_p]:mb-3 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 ${className}`} dangerouslySetInnerHTML={{ __html: html }} />
+const Html = ({ html, className = '' }) => <div className={`[&_a]:text-[#116DFF] [&_a]:underline [&_li]:my-0.5 [&_p:last-child]:mb-0 [&_p]:mb-3 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 ${className}`} dangerouslySetInnerHTML={{ __html: cleanHtml(html) }} />
 /** A field in one language, with a small "English" tag when the Vietnamese is not written yet. */
 function T({ v, lang, as: As = 'span', className = '', html = false }) {
   const p = pick(v, lang)
@@ -162,35 +163,40 @@ function EmailPreview({ p }) {
   )
 }
 
-/** The PDF, made when asked for (it takes a few seconds). */
-function PdfPreview({ p, lang }) {
-  const [state, setState] = useState({ url: '', busy: false, error: '', pages: 0 })
+/**
+ * The PDF, made as soon as this tab is opened, and made again a moment after
+ * the issue changes (the last one stays on screen meanwhile).
+ */
+function PdfPreview({ p, lang, L }) {
+  const [state, setState] = useState({ url: '', busy: true, error: '', pages: 0, size: 0 })
   const urlRef = useRef('')
-  const make = async () => {
-    setState((s) => ({ ...s, busy: true, error: '' }))
-    try {
-      const { newsletterPdf } = await import('../../lib/newsletter/pdf.js')
-      const { blob, pages } = await newsletterPdf(p, lang)
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current)
-      urlRef.current = URL.createObjectURL(blob)
-      setState({ url: urlRef.current, busy: false, error: '', pages, size: blob.size })
-      setMadeFor(`${lang}|${key}`)
-    } catch (e) { setState((s) => ({ ...s, busy: false, error: e.message || String(e) })) }
-  }
+  const run = useRef(0)
+  const key = `${lang}|${JSON.stringify(p)}`
+  useEffect(() => {
+    const n = ++run.current
+    const t = setTimeout(async () => {
+      setState((s) => ({ ...s, busy: true, error: '' }))
+      try {
+        const { newsletterPdf } = await import('../../lib/newsletter/pdf.js')
+        const { blob, pages } = await newsletterPdf(p, lang)
+        if (n !== run.current) return
+        if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+        urlRef.current = URL.createObjectURL(blob)
+        setState({ url: urlRef.current, busy: false, error: '', pages, size: blob.size })
+      } catch (e) { if (n === run.current) setState((s) => ({ ...s, busy: false, error: e.message || String(e) })) }
+    }, urlRef.current ? 2500 : 0)
+    return () => clearTimeout(t)
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { if (urlRef.current) URL.revokeObjectURL(urlRef.current) }, [])
-  // A real change to the issue (not a new copy of the same one) asks for the PDF to be made again.
-  const key = JSON.stringify(p)
-  const [madeFor, setMadeFor] = useState('')
-  const stale = state.url && madeFor !== `${lang}|${key}`
   return (
     <div className="space-y-2 p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn-secondary" disabled={state.busy} onClick={make}>{state.busy ? '…' : state.url ? (lang === 'vi' ? 'Làm lại PDF' : 'Make the PDF again') : (lang === 'vi' ? 'Làm PDF' : 'Make the PDF')}</button>
-        {state.url && <span className="text-xs text-slate-500">{state.pages} {state.pages === 1 ? 'page' : 'pages'} · {(state.size / 1048576).toFixed(1)} MB{stale ? (lang === 'vi' ? ' · đã có thay đổi, hãy làm lại' : ' · the issue has changed since: make it again') : ''}</span>}
-        {state.url && <a className="btn-ghost text-xs" href={state.url} target="_blank" rel="noreferrer"><Maximize2 size={14} />Open</a>}
+      <div className="flex min-h-[32px] flex-wrap items-center gap-2 text-xs text-slate-500">
+        {state.busy && <span className="inline-flex items-center gap-1.5"><LoaderCircle size={14} className="animate-spin" />{state.url ? L('Updating the PDF…', 'Đang cập nhật PDF…') : L('Making the PDF…', 'Đang làm PDF…')}</span>}
+        {!state.busy && state.url && <span>{L(`${state.pages} page${state.pages === 1 ? '' : 's'}`, `${state.pages} trang`)} · {(state.size / 1048576).toFixed(1)} MB</span>}
+        {state.url && <a className="btn-ghost ml-auto !py-1 text-xs" href={state.url} target="_blank" rel="noreferrer"><Maximize2 size={14} />{L('Open', 'Mở')}</a>}
       </div>
-      {state.error && <p className="text-sm text-red-700">{state.error}</p>}
-      {state.url && <iframe title="PDF" src={state.url} className="h-[900px] w-full rounded-lg border border-slate-200" />}
+      {state.error && <p className="text-sm text-red-700">{L('The PDF could not be made: ', 'Không làm được PDF: ')}{state.error}</p>}
+      {state.url ? <iframe title="PDF" src={state.url} className="h-[900px] w-full rounded-lg border border-slate-200" /> : !state.error && <div className="h-[600px] w-full animate-pulse rounded-lg bg-slate-100" />}
     </div>
   )
 }
@@ -208,7 +214,7 @@ export default function Preview({ payload, families, L }) {
       <div className="max-h-[calc(100vh-9rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white">
         {kind === 'web' && <WebPreview p={payload} lang={lang} />}
         {kind === 'email' && <EmailPreview p={families} />}
-        {kind === 'pdf' && <PdfPreview p={families} lang={lang} />}
+        {kind === 'pdf' && <PdfPreview p={payload} lang={lang} L={L} />}
       </div>
       <p className="text-xs text-slate-400">{kind === 'web' ? L('Close to the real page. Families-only parts are not shown here.', 'Gần giống trang thật. Phần chỉ gửi gia đình không hiện ở đây.') : kind === 'email' ? L('The email families get: Need to know in full, the rest one tap away.', 'Email gia đình nhận: phần Cần biết đầy đủ, phần còn lại bấm để xem.') : L('The PDF attached to the email and linked on the page.', 'PDF đính kèm email và có trên trang web.')}</p>
     </div>

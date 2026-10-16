@@ -44,9 +44,35 @@ function deleteDeep(obj, path) {
   if (cur && typeof cur === 'object') delete cur[path[path.length - 1]]
   return obj
 }
-/** The same change adm_newsletter_edit makes, on a part held in memory. */
+/** One photo by its id ({photos,@id,…}) or the photos' order ({photos,@order}), as adm_newsletter_photo_edit does it. */
+function photoEdit(d, path, value, del) {
+  const list = Array.isArray(d.photos) ? d.photos : []
+  if (path[1] === '@order') {
+    const at = new Map((Array.isArray(value) ? value : []).map((id, i) => [id, i]))
+    d.photos = list.map((p, i) => [p, at.has(p.id) ? at.get(p.id) : 100000 + i]).sort((a, b) => a[1] - b[1]).map(([p]) => p)
+    return d
+  }
+  const id = path[1].slice(1)
+  const rest = path.slice(2)
+  const i = list.findIndex((p) => p.id === id)
+  if (del) {
+    if (i < 0) return d
+    d.photos = rest.length ? list.map((p, k) => (k === i ? deleteDeep(p, rest) : p)) : list.filter((_, k) => k !== i)
+    return d
+  }
+  if (!rest.length) { const el = { ...value, id }; d.photos = i < 0 ? [...list, el] : list.map((p, k) => (k === i ? el : p)); return d }
+  if (i < 0) return d
+  d.photos = list.map((p, k) => (k === i ? setDeep(p, rest, value) : p))
+  return d
+}
+/**
+ * The same change adm_newsletter_edit makes, on a part held in memory. A box of a
+ * date, reminder, word or photo that someone removed meanwhile changes nothing.
+ */
 export function applyEdit(data, path, value, del = false) {
   const d = clone(data || {})
+  if (path[0] === 'photos' && String(path[1] || '').startsWith('@')) return photoEdit(d, path, value, del)
+  if (!del && path.length >= 3 && ['items', 'words'].includes(path[0]) && d[path[0]]?.[path[1]] == null) return d
   return del ? deleteDeep(d, path) : setDeep(d, path, value)
 }
 
@@ -123,23 +149,39 @@ export async function patchIssue(id, fields) {
     const i = (d.issues || []).findIndex((x) => x.id === id)
     if (i < 0) throw new Error('This issue no longer exists.')
     const next = { ...d.issues[i], ...fields, updated_at: now() }
-    if (fields.status === 'published') { next.published_at = now(); next.published_by = 'offline' }
+    if (fields.status === 'published' && d.issues[i].status !== 'published') { next.published_at = now(); next.published_by = 'offline' }
     if (fields.status && fields.status !== 'published') next.published = null
     if (fields.status === 'english_done' && d.issues[i].status === 'draft') { next.english_done_at = now(); next.english_done_by = 'offline' }
     d.issues[i] = next
     lsWrite(d)
     return next
   }
-  const { data, error } = await supabase.from(ISSUES).update(fields).eq('id', id).select(ISSUE_COLS).maybeSingle()
+  // With the published payload: the PDFs' addresses in it are what "Save the email" attaches.
+  const { data, error } = await supabase.from(ISSUES).update(fields).eq('id', id).select(`${ISSUE_COLS}, published`).maybeSingle()
   throwIf(error)
   if (!data) throw new Error('This could not be saved: the issue no longer exists, or your account may not change it.')
   return data
 }
 
-/** Changes one key of an issue's settings, leaving the others as they are in the database. */
-export async function patchSettings(issue, key, value) {
-  const fresh = hasSupabase ? await getIssue(issue.id) : issue
-  return patchIssue(issue.id, { settings: { ...(fresh?.settings || issue.settings || {}), [key]: value } })
+/**
+ * Changes one key of an issue's settings in the database, leaving the others as
+ * they are there (a null value removes it). Returns all the settings as saved.
+ */
+export async function setIssueSetting(id, key, value) {
+  if (!hasSupabase) {
+    const d = lsRead()
+    const i = (d.issues || []).findIndex((x) => x.id === id)
+    if (i < 0) throw new Error('This issue no longer exists.')
+    const settings = { ...(d.issues[i].settings || {}) }
+    if (value == null) delete settings[key]
+    else settings[key] = value
+    d.issues[i] = { ...d.issues[i], settings, updated_at: now() }
+    lsWrite(d)
+    return settings
+  }
+  const { data, error } = await supabase.rpc('adm_newsletter_setting', { p_issue: id, p_key: key, p_value: value ?? null })
+  throwIf(error)
+  return data || {}
 }
 
 export async function removeIssue(id) {

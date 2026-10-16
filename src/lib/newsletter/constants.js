@@ -96,6 +96,19 @@ export const PART_TYPES = {
 }
 /** The kinds of part, in Vietnamese (for the editor in Vietnamese). */
 export const PART_LABELS_VI = { opening: 'Mở đầu', dates: 'Ngày cần nhớ', reminders: 'Ghi nhớ', story: 'Bài viết', class: 'Góc lớp', photos: 'Ảnh', quote: 'Câu nói của học viên', press: 'Từ The Palm Press', welcome: 'Chào mừng', closing: 'Lời kết' }
+/** What each kind of part is for, in Vietnamese (PART_TYPES.help is the English). */
+export const PART_HELP_VI = {
+  opening: 'Một câu nói tuần này có gì, rồi hai ba câu nữa. Phần này mở đầu email và trang web, và là dòng xem trước trong hộp thư.',
+  dates: 'Đánh dấu những ngày từ lịch năm học, hoặc thêm ngày cho số này. Ngày tháng được viết sẵn bằng hai thứ tiếng.',
+  reminders: 'Những thứ cần mang, cần đóng hoặc gửi lại. Mỗi việc một dòng ngắn. Dòng "hằng tuần" sẽ tự chuyển sang số tuần sau.',
+  story: 'Một tiêu đề, vài đoạn ngắn và tối đa ba ảnh. Câu đầu tiên là phần email sẽ hiện.',
+  class: 'Lớp đã làm gì trong tuần, do giáo viên của lớp viết: vài câu, một hai ảnh, từ vựng trong tuần và một câu hỏi để gia đình hỏi con.',
+  photos: 'Một bộ ảnh có tiêu đề: một sự kiện, một chuyến đi, một dự án.',
+  quote: 'Nguyên văn câu nói của một học viên, kèm tên gọi và lớp.',
+  press: 'Đường dẫn đến một bài trên blog The Palm Press.',
+  welcome: 'Học viên mới trong tuần, chỉ tên gọi và lớp. Chỉ gửi gia đình: có trong email và PDF, không đăng lên trang web.',
+  closing: 'Một câu kết. "Trân trọng, Trung tâm Anh ngữ Palm River Academy" được thêm tự động.',
+}
 /** Parts Seth adds with "+ Add", in the order the menu shows them. */
 export const ADDABLE = ['story', 'class', 'photos', 'quote', 'press', 'welcome']
 

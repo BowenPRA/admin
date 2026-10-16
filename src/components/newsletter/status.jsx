@@ -2,13 +2,13 @@
 import { Check, Globe, Languages, Mail, PencilLine } from 'lucide-react'
 import { issueChecks, statusOf } from '../../lib/newsletter/payload'
 
-/** Whether this signed-in teacher writes this class corner. */
+/** Whether this signed-in teacher writes this class corner (the same rule as adm_newsletter_can_edit in the database). */
 export function ownsCorner(part, me) {
   if (part.type !== 'class' || !me) return false
   const d = part.data || {}
-  if (d.teacher_email && d.teacher_email === me.email) return true
+  if (d.teacher_email && String(d.teacher_email).toLowerCase() === String(me.email || '').toLowerCase()) return true
   const hr = me.homeroom_groups || []
-  return hr.includes('*') || (d.year_groups || []).some((g) => hr.includes(g))
+  return (d.year_groups || []).some((g) => hr.includes(g))
 }
 
 /** Where an issue stands, as chips (also used at the top of the editor). */
