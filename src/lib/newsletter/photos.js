@@ -78,6 +78,11 @@ export async function addPhoto(issueId, source, { by = '', extra = {} } = {}) {
   const { blob, w, h } = await redraw(source)
   const key = `${issueId}/${id}.jpg`
   await store(key, blob)
+  // Its link straight away, so it shows at once (the cover too), not only after the page is loaded again.
+  if (hasSupabase) {
+    const { data } = await supabase.storage.from(BUCKET).createSignedUrl(key, LINK_SECONDS)
+    if (data?.signedUrl) links.set(key, { url: data.signedUrl, expires: Date.now() + LINK_SECONDS * 1000 })
+  }
   return { id, key, w, h, en: '', vi: '', cleared: false, source: 'upload', added_by: by, added_on: new Date().toISOString().slice(0, 10), ...extra }
 }
 

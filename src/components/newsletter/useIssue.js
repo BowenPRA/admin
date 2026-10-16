@@ -279,6 +279,15 @@ export function useIssue(id, { onError = () => {} } = {}) {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', onShow) }
   }, [refresh])
 
+  // Any photo on screen without a link yet (a cover just picked, a photo someone else added) gets one now.
+  const photoKeys = [state.issue?.settings?.cover?.key, ...state.parts.flatMap((p) => (p.data?.photos || []).map((ph) => ph?.key))].filter(Boolean).join('|')
+  useEffect(() => {
+    if (!photoKeys) return
+    const s = stateRef.current
+    const photos = [s.issue?.settings?.cover, ...s.parts.flatMap((p) => p.data?.photos || [])].filter(Boolean)
+    preparePhotoLinks(photos).then((n) => { if (n && alive.current) setPhotoTick((x) => x + 1) }).catch(() => {})
+  }, [photoKeys])
+
   // Signed photo links are renewed before they run out (a steady timer: editing does not restart it).
   useEffect(() => {
     const t = setInterval(async () => {
