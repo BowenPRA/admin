@@ -5,7 +5,7 @@
 // the browser with an office account's own sign-in (src/lib/eventUpload.js). This
 // script is the fallback, and it needs the Supabase secret key.
 //
-//   node scripts/upload-event-photos.mjs "C:\Users\bowen\PRA Photos\<event>\current"
+//   node scripts/upload-event-photos.mjs "C:\Users\sbowe\PRA Photos\<event>\current"
 //   node scripts/upload-event-photos.mjs "<folder>" --dry-run       (lists what would be sent)
 //   node scripts/upload-event-photos.mjs "<folder>" --replace-text  (see below)
 //   node scripts/upload-event-photos.mjs "<folder>" --delist-missing (see below)
@@ -29,6 +29,7 @@
 // it delisted. A delisted photo can be listed again from its card in the tab.
 
 import { readFileSync, existsSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 
@@ -39,7 +40,7 @@ const replaceText = args.includes('--replace-text')
 const delistMissing = args.includes('--delist-missing')
 const folder = args.find((a) => !a.startsWith('--'))
 if (!folder || !existsSync(join(folder, 'event.json'))) {
-  console.error('Give the folder that holds event.json, e.g. "C:\\Users\\bowen\\PRA Photos\\2026-09-25 Mid-Autumn Festival\\current"')
+  console.error(`Give the folder that holds event.json, e.g. "${join(homedir(), 'PRA Photos', '2026-09-25 Mid-Autumn Festival', 'current')}"`)
   process.exit(1)
 }
 

@@ -125,7 +125,7 @@ Each entry is one or two sentences. Where a word has a chapter of its own, the e
 | Reel | The one-line notice under the menu on every page of the website. Each notice disappears by itself on its end date. |
 | Noticeboard | The cards under the top banner of the website's home page. They do not expire: remove them by hand when their date has passed. |
 | Event page | A full page for one event on the website (Mid-Autumn 2026, the Quarter 1 Showcase). Every other event is a short entry on the events page. |
-| Photo library | `C:\Users\bowen\PRA Photos` on the laptop: one folder per event, with the originals, the edited album and Claude's notes on each photo. See [Photos and Facebook](#/handbook/photos). |
+| Photo library | `C:\Users\sbowe\PRA Photos` on the laptop: one folder per event, with the originals, the edited album and Claude's notes on each photo. See [Photos and Facebook](#/handbook/photos). |
 | No-photo list | The office's list of children who must not appear in photos. A member of staff checks each photo against it in The Current, and only checked photos go on the website or Facebook. |
 
 ### The Current and the database

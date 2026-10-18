@@ -2,7 +2,7 @@ The Current is PRA's own web app for the office and the teachers: students, atte
 
 ## What The Current is
 
-The Current runs in a web browser at https://current.pra.edu.vn, on a laptop or a phone (the register and the header are built for thumbs). It is one web page that talks straight to a database run by a company called Supabase. That database is shared with another PRA app, the student Dashboard, which is why every table in it starts with `adm_`. PRA has no server of its own apart from one small function that posts photos to Facebook. The page is hosted for free on GitHub Pages; the code is in `C:/Users/bowen/admin` on the laptop that holds the code, and on GitHub as BowenPRA/admin. A change to how the app works is a change to that code followed by a deploy (see [Behind the scenes](#/handbook/behind)). The app replaced the Google Sheets invoices in September 2026, the Inquiries Tracker spreadsheet on 30 September 2026, Jotform for enrollment on 30 September 2026, and the Team To-Do spreadsheet on 1 October 2026.
+The Current runs in a web browser at https://current.pra.edu.vn, on a laptop or a phone (the register and the header are built for thumbs). It is one web page that talks straight to a database run by a company called Supabase. That database is shared with another PRA app, the student Dashboard, which is why every table in it starts with `adm_`. PRA has no server of its own apart from one small function that posts photos to Facebook. The page is hosted for free on GitHub Pages; the code is in `C:/Users/sbowe/admin` on the laptop that holds the code, and on GitHub as BowenPRA/admin. A change to how the app works is a change to that code followed by a deploy (see [Behind the scenes](#/handbook/behind)). The app replaced the Google Sheets invoices in September 2026, the Inquiries Tracker spreadsheet on 30 September 2026, Jotform for enrollment on 30 September 2026, and the Team To-Do spreadsheet on 1 October 2026.
 
 ## Signing in
 
@@ -247,7 +247,7 @@ A teacher's login is made on the Teachers page by the Super Admin or the Head Te
 
 ### An office account
 
-Office accounts (Admin, Head Teacher, Super Admin) are made with a script on the laptop that holds the code: `scripts/create-staff-accounts.mjs` in `C:/Users/bowen/admin`. The list of office staff and their roles is written inside that script. The script creates any login that is missing with a temporary password, printed once, and sets everyone's role.
+Office accounts (Admin, Head Teacher, Super Admin) are made with a script on the laptop that holds the code: `scripts/create-staff-accounts.mjs` in `C:/Users/sbowe/admin`. The list of office staff and their roles is written inside that script. The script creates any login that is missing with a temporary password, printed once, and sets everyone's role.
 
 The script asks for the Supabase **secret** key. You type it yourself; Claude never types or sees it. The key is in Supabase (signed in as admin@palmriveracademy.edu.vn) under Project Settings → API Keys → Secret key. Today it is held by Bowen.
 
@@ -266,7 +266,7 @@ The script asks for the Supabase **secret** key. You type it yourself; Claude ne
 - On the command line, if Claude is not at hand, in PowerShell (the script then asks for the key):
 
 ```
-node C:\Users\bowen\admin\scripts\create-staff-accounts.mjs --dry-run
+node C:\Users\sbowe\admin\scripts\create-staff-accounts.mjs --dry-run
 ```
 
 ### The triage account

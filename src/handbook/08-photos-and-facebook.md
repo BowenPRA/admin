@@ -5,9 +5,9 @@ This chapter covers PRA's photos from the moment staff upload them to the moment
 | Place | What is there | Public? |
 |---|---|---|
 | The shared drive: PRA Shared Drive → "PHOTOS BY CLASS 2026-2027" | What staff upload after an event, one folder per event (for example "20261015 Showcase Term 1"), and the finished albums copied back | No: PRA accounts only |
-| The photo library on the laptop: `C:\Users\bowen\PRA Photos` | Every event Claude has worked on: copies of the originals, scores, tags, privacy flags, the edited album | No: one laptop |
+| The photo library on the laptop: `C:\Users\sbowe\PRA Photos` | Every event Claude has worked on: copies of the originals, scores, tags, privacy flags, the edited album | No: one laptop |
 | The Current's **Photos** tab | Photos still under review, their captions and sign-off, the draft Facebook posts | No: office accounts only |
-| The website's git project: `C:\Users\bowen\pra-website` | Photos signed off and chosen for the website | Yes: anyone, for good |
+| The website's git project: `C:\Users\sbowe\pra-website` | Photos signed off and chosen for the website | Yes: anyone, for good |
 | PRA's Facebook Page | Posts | Yes |
 
 The database holds only the details about each photo (score, tags, caption, sign-off, website state), never a child's name.

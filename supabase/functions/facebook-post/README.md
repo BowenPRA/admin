@@ -60,7 +60,7 @@ these projects.
 2. **Edge Functions → Deploy a new function → Via Editor**. Name it exactly
    `facebook-post`, replace the sample with the whole of
    `supabase/functions/facebook-post/index.ts`, then **Deploy**.
-   (Or, from `C:\Users\bowen\admin`: `npx supabase functions deploy facebook-post`.)
+   (Or, from `C:\Users\sbowe\admin`: `npx supabase functions deploy facebook-post`.)
 3. **Edge Functions → Secrets**: add
    - `FB_PAGE_ID` = the Page ID
    - `FB_TOKEN` = the Page key

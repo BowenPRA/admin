@@ -124,18 +124,18 @@ Also waiting: one Kindergarten student's legal first name, to be typed on the re
 The exact files, for searching or for Claude:
 
 ```
-C:\Users\bowen\admin\supabase\updates-2026-09-21-early-years.sql
-C:\Users\bowen\admin\supabase\updates-2026-09-21-receipt-proof.sql
-C:\Users\bowen\admin\supabase\updates-2026-09-22-private-photos.sql
-C:\Users\bowen\admin\supabase\updates-2026-09-28-event-photos-website.sql
-C:\Users\bowen\admin\supabase\updates-2026-09-29-facebook.sql
-C:\Users\bowen\admin\supabase\updates-2026-10-01-receipt-numbers.sql
-C:\Users\bowen\admin\supabase\updates-2026-10-01-todo-delete.sql
-C:\Users\bowen\admin\supabase\updates-2026-10-02-master-minds-movement.sql
-C:\Users\bowen\Desktop\Admin Email\year7-q1-reports.sql
-C:\Users\bowen\Desktop\Admin Email\year7-q1-reports-2.sql
-C:\Users\bowen\Desktop\Admin Email\q2-week-1-newsletters.sql
-C:\Users\bowen\Desktop\Admin Email\q2-week-1-vietnamese.sql
+C:\Users\sbowe\admin\supabase\updates-2026-09-21-early-years.sql
+C:\Users\sbowe\admin\supabase\updates-2026-09-21-receipt-proof.sql
+C:\Users\sbowe\admin\supabase\updates-2026-09-22-private-photos.sql
+C:\Users\sbowe\admin\supabase\updates-2026-09-28-event-photos-website.sql
+C:\Users\sbowe\admin\supabase\updates-2026-09-29-facebook.sql
+C:\Users\sbowe\admin\supabase\updates-2026-10-01-receipt-numbers.sql
+C:\Users\sbowe\admin\supabase\updates-2026-10-01-todo-delete.sql
+C:\Users\sbowe\admin\supabase\updates-2026-10-02-master-minds-movement.sql
+C:\Users\sbowe\Desktop\Admin Email\year7-q1-reports.sql
+C:\Users\sbowe\Desktop\Admin Email\year7-q1-reports-2.sql
+C:\Users\sbowe\Desktop\Admin Email\q2-week-1-newsletters.sql
+C:\Users\sbowe\Desktop\Admin Email\q2-week-1-vietnamese.sql
 ```
 
 ### How to tell whether a file has run

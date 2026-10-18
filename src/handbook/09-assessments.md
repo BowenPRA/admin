@@ -119,7 +119,7 @@ Adding the quarter's own assessments is one of the jobs of each quarter (see [Th
 - **The session**, the quarter they belong to, written "Quarter 1, 2026-27".
 - **On the tab** they appear as **PRA progress review**, titled "Quarter 1 assessment · Units 1–3", with a **Paper** and a **Mark scheme**.
 - **On the drive** they sit in Maths → Year 7 → PRA progress reviews.
-- **The originals** of Bowen's Year 7 assessments are in `C:\Users\bowen\Desktop\Y7Tests`, one folder per subject. They are kept out of his public lessons project on purpose, because that project is public.
+- **The originals** of Bowen's Year 7 assessments are in `C:\Users\sbowe\Desktop\Y7Tests`, one folder per subject. They are kept out of his public lessons project on purpose, because that project is public.
 
 Hand Claude the files with their names in this form, or tell Claude the year, subject, units and quarter and let it name them.
 

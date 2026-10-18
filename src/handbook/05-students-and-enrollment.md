@@ -176,13 +176,13 @@ Lines a person ticks with **Mark done** (each tick records who and when):
 
 The student list was first filled in September 2026 from the office's student workbook (an Excel file) through a roster file. Day-to-day changes are made in the student window; the roster file is for a whole new list.
 
-1. On the laptop that holds the code, `python scripts/build_roster.py "<workbook.xlsx>"` in `C:/Users/bowen/admin` reads the workbook and writes `private/roster.json`.
+1. On the laptop that holds the code, `python scripts/build_roster.py "<workbook.xlsx>"` in `C:/Users/sbowe/admin` reads the workbook and writes `private/roster.json`.
 2. **Students** → **More** → **Load roster file…** and pick that file. It adds anyone missing, as Enrolled, and fills in blank details on existing records.
 
 - The same script also writes `src/data/rosterIndex.js`: only student IDs and one-way fingerprints of the names, no names. That list is how the app knows who was on the 2026-2027 roster, and so who pays the reduced Quarter 4. Running the script again with a newer workbook changes who counts as on the roster.
 - **Settings** → **Import roster (Excel)** is an older, simpler import. It matches by name only and puts unknown year groups in Year 1. Avoid it.
 
-> **Rule:** the `private/` folder in `C:/Users/bowen/admin` holds the full roster with birthdays, parents' contacts and home addresses, and the student photos. It is left out of git and must stay that way. Anything in the code's `public/` folder or used by the code ends up on the public website, so children's details reach the app only through the database, after someone signs in. On 22 September 2026 the roster and 37 photos were found in the public code and on the live site, where they had been since 14 September; they were taken out the same day. The old copies are still in the code's history, and the repository is public (not checked since 15 October 2026).
+> **Rule:** the `private/` folder in `C:/Users/sbowe/admin` holds the full roster with birthdays, parents' contacts and home addresses, and the student photos. It is left out of git and must stay that way. Anything in the code's `public/` folder or used by the code ends up on the public website, so children's details reach the app only through the database, after someone signs in. On 22 September 2026 the roster and 37 photos were found in the public code and on the live site, where they had been since 14 September; they were taken out the same day. The old copies are still in the code's history, and the repository is public (not checked since 15 October 2026).
 
 > **Ask Claude:** "Build a new roster file from this office workbook, tell me how many students it adds or changes and whether it changes who gets the reduced Quarter 4, and wait for my yes before anything is loaded or deployed."
 

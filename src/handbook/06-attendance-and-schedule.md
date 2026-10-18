@@ -188,7 +188,7 @@ Everyone can read it; office accounts can change it.
 
 There are two copies:
 
-- The **built-in** timetable is in the code, in `src/data/schedule.js` in `C:/Users/bowen/admin`. It was made from the "Schedule 2026-2027" spreadsheet. Claude edits it, and a deploy makes it live.
+- The **built-in** timetable is in the code, in `src/data/schedule.js` in `C:/Users/sbowe/admin`. It was made from the "Schedule 2026-2027" spreadsheet. Claude edits it, and a deploy makes it live.
 - The **saved** copy is in the database. It exists only once someone has pressed **Save** on the Schedule page, and from then on it is the one everyone sees.
 
 Whether a saved copy exists on the live database has not been checked since 15 October 2026. If one does, a change to the built-in timetable shows only after **Built-in schedule** and **Save** are pressed.

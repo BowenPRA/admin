@@ -13,10 +13,10 @@ Almost everything in this handbook was built, and is still run, by Bowen working
 
 ### The session folder
 
-Every session starts in one folder: `C:\Users\bowen\Desktop\Admin Email`.
+Every session starts in one folder: `C:\Users\sbowe\Desktop\Admin Email`.
 
 1. Open the **Claude** app and go to the **Code** tab.
-2. Start a new session and pick `C:\Users\bowen\Desktop\Admin Email` in the folder picker. Do not pick an older entry whose path goes through `OneDrive`: it is the same folder under an old name, and file links in Claude's replies break.
+2. Start a new session and pick `C:\Users\sbowe\Desktop\Admin Email` in the folder picker. Do not pick an older entry whose path goes through `OneDrive`: it is the same folder under an old name, and file links in Claude's replies break.
 3. Type what you want in the message box.
 
 Why this folder and no other:
@@ -35,17 +35,17 @@ The code lives in three repositories on the laptop, each with a copy on GitHub.
 
 | What | Folder on the laptop | On GitHub | How a change goes live |
 |---|---|---|---|
-| The Current | `C:\Users\bowen\admin` | BowenPRA/admin (public) | `npm run deploy` in that folder; live about two minutes later |
-| The website | `C:\Users\bowen\pra-website` | BowenPRA/website (public) | a push to `main`; GitHub builds and publishes it |
-| The triage | `C:\Users\bowen\pra-triage` | BowenPRA/triage (private) | a push to `main`; the next cloud run uses it |
+| The Current | `C:\Users\sbowe\admin` | BowenPRA/admin (public) | `npm run deploy` in that folder; live about two minutes later |
+| The website | `C:\Users\sbowe\pra-website` | BowenPRA/website (public) | a push to `main`; GitHub builds and publishes it |
+| The triage | `C:\Users\sbowe\pra-triage` | BowenPRA/triage (private) | a push to `main`; the next cloud run uses it |
 
-A fourth, small repository, `C:\Users\bowen\pra-redirect`, sends the old palmriveracademy.edu.vn addresses to pra.edu.vn through Netlify. It rarely changes. [Behind the scenes](#/handbook/behind) and [Google Workspace and domains](#/handbook/google) have the detail.
+A fourth, small repository, `C:\Users\sbowe\pra-redirect`, sends the old palmriveracademy.edu.vn addresses to pra.edu.vn through Netlify. It rarely changes. [Behind the scenes](#/handbook/behind) and [Google Workspace and domains](#/handbook/google) have the detail.
 
 Other folders Claude works in:
 
-- the photo library, `C:\Users\bowen\PRA Photos` (see [the photos chapter](#/handbook/photos))
-- the folder export, `C:\Users\bowen\Desktop\PRA Admin`, synced to Google Drive
-- Bowen's teaching material, `C:\Users\bowen\lessons`, and the Year 7 assessment papers, `C:\Users\bowen\Desktop\Y7Tests`
+- the photo library, `C:\Users\sbowe\PRA Photos` (see [the photos chapter](#/handbook/photos))
+- the folder export, `C:\Users\sbowe\Desktop\PRA Admin`, synced to Google Drive
+- Bowen's teaching material, `C:\Users\sbowe\lessons`, and the Year 7 assessment papers, `C:\Users\sbowe\Desktop\Y7Tests`
 - Google Drive for desktop, which is the `G:` drive
 
 ### Memory
@@ -53,7 +53,7 @@ Other folders Claude works in:
 Claude keeps notes between sessions in this folder:
 
 ```
-C:\Users\bowen\.claude\projects\C--Users-bowen-Desktop-Admin-Email\memory\
+C:\Users\sbowe\.claude\projects\C--Users-sbowe-Desktop-Admin-Email\memory\
 ```
 
 - `MEMORY.md` is the index: one line per note, with a short summary. Claude reads it at the start of every session opened in the Admin Email folder.
@@ -80,7 +80,7 @@ The rules notes, as of 16 October 2026:
 | `feedback-report-comments` | How Bowen's own report comments are written |
 | `feedback-reviews-means-assessments` | "Reviews" means the assessment papers; ask when a request is unclear <!-- allow -->
 | `feedback-powershell-commands` | A command for you is one line for Windows PowerShell 5.1, with full paths |
-| `feedback-full-path-links` | Every file path outside the Admin Email folder is written in full from `C:/Users/bowen/` |
+| `feedback-full-path-links` | Every file path outside the Admin Email folder is written in full from `C:/Users/sbowe/` |
 
 [Rules and wording](#/handbook/rules) has the full rules.
 
@@ -126,7 +126,7 @@ Claude writes the list into its memory too, so the next session starts from it. 
 
 For The Current the order is always:
 
-1. **SQL (you).** Claude writes a dated file in `C:\Users\bowen\admin\supabase\`, made to be safe to run twice. In Supabase open **SQL Editor** → **New query**, paste the whole file, click **Run**. Tell Claude "ran the sql".
+1. **SQL (you).** Claude writes a dated file in `C:\Users\sbowe\admin\supabase\`, made to be safe to run twice. In Supabase open **SQL Editor** → **New query**, paste the whole file, click **Run**. Tell Claude "ran the sql".
 2. **Deploy (Claude).** It runs the deploy and checks the live site.
 3. **Commit and push (on your word).**
 
@@ -141,7 +141,7 @@ The Current usually copes with a deploy that comes before the SQL: the new featu
 If Claude is not at hand, the deploy is one line in PowerShell:
 
 ```
-npm --prefix C:/Users/bowen/admin run deploy
+npm --prefix C:/Users/sbowe/admin run deploy
 ```
 
 > **Ask Claude:** "I ran the sql. Deploy The Current, check the live site, then commit and push."
@@ -210,7 +210,7 @@ A skill is a written procedure Claude follows for one kind of job. You use one b
 
 ### The skills on the laptop
 
-These are in `C:\Users\bowen\.claude\skills\` and work from any folder.
+These are in `C:\Users\sbowe\.claude\skills\` and work from any folder.
 
 | Skill | What it does | What to say |
 |---|---|---|
@@ -224,7 +224,7 @@ These are in `C:\Users\bowen\.claude\skills\` and work from any folder.
 
 ### The triage skills
 
-The triage repository has its own skills in `C:\Users\bowen\pra-triage\.claude\skills\`: early-check, morning-update, inbox-sort, day-recap and evening-check, plus copies of claude-todos and inbox-cleanup. The cloud routines run the first five. You can run any of them in a session by name, for example the morning update when a cloud run was missed.
+The triage repository has its own skills in `C:\Users\sbowe\pra-triage\.claude\skills\`: early-check, morning-update, inbox-sort, day-recap and evening-check, plus copies of claude-todos and inbox-cleanup. The cloud routines run the first five. You can run any of them in a session by name, for example the morning update when a cloud run was missed.
 
 ### Retired skills
 
@@ -314,8 +314,8 @@ Bowen loosened the commit rule for the To-Do plan of 2 October 2026 ("you can de
 
 ### Things that have bitten before
 
-- **OneDrive paths.** The laptop once had OneDrive. Claude kept writing paths through it and links in the chat broke (28 September to 5 October 2026). Every path is now written in full from `C:/Users/bowen/`, and sessions open in the real Admin Email folder.
-- **PowerShell syntax.** Your terminal is Windows PowerShell 5.1, which does not understand `&&`. Bowen pasted that error five times in September 2026. A command for you is one line with full paths, for example `git -C C:/Users/bowen/pra-website push`.
+- **OneDrive paths.** The laptop once had OneDrive. Claude kept writing paths through it and links in the chat broke (28 September to 5 October 2026). Every path is now written in full from `C:/Users/sbowe/`, and sessions open in the real Admin Email folder.
+- **PowerShell syntax.** Your terminal is Windows PowerShell 5.1, which does not understand `&&`. Bowen pasted that error five times in September 2026. A command for you is one line with full paths, for example `git -C C:/Users/sbowe/pra-website push`.
 - **A deploy carries other work.** `npm run deploy` publishes everything in the admin folder, committed or not. If another session has unfinished work there, a deploy publishes that too. Claude checks first. On 16 October 2026 the Student Blog rename waited because the handbook's unfinished files were in the same folder.
 - **Offline mode on the live site.** A deploy made without the `.env` file gave a live Current with no database, showing "Offline mode" (14 September 2026). The deploy must run on the laptop that has `.env`.
 - **Two chats in one repository.** Two sessions changing the same code overwrite each other. Claude runs `git status` first and asks before touching files it did not change.
@@ -352,9 +352,9 @@ When the admin role changes hands, these must change too. Work through the list 
 
 ### The laptop
 
-- [ ] **The laptop itself**, with the four repositories, GAM (`C:\GAM7`, its settings in `C:\GAMConfig`, signed in as admin@), the `.env` file in `C:\Users\bowen\admin`, and the triage login file in the Admin Email folder. These never travel by email or inside the code.
-- [ ] **Paths.** The skills, the agents, the launch configs and the memory notes name `C:\Users\bowen\` in full. The simplest handover keeps the laptop and its Windows user as they are. On a new user or a new laptop, every one of those paths needs changing.
+- [ ] **The laptop itself**, with the four repositories, GAM (`C:\GAM7`, its settings in `C:\GAMConfig`, signed in as admin@), the `.env` file in `C:\Users\sbowe\admin`, and the triage login file in the Admin Email folder. These never travel by email or inside the code.
+- [ ] **Paths.** The skills, the agents, the launch configs and the memory notes name `C:\Users\sbowe\` in full. The simplest handover keeps the laptop and its Windows user as they are. On a new user or a new laptop, every one of those paths needs changing.
 - [ ] **The stock password file** made by `stock_password.ps1` is tied to Bowen's Windows user and does not move. Run the script again as yourself.
-- [ ] **Claude's memory and skills** are in `C:\Users\bowen\.claude\`. They travel with the laptop's user profile. On a new profile, copy that folder and open the Admin Email folder at the same path, or the memory does not load.
+- [ ] **Claude's memory and skills** are in `C:\Users\sbowe\.claude\`. They travel with the laptop's user profile. On a new profile, copy that folder and open the Admin Email folder at the same path, or the memory does not load.
 
 > **Ask Claude:** "I am taking over from Bowen. Go through the handover list in the Working with Claude chapter and tell me, item by item, what is done and what is still to do."

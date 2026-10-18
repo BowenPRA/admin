@@ -128,8 +128,8 @@ These are the standing rules Bowen set while the systems were built, from Septem
 
 ## Commands and paths
 
-- **Commands work in Windows PowerShell 5.1.** One command, no `&&`, no `cd`, full paths, for example `npm --prefix C:/Users/bowen/admin run deploy`. If two steps cannot be avoided, they are joined with `;`. Set 1 October 2026, after the same error was pasted five times. Why: PowerShell 5.1 has no `&&`, and the admin pastes exactly what is given.
-- **Every file path in a reply is written in full**, from `C:/Users/bowen/...`, linked or not. Set 1 October 2026 and again 5 October 2026 ("why do you keep doing this"). Why: the desktop app links a short path to the wrong folder and opens an error box. If the code moves to another laptop, the paths change with it.
+- **Commands work in Windows PowerShell 5.1.** One command, no `&&`, no `cd`, full paths, for example `npm --prefix C:/Users/sbowe/admin run deploy`. If two steps cannot be avoided, they are joined with `;`. Set 1 October 2026, after the same error was pasted five times. Why: PowerShell 5.1 has no `&&`, and the admin pastes exactly what is given.
+- **Every file path in a reply is written in full**, from `C:/Users/sbowe/...`, linked or not. Set 1 October 2026 and again 5 October 2026 ("why do you keep doing this"). Why: the desktop app links a short path to the wrong folder and opens an error box. If the code moves to another laptop, the paths change with it.
 - **No OneDrive.** Never a OneDrive path, never OneDrive as a backup. PRA uses Google Drive for desktop. Set 28 September 2026 and repeated three times. Why: Bowen has no OneDrive; the old paths kept coming back and broke links.
 - **Long texts are written to a file first.** A commit message with backticks goes through a file (`git commit -F`), and an email text through the Write tool. Why: the shell on the laptop ate words in long quoted texts (noted 15 October 2026).
 
@@ -137,10 +137,10 @@ These are the standing rules Bowen set while the systems were built, from Septem
 
 | Place | What it holds |
 |---|---|
-| Claude's memory: the `memory` folder of the Admin Email project, under `C:\Users\bowen\.claude\projects\` | The rules as notes: each `feedback-` note is one rule Bowen gave, with why and how to apply it. Claude reads them at the start of a session. |
-| The triage's `CLAUDE.md`, in `C:\Users\bowen\pra-triage` | The inbox rules: drafts only, the four addresses, Sensitive, the two email exceptions |
-| The website's `PLAN.md` (section 3) and `VIETNAMESE.md`, in `C:\Users\bowen\pra-website` | The copy rules, the banned words, the Vietnamese rules and glossary |
-| The two Opus agent definitions, in `C:\Users\bowen\Desktop\Admin Email\.claude\agents` | The rules an agent may never break |
+| Claude's memory: the `memory` folder of the Admin Email project, under `C:\Users\sbowe\.claude\projects\` | The rules as notes: each `feedback-` note is one rule Bowen gave, with why and how to apply it. Claude reads them at the start of a session. |
+| The triage's `CLAUDE.md`, in `C:\Users\sbowe\pra-triage` | The inbox rules: drafts only, the four addresses, Sensitive, the two email exceptions |
+| The website's `PLAN.md` (section 3) and `VIETNAMESE.md`, in `C:\Users\sbowe\pra-website` | The copy rules, the banned words, the Vietnamese rules and glossary |
+| The two Opus agent definitions, in `C:\Users\sbowe\Desktop\Admin Email\.claude\agents` | The rules an agent may never break |
 | The report editor's writing checker | Advice under each box when a banned word, "term", a nickname or a name without accents appears |
 | `npm run check:vi` on the website | Vietnamese pages that have drifted, and the banned Vietnamese words |
 | The handbook checker, `scripts/check-handbook.mjs` | The banned words, links and anything that looks like a secret in these chapters |

@@ -32,7 +32,7 @@ export default function WebsitePanel({ event, photos, onChoose, onChooseAll, onF
   const plan = finishPlan(photos)
   const stored = allKeys(photos).length
   const finished = event.notes?.finished
-  const command = `node "C:\\Users\\bowen\\pra-website\\scripts\\add-event-photos.mjs" "C:\\Users\\bowen\\Downloads\\website-${event.slug}.json"`
+  const command = `node "C:\\Users\\sbowe\\pra-website\\scripts\\add-event-photos.mjs" "C:\\Users\\sbowe\\Downloads\\website-${event.slug}.json"`
 
   const run = async (name, fn) => {
     setBusy(name)

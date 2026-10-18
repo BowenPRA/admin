@@ -15,7 +15,7 @@ The usual way is to ask Claude. Say which chapter, what is wrong or missing, and
 
 What Claude does, so you can follow along:
 
-1. Edits the chapter file in `C:\Users\bowen\admin\src\handbook\` (on whichever laptop holds the code; see [Behind the scenes](#/handbook/behind) for where it is).
+1. Edits the chapter file in `C:\Users\sbowe\admin\src\handbook\` (on whichever laptop holds the code; see [Behind the scenes](#/handbook/behind) for where it is).
 2. Changes that chapter's `updated` date in `index.js` to the day of the change.
 3. Runs the checker (below). It stops a deploy that would publish a banned word, a broken link or anything that looks like a secret.
 4. Runs `npm run deploy` in the `admin` folder. About two minutes later https://current.pra.edu.vn shows the new text. A hard refresh (Ctrl+F5) helps if the old page is still showing.
@@ -52,7 +52,7 @@ If you prefer to edit the text yourself, any text editor opens the `.md` files. 
 Claude runs it before every deploy that touches the handbook. To run it by hand, in PowerShell:
 
 ```
-node C:\Users\bowen\admin\scripts\check-handbook.mjs
+node C:\Users\sbowe\admin\scripts\check-handbook.mjs
 ```
 
 It prints each problem with the file and line, or "Handbook OK".

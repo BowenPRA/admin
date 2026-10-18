@@ -16,14 +16,14 @@ For the website, a push is the deploy: GitHub builds and publishes the site by i
 
 | Folder on the admin laptop | On GitHub | What it is | Who can see the code | How it goes live |
 |---|---|---|---|---|
-| `C:\Users\bowen\admin` | BowenPRA/admin | The Current: every page, the database files in `supabase`, the scripts, this handbook | Anyone (the repository is public) | `npm run deploy`, run in this folder |
-| `C:\Users\bowen\pra-website` | BowenPRA/website | The website, pra.edu.vn, in English and Vietnamese | Anyone | A push to `main`; GitHub builds and publishes it in a few minutes |
-| `C:\Users\bowen\pra-triage` | BowenPRA/triage | The triage: its rules, skills, the scripts that write to The Current, the Triage Log | PRA only (private, because the log names families and staff) | A push; the cloud runs use it from their next run |
-| `C:\Users\bowen\pra-redirect` | BowenPRA/palmriveracademy-redirect | The redirect from the old address palmriveracademy.edu.vn to pra.edu.vn | Anyone | A deploy to Netlify ([Google Workspace and domains](#/handbook/google)) |
+| `C:\Users\sbowe\admin` | BowenPRA/admin | The Current: every page, the database files in `supabase`, the scripts, this handbook | Anyone (the repository is public) | `npm run deploy`, run in this folder |
+| `C:\Users\sbowe\pra-website` | BowenPRA/website | The website, pra.edu.vn, in English and Vietnamese | Anyone | A push to `main`; GitHub builds and publishes it in a few minutes |
+| `C:\Users\sbowe\pra-triage` | BowenPRA/triage | The triage: its rules, skills, the scripts that write to The Current, the Triage Log | PRA only (private, because the log names families and staff) | A push; the cloud runs use it from their next run |
+| `C:\Users\sbowe\pra-redirect` | BowenPRA/palmriveracademy-redirect | The redirect from the old address palmriveracademy.edu.vn to pra.edu.vn | Anyone | A deploy to Netlify ([Google Workspace and domains](#/handbook/google)) |
 
 - The GitHub account is BowenPRA, with a mirror account, sbowen209. Bowen holds both.
-- `C:\Users\bowen\pra-redirect-www` is an unused copy of the redirect. It can be deleted when Bowen agrees.
-- Other folders on the laptop that matter but are not code projects: `C:\Users\bowen\Desktop\Admin Email` (where Claude sessions are opened, with Claude's memory notes, its helper agents and the sources of this handbook), `C:\Users\bowen\PRA Photos` (the photo library, see [Photos and Facebook](#/handbook/photos)), and `C:\GAM7` and `C:\GAMConfig` (the Google Workspace tool, see [Google Workspace and domains](#/handbook/google)).
+- `C:\Users\sbowe\pra-redirect-www` is an unused copy of the redirect. It can be deleted when Bowen agrees.
+- Other folders on the laptop that matter but are not code projects: `C:\Users\sbowe\Desktop\Admin Email` (where Claude sessions are opened, with Claude's memory notes, its helper agents and the sources of this handbook), `C:\Users\sbowe\PRA Photos` (the photo library, see [Photos and Facebook](#/handbook/photos)), and `C:\GAM7` and `C:\GAMConfig` (the Google Workspace tool, see [Google Workspace and domains](#/handbook/google)).
 
 ### What is never in the code
 
@@ -70,9 +70,9 @@ Bowen's standing rule for The Current: Claude deploys a change as soon as it is 
 For the day Claude is not at hand, these work in PowerShell from any folder. Type one line at a time; PowerShell on this laptop does not accept `&&` between commands.
 
 ```
-git -C C:\Users\bowen\admin status
-npm --prefix C:\Users\bowen\admin run deploy
-node C:\Users\bowen\admin\scripts\check-handbook.mjs
+git -C C:\Users\sbowe\admin status
+npm --prefix C:\Users\sbowe\admin run deploy
+node C:\Users\sbowe\admin\scripts\check-handbook.mjs
 ```
 
 The last line runs the handbook checker, which looks for banned words, broken links and anything that looks like a key in these chapters (see [Keeping this handbook up to date](#/handbook/updating)).
@@ -144,7 +144,7 @@ Files are kept in "buckets". The app opens a private file through a link that la
 
 Nothing in the database changes until a person runs a file. This is the routine for every new column, table or rule.
 
-1. Claude writes the change as a new file in `C:\Users\bowen\admin\supabase\`, named `updates-` plus the date plus a short name, for example `updates-2026-10-16-newsletter.sql`. Its first lines say what it does and which file must run before it. Every file is safe to run twice.
+1. Claude writes the change as a new file in `C:\Users\sbowe\admin\supabase\`, named `updates-` plus the date plus a short name, for example `updates-2026-10-16-newsletter.sql`. Its first lines say what it does and which file must run before it. Every file is safe to run twice.
 2. Claude tells you the file's full path and that it needs running.
 3. You open https://supabase.com/dashboard, sign in with the admin@ account, open the project, then **SQL Editor** → **New query**.
 4. Open the file in any text editor, copy all of it, paste it into the query box and press **Run**.

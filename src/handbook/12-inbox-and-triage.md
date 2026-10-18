@@ -17,7 +17,7 @@ The triage is Claude reading the inbox several times a day, Monday to Friday, an
 3. It forwards the email to the member of staff who owns it, with a note above: who wrote, what they want, what we already know, the suggested reply and any due date. Seth is in copy on every forward.
 4. It records what the email changes in The Current: a family on the Leads tab, a task on the To-Do tab.
 
-It never sends anything to a parent, an applicant or a supplier. Everything it follows is written down in one folder, the repository `C:/Users/bowen/pra-triage`, which is also on GitHub as BowenPRA/triage. That repository is private because its log names families and staff. The rulebook is `CLAUDE.md` at the top; `docs/handling.md` says how one email is handled and `docs/digest-format.md` how every email the triage writes is laid out; each run has its own skill in `.claude/skills/`.
+It never sends anything to a parent, an applicant or a supplier. Everything it follows is written down in one folder, the repository `C:/Users/sbowe/pra-triage`, which is also on GitHub as BowenPRA/triage. That repository is private because its log names families and staff. The rulebook is `CLAUDE.md` at the top; `docs/handling.md` says how one email is handled and `docs/digest-format.md` how every email the triage writes is laid out; each run has its own skill in `.claude/skills/`.
 
 ### The weekday timetable
 
@@ -206,7 +206,7 @@ The known failure: when the weekly allowance is used up, a run is refused (not b
 
 To run the morning update by hand:
 
-1. Open the Claude desktop app, **Code** tab, and start a session in the folder `C:/Users/bowen/pra-triage`.
+1. Open the Claude desktop app, **Code** tab, and start a session in the folder `C:/Users/sbowe/pra-triage`.
 2. Say the sentence below. Claude updates the folder from GitHub, checks that both scripts can sign in to The Current, then follows the repository's morning-update skill. It covers everything since the last sorting run or day recap.
 3. The digests go out as usual; the report to the admin comes in the chat, not by email. Claude saves the log and pushes it.
 

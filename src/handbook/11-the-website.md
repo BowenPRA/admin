@@ -3,7 +3,7 @@ The website is https://pra.edu.vn, PRA's public face in English and Vietnamese. 
 ## What the site is
 
 - English pages are at https://pra.edu.vn and every address under it (https://pra.edu.vn/about/). Vietnamese pages are the same addresses under `/vi/` (https://pra.edu.vn/vi/about/).
-- The code is on GitHub in the repository BowenPRA/website (https://github.com/BowenPRA/website). The working copy is `C:/Users/bowen/pra-website` on the laptop that holds the code (Bowen's today). There is one branch, `main`.
+- The code is on GitHub in the repository BowenPRA/website (https://github.com/BowenPRA/website). The working copy is `C:/Users/sbowe/pra-website` on the laptop that holds the code (Bowen's today). There is one branch, `main`.
 - The pages are built by a program called Eleventy and hosted by GitHub Pages, free hosting that comes with GitHub. GitHub rebuilds and publishes the site after every push.
 - The old address palmriveracademy.edu.vn forwards to pra.edu.vn. palmriveracademy.com stays on Wix and is left alone. See "Domains and DNS" below.
 - The site sends no email. Its two forms save straight into The Current (see "The forms").
@@ -11,7 +11,7 @@ The website is https://pra.edu.vn, PRA's public face in English and Vietnamese. 
 
 ## How a change goes live
 
-1. Edit the file in `C:/Users/bowen/pra-website` (the table under "Where the text lives" says which).
+1. Edit the file in `C:/Users/sbowe/pra-website` (the table under "Where the text lives" says which).
 2. Look at the page on the laptop (see "Running it on the laptop") and, for any text change, run `npm run check:vi` (see "The Vietnamese pages").
 3. Commit the change in git with a short message saying what changed.
 4. Push to `main` on GitHub.
@@ -26,7 +26,7 @@ The same workflow also runs by itself every night at 02:30 Vietnam time, with no
 
 ## Where the text lives
 
-All paths are under `C:/Users/bowen/pra-website/src/`. A `.njk` file is a page: HTML with a block of settings between two `---` lines at the top (the "front matter") and placeholders filled in at build time. A `.json` file is a list of named values in quotes; edit the words between the quotes and leave the commas and brackets as they are. Every Vietnamese page has the same file name under `vi/`.
+All paths are under `C:/Users/sbowe/pra-website/src/`. A `.njk` file is a page: HTML with a block of settings between two `---` lines at the top (the "front matter") and placeholders filled in at build time. A `.json` file is a list of named values in quotes; edit the words between the quotes and leave the commas and brackets as they are. Every Vietnamese page has the same file name under `vi/`.
 
 | Page or thing | File | Format |
 |---|---|---|
@@ -171,7 +171,7 @@ Reviews are in `_data/reviews.json`. The top of the file has `rating` (4.6 on 10
 
 ### The check
 
-`npm run check:vi`, run in `C:/Users/bowen/pra-website` after any text change, lists: English pages with no twin; twins whose photos, links, sections or address no longer match; data items with no `vi` block or a `vi` block missing a field; photos with no Vietnamese caption; Vietnamese pages last committed before their English twin changed; and the words never used. It does not stop a deploy; it is a reminder. On 16 October 2026 it reported three known, harmless lines, "missing page" for `src/vi/robots.njk`, `src/vi/sitemap.njk` and `src/vi/newsletter/preview.njk`; those three files are not pages a visitor reads and need no twin. Anything else it reports is real, including a "last committed before" warning, which means the Vietnamese twin may no longer say what the English says.
+`npm run check:vi`, run in `C:/Users/sbowe/pra-website` after any text change, lists: English pages with no twin; twins whose photos, links, sections or address no longer match; data items with no `vi` block or a `vi` block missing a field; photos with no Vietnamese caption; Vietnamese pages last committed before their English twin changed; and the words never used. It does not stop a deploy; it is a reminder. On 16 October 2026 it reported three known, harmless lines, "missing page" for `src/vi/robots.njk`, `src/vi/sitemap.njk` and `src/vi/newsletter/preview.njk`; those three files are not pages a visitor reads and need no twin. Anything else it reports is real, including a "last committed before" warning, which means the Vietnamese twin may no longer say what the English says.
 
 ### The rules
 
@@ -206,7 +206,7 @@ The full list is in [Rules and wording](#/handbook/rules); the ones that bite on
 
 ## Images and the photo pipeline
 
-- **Originals** are in `C:/Users/bowen/pra-website/originals/`, about 2 GB and not in git. Keep a backup copy on Google Drive. Inside are the Wix exports, the class photo dumps, `events/<date> <event>/` (with `curated/` for what The Current signed off), `flyers/`, `staff/`, `writing/`, `yearbook/` and working folders. Three small files inside it are in git and matter: `picks.json` (every photo the site uses and how to crop it), `portraits.json` (the staff portraits) and `README.md`.
+- **Originals** are in `C:/Users/sbowe/pra-website/originals/`, about 2 GB and not in git. Keep a backup copy on Google Drive. Inside are the Wix exports, the class photo dumps, `events/<date> <event>/` (with `curated/` for what The Current signed off), `flyers/`, `staff/`, `writing/`, `yearbook/` and working folders. Three small files inside it are in git and matter: `picks.json` (every photo the site uses and how to crop it), `portraits.json` (the staff portraits) and `README.md`.
 - **From picks.json to the page.** Each entry has `src` (path under originals), `slug` (descriptive, lower case, hyphens), `alt` (a plain sentence) and optional crop settings. `node scripts/images.mjs`, run in the repository folder, writes three sizes of each photo into `src/assets/img/photos/` and updates `src/_data/photos.json`. Only new slugs are built; `--force` rebuilds everything. Pages show a photo by its slug; an unknown slug shows a grey placeholder instead of breaking.
 - **Photos from The Current.** The office picks photos for the website inside The Current: [Photos](#/photos) → an event → **Website** → **Download the list**. Every photo on that list has passed the no-photo list, which is the only route for a child's photo onto the site (see [Photos and Facebook](#/handbook/photos)). Then `node scripts/add-event-photos.mjs <the downloaded file>` (add `--dry-run` to see what would change) copies each photo into `originals/events/<date> <event>/curated/`, adds it to `picks.json`, removes any photo the list says to take down, and runs images.mjs. After that: slugs into `events.json` (or onto the event page), Vietnamese captions into `altVi.json`. The script never commits. Until the result is committed and pushed, the live site has none of the photos; when photos are signed off but the site shows none, look for uncommitted files first (Bowen met this on 16 October 2026).
 - **Taking a photo down** removes it from the site at the next push, but it stays in the public git history. A photo that must be gone for good needs the history rewritten; tell Claude that is what you need.
@@ -231,7 +231,7 @@ The site has no server of its own. Each form sends its answers from the visitor'
 
 1. Try it yourself from a phone and from a laptop, with a message that says TEST so the office can mark it done.
 2. If the page shows "That did not send": check that https://current.pra.edu.vn is up, and that the visitor has a working connection (the form needs JavaScript).
-3. The enrollment form failed on 1 October 2026 because the live database table was missing a column the function writes; a SQL file in the admin repository fixed it. If forms fail after a database change in The Current, suspect that first. The database functions and their SQL files are in the admin repository (`C:/Users/bowen/admin`, folder `supabase/`): the files dated 30 September 2026 for the contact form and the enrollments, plus the later fix files.
+3. The enrollment form failed on 1 October 2026 because the live database table was missing a column the function writes; a SQL file in the admin repository fixed it. If forms fail after a database change in The Current, suspect that first. The database functions and their SQL files are in the admin repository (`C:/Users/sbowe/admin`, folder `supabase/`): the files dated 30 September 2026 for the contact form and the enrollments, plus the later fix files.
 4. Until it is fixed, families can email admin@palmriveracademy.edu.vn or message on WhatsApp; both links are already on the form's error note.
 5. If the database project or its public key ever changes, the three values under `forms` in `site.json` change with it, and the site is pushed.
 
@@ -248,7 +248,7 @@ The site has no server of its own. Each form sends its answers from the visitor'
 > **Careful:** the MX and TXT records on both .edu.vn domains are PRA's email. Change or delete one and admin@ stops receiving mail. Never touch them, and verify with a DNS lookup before and after any other change. A snapshot of the palmriveracademy.edu.vn records from before the redirect is in the redirect repository as `dns-before-2026-10-06.txt`.
 
 - HTTPS on pra.edu.vn has been live since 29 September 2026 (the certificate comes from GitHub Pages once the DNS points at it). www.pra.edu.vn redirects to the bare name. Google Search Console has a Domain property for pra.edu.vn, verified on 6 October 2026 with a TXT record at P.A Vietnam; keep that record.
-- The redirect for the old domain is its own small repository, `C:/Users/bowen/pra-redirect` (GitHub BowenPRA/palmriveracademy-redirect), hosted on Netlify since 7 October 2026 under Bowen's account there. `make.mjs` holds the map of old Wix addresses to new pages; `node make.mjs` writes the pages; a change is committed, pushed and then deployed to Netlify with the command in that repository's README. The GitHub Pages copy of the same repository is a leftover fallback that can be retired with Bowen's say-so, and the folder `C:/Users/bowen/pra-redirect-www` is an unused copy that can be deleted.
+- The redirect for the old domain is its own small repository, `C:/Users/sbowe/pra-redirect` (GitHub BowenPRA/palmriveracademy-redirect), hosted on Netlify since 7 October 2026 under Bowen's account there. `make.mjs` holds the map of old Wix addresses to new pages; `node make.mjs` writes the pages; a change is committed, pushed and then deployed to Netlify with the command in that repository's README. The GitHub Pages copy of the same repository is a leftover fallback that can be retired with Bowen's say-so, and the folder `C:/Users/sbowe/pra-redirect-www` is an unused copy that can be deleted.
 - Who pays: GitHub Pages and Netlify are on free plans as far as the notes record. Both .edu.vn names renew at P.A Vietnam, whose notices go to admin@palmriveracademy.com (which lands in the admin@ inbox).
 
 | Renewal | Date (from the project notes; not checked since 15 October 2026) |
@@ -267,7 +267,7 @@ The site has no server of its own. Each form sends its answers from the visitor'
 
 The site needs Node.js and npm (installed on the laptop; GitHub builds with Node 22). Python is needed only for the photo scripts.
 
-1. First time only, in PowerShell: `npm --prefix C:\Users\bowen\pra-website install`.
+1. First time only, in PowerShell: `npm --prefix C:\Users\sbowe\pra-website install`.
 2. Start the preview: in the folder, `npm run dev`. Open http://localhost:8080. Edits under `src/` rebuild by themselves; refresh the browser.
 3. Build once without a preview: `npm run build` (writes `_site/`). This is the same command GitHub runs.
 4. Check the Vietnamese: `npm run check:vi`.

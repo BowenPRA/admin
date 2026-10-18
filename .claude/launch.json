@@ -4,7 +4,7 @@
     {
       "name": "admin-dev",
       "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "cd /d C:\\Users\\bowen\\admin && npx vite --mode offline --port 5180"],
+      "runtimeArgs": ["/c", "cd /d %USERPROFILE%\\admin && npx vite --mode offline --port 5180"],
       "port": 5180
     }
   ]
