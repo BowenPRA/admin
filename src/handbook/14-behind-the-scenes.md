@@ -54,7 +54,8 @@ The website has the same kind of file, `src/CNAME` with `pra.edu.vn`. Leave it a
 
 - It publishes **everything in the folder, committed or not**. If another Claude session is halfway through a change in the same folder, that half-change goes live too.
 - It does not commit or push the code. That is a separate step.
-- The `.env` values are built into the site, so it must run on a laptop that has the `.env` file.
+- The `.env` values are built into the site, so it must run on a laptop that has the `.env` file. Without it the live site would switch to offline mode, which happened on 19 October 2026 on the new laptop (fixed the same morning). Since then the build stops with "No VITE_SUPABASE_URL" instead of going live.
+- Anyone who had The Current open while a broken version was live keeps it until they reload the page. After fixing a bad deploy, ask staff to reload.
 - It prints nothing for up to three minutes on a slow connection, then "Published".
 
 > **Rule:** two chats must not edit the same folder at once without knowing it. Before any change or deploy, Claude checks `git status` (the list of changed files) and asks about any file it did not change.
@@ -197,9 +198,19 @@ updates-2026-10-16    -newsletter
 
 - An optional fifth, VITE_WEBSITE_URL, defaults to https://pra.edu.vn.
 - Bowen holds the values. They are never in the code: git ignores the file. `.env.example` lists the names with no values; `.env.offline` has empty database values for offline mode.
-- The values are built into the site at each deploy. A deploy from a laptop without `.env`, or with the database values missing, publishes a site that cannot see the database: every user gets the amber "Offline mode" band. This happened on 14 September 2026. The fix is to deploy again from a laptop that has the file.
+- The values are built into the site at each deploy. A deploy from a laptop without `.env`, or with the database values missing, publishes a site that cannot see the database: every user gets the amber "Offline mode" band. This happened on 14 September 2026, and again on 19 October 2026, the morning after the move to a new laptop, because `.env` had not been copied over. The fix is to put the file back and deploy again.
+- Since 19 October 2026, `vite.config.js` checks for the database values before it builds. Without them the build stops with "No VITE_SUPABASE_URL" and nothing is published. Keep that check.
 - Without the Google client ID, **Gmail draft…** saves the PDF and opens a Gmail compose window instead; you attach the file by hand.
-- On a new laptop, the file has to be carried over or rebuilt by a person: the database values from Supabase → **Project Settings** → **API**, the client ID from the Google Cloud project below.
+
+### On a new laptop
+
+The `.env` file never travels with the code, so it is the step most likely to be missed when the code moves. Before the first deploy from a new laptop:
+
+1. Copy `.env` from the old laptop into `C:\Users\sbowe\admin`, by USB stick or a password manager, never by email or chat.
+2. If the old laptop is gone, rebuild the file: the database values from Supabase → **Project Settings** → **API**, the client ID from the Google Cloud project below. Claude can also read the three values from the last good deploy on GitHub (the `gh-pages` branch of BowenPRA/admin). They are meant to be public: every browser that opens The Current receives them.
+3. Ask Claude to run `npm run build` in the admin folder. If the file is missing or incomplete, the build stops with "No VITE_SUPABASE_URL" and nothing goes live.
+
+> **Ask Claude:** "I am on a new laptop. Check that the admin folder has a complete .env file, rebuild it from the last good deploy if it does not, and run a build to prove it before anything is deployed."
 
 ## Backups
 

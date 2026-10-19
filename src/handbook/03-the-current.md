@@ -302,6 +302,6 @@ Ask Claude to take the person out of the staff account script and out of `src/da
 The Current can run without the database, keeping everything in that one browser. It is meant for trying things on the laptop. When it does, a yellow band under the header reads "Offline mode: data is stored in this browser only.", you are signed in as "Offline admin", and your menu has **Preview as (offline only)** to see the app as any teacher.
 
 - On your own laptop, while Claude is testing a change, the band is expected. Nothing typed there reaches the real records.
-- On https://current.pra.edu.vn the band should never appear. If it does, the last deploy was built without the database settings (this happened on 14 September 2026). Do not type anything into it: it would be lost. Real records are safe in the database; the page cannot see them.
+- On https://current.pra.edu.vn the band should never appear. If it does, the last deploy was built without the database settings (this happened on 14 September 2026, and on 19 October 2026 after the move to a new laptop). Do not type anything into it: it would be lost. Real records are safe in the database; the page cannot see them. Anything staff typed while the band was showing stays in their own browser only, so ask them to check and enter it again once the real site is back, and to reload the page.
 
 > **Ask Claude:** "The live Current shows the yellow Offline mode band. Check the .env file on the laptop and deploy The Current again, then tell me when the live site shows the real data."
