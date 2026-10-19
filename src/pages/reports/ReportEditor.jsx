@@ -295,8 +295,16 @@ export default function ReportEditor() {
   const cardProps = { reviewScores, settings, levels, bi, teachers, isHead, signName: displayName, yearGroup: report.year_group, isLastPeriod, lastLabel, name, viAll, limits: L, minimums: MIN }
   // Headings and learner skills follow the report's template (Early Years has its own).
   const template = templateOf(settings, report)
-  // Reports without review scores (Early Years, Years 1 to 3) leave that part out of the hint.
-  const tierHint = (tier) => (tier.key === 'academic' && !reviewScores ? tier.hint.replace(', progress review score', '') : tier.hint)
+  // Reports without review scores (Early Years, Years 1 to 3) leave that part out of the hint,
+  // and a vocational area with its own comment (Early Years Physical Development) is named.
+  const tierHint = (tier) => {
+    if (tier.key === 'academic' && !reviewScores) return tier.hint.replace(', progress review score', '')
+    const own = tier.key === 'vocational' ? tiers.vocational.filter((s) => writingFor(settings, s.subject_key).comment).map((s) => subjectByKey(settings, s.subject_key).name) : []
+    if (!own.length) return tier.hint
+    const all = own.length === tiers.vocational.length
+    return all ? TIERS.find((x) => x.key === 'specialist').hint
+      : `${tier.hint.replace(' No individual comment.', '')} ${own.join(' and ')} ${own.length > 1 ? 'have' : 'has'} an individual comment for each student instead.`
+  }
 
   return (
     <div className={`grid gap-6 ${preview ? 'xl:grid-cols-[1fr_auto]' : ''}`}>

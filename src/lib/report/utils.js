@@ -50,14 +50,20 @@ export const TIER_KEYS = ['academic', 'specialist', 'vocational']
 /**
  * What teachers write for a learning area: an individual comment on each
  * student, one course description for the year group, or both (core areas).
- * The tier (subject.kind) decides; every screen reads this so they agree.
+ * The tier (subject.kind) decides, except that a vocational area with
+ * `comment: true` (Early Years Physical Development) takes a comment instead of
+ * the description. Every screen reads writingFor() so they agree.
  */
 export const WRITING = {
   academic: { comment: true, description: true },
   specialist: { comment: true, description: false },
   vocational: { comment: false, description: true },
 }
-export const writingFor = (settings, key) => WRITING[subjectByKey(settings, key).kind] || WRITING.vocational
+export function writingFor(settings, key) {
+  const sub = subjectByKey(settings, key)
+  if (sub.kind === 'vocational' && sub.comment) return WRITING.specialist
+  return WRITING[sub.kind] || WRITING.vocational
+}
 
 /** A section's tier comes from the current settings, so re-tiering an area applies to existing reports. */
 export function tierOf(settings, section) {
@@ -198,7 +204,7 @@ const written = (text, min) => charCount(text) >= Math.max(1, min || 0)
 export function sectionDone(settings, s, report = null) {
   if (!s.level) return false
   const tier = tierOf(settings, s)
-  if (!(WRITING[tier] || WRITING.vocational).comment) return true
+  if (!writingFor(settings, s.subject_key).comment) return true
   return written(s.comment, textMinimums(settings, report)[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
 }
 
@@ -256,7 +262,7 @@ export function descriptionTasks(settings, reports, sections, { subjects = [], n
  * (a level, plus an individual comment where the area has one) and, where the
  * area has a course description, one description task for the year group.
  *   { done, total, groups: [{ yearGroup, done, total,
- *       areas: [{ key, name, tier, done, total, description: null | { done } }] }] }
+ *       areas: [{ key, name, tier, writing, done, total, description: null | { done } }] }] }
  * Group and overall totals include the description tasks. Areas follow the
  * order of settings.subjects, with the homeroom comment last.
  */
@@ -269,7 +275,7 @@ export function reportWork(settings, reports, sections, { subjects = [], homeroo
     const g = groups.get(yearGroup)
     if (!g.areas.has(key)) {
       const homeroom = key === HOMEROOM_PART
-      g.areas.set(key, { key, name: homeroom ? 'Homeroom' : subjectByKey(settings, key).name, tier: homeroom ? null : subjectByKey(settings, key).kind, done: 0, total: 0, description: null })
+      g.areas.set(key, { key, name: homeroom ? 'Homeroom' : subjectByKey(settings, key).name, tier: homeroom ? null : subjectByKey(settings, key).kind, writing: homeroom ? null : writingFor(settings, key), done: 0, total: 0, description: null })
     }
     return [g, g.areas.get(key)]
   }

@@ -42,7 +42,11 @@ export const LEVELS = [
 //   specialist  level and an individual comment for each student
 //   vocational  level for each student, plus one course description shared by
 //               the whole year group (no individual comment)
-// WRITING in utils.js holds the same split as data, for the screens.
+// A vocational area with `comment: true` takes an individual comment for each
+// student instead of the course description, and still prints in the
+// vocational band (Early Years Physical Development, since 18 October 2026).
+// WRITING and writingFor() in utils.js hold the same split as data, for the
+// screens.
 export const TIERS = [
   { key: 'academic', name: 'Academic Learning', name_vi: 'Học thuật', short: 'Academic',
     hint: 'Level, progress review score and an individual comment for each student, plus one course description shared by the year group.' },
@@ -61,10 +65,12 @@ const LOWER_SECONDARY_YEARS = ['Year 7', 'Year 8', 'Year 9']
 
 // Early Years areas follow the Early Years Foundation Stage, as last year's
 // Nursery and Kindergarten reports did: Communication & Language, Mathematics
-// and Understanding the World get a comment each, Applied English is the
-// English teacher's comment, and Physical Development and Expressive Arts &
-// Design get a level plus the class's shared description. Personal, social
-// and emotional development is in the Early Years learner skills.
+// and Understanding the World get a comment each; Applied English and Cooking
+// are specialist cards with an individual comment each; Physical Development
+// and Expressive Arts & Design share the vocational band, Physical Development
+// with an individual comment (`comment: true`) and Expressive Arts & Design
+// with a level plus the class's shared description. Personal, social and
+// emotional development is in the Early Years learner skills.
 export const SUBJECTS = [
   { key: 'communication', kind: 'academic', name: 'Communication & Language', name_vi: 'Giao tiếp & Ngôn ngữ', icon: 'chat', scored: false, yearGroups: EARLY_YEARS },
   { key: 'math', kind: 'academic', name: 'Mathematics', name_vi: 'Toán học', icon: 'calculator', scored: true },
@@ -75,7 +81,7 @@ export const SUBJECTS = [
   { key: 'art_of_science', kind: 'specialist', name: 'Art of Science', name_vi: 'Nghệ thuật Khoa học', icon: 'palette', scored: false },
   { key: 'history', kind: 'specialist', name: 'History', name_vi: 'Lịch sử', icon: 'landmark', scored: false },
   { key: 'art_craft', kind: 'specialist', name: 'Art & Crafts', name_vi: 'Mỹ thuật & Thủ công', icon: 'brush', scored: false, yearGroups: PRIMARY_YEARS },
-  { key: 'cooking', kind: 'specialist', name: 'Cooking', name_vi: 'Nấu ăn', icon: 'chef', scored: false, yearGroups: PRIMARY_YEARS },
+  { key: 'cooking', kind: 'specialist', name: 'Cooking', name_vi: 'Nấu ăn', icon: 'chef', scored: false, yearGroups: [...EARLY_YEARS, ...PRIMARY_YEARS] },
   { key: 'movement', kind: 'specialist', name: 'Movement', name_vi: 'Vận động', icon: 'movement', scored: false, yearGroups: [...PRIMARY_YEARS, 'Year 7'] },
   { key: 'master_minds', kind: 'specialist', name: 'Master Minds', name_vi: 'Tư duy & Giải đố', icon: 'puzzle', scored: false, yearGroups: ['Year 1'] },
   { key: 'executive_function', kind: 'vocational', name: 'Executive Function', name_vi: 'Kỹ năng điều hành', icon: 'brain', scored: false },
@@ -83,7 +89,7 @@ export const SUBJECTS = [
   { key: 'wellbeing', kind: 'vocational', name: 'Wellbeing', name_vi: 'Sức khỏe tinh thần', icon: 'heart', scored: false, yearGroups: [...YEARS_2_TO_6, ...LOWER_SECONDARY_YEARS] },
   { key: 'everyday_experts', kind: 'vocational', name: 'Everyday Experts', name_vi: 'Chuyên gia thường ngày', icon: 'lightbulb', scored: false, yearGroups: YEARS_2_TO_6 },
   { key: 'presentation_play', kind: 'vocational', name: 'Presentation & Play', name_vi: 'Thuyết trình & Vui chơi', icon: 'drama', scored: false, yearGroups: ['Year 1'] },
-  { key: 'physical', kind: 'vocational', name: 'Physical Development', name_vi: 'Phát triển thể chất', icon: 'footprints', scored: false, yearGroups: EARLY_YEARS },
+  { key: 'physical', kind: 'vocational', comment: true, name: 'Physical Development', name_vi: 'Phát triển thể chất', icon: 'footprints', scored: false, yearGroups: EARLY_YEARS },
   { key: 'expressive_arts', kind: 'vocational', name: 'Expressive Arts & Design', name_vi: 'Nghệ thuật & Sáng tạo', icon: 'music', scored: false, yearGroups: EARLY_YEARS },
 ]
 
@@ -95,8 +101,11 @@ export const SUBJECTS = [
 // specialist and 3 vocational areas, in both languages, and with Year 1's four
 // specialist areas). Longer text is set
 // smaller, then cut. Bowen does not want these limits lowered. A template can
-// raise a limit with its own `limits` (and `minimums`): Early Years has one
-// full-width Applied English card, which holds a longer comment.
+// raise a limit with its own `limits` (and `minimums`): Early Years comments
+// outside the academic rows (Applied English, Cooking, Physical Development)
+// may run to 600. Applied English was one full-width card until Cooking joined
+// it on 18 October 2026, and its comments were written to that length. A
+// vocational area's comment (`comment: true`) uses the specialist limits.
 // Since 24 September 2026 there is no next focus, student voice or experiences
 // box: those columns stay in the database but no longer print.
 export const TEXT_LIMITS = {
@@ -167,13 +176,15 @@ export const TEMPLATES = {
   early_years: {
     key: 'early_years', name: 'Early Years', program: 'Early Years Program', program_vi: 'Chương trình Mầm non',
     yearGroups: EARLY_YEARS, scoreYearGroups: [],
-    areas: ['communication', 'math', 'understanding_world', 'applied_english', 'physical', 'expressive_arts'],
+    areas: ['communication', 'math', 'understanding_world', 'applied_english', 'cooking', 'physical', 'expressive_arts'],
     skillGroups: EARLY_YEARS_SKILL_GROUPS,
     limits: { specialist_comment: 600 }, minimums: { specialist_comment: 300 },
     titles: {
       academic: 'Areas of Learning', academic_vi: 'Các lĩnh vực học tập',
       vocational: 'Physical & Creative Development', vocational_vi: 'Phát triển thể chất & Sáng tạo',
-      vocationalNote: 'What the {yearGroup} class explored together this quarter', vocationalNote_vi: 'Những gì lớp {yearGroup} đã cùng khám phá trong quý này',
+      // Physical Development is a comment on the child, Expressive Arts & Design what the class did.
+      vocationalNote: "{nickname}'s physical progress, and what the {yearGroup} class explored in art and design",
+      vocationalNote_vi: 'Tiến bộ thể chất của {nickname} và hoạt động nghệ thuật của lớp {yearGroup} trong quý này',
     },
   },
   primary: {
@@ -195,7 +206,7 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
-const SETTINGS_VERSION = 8
+const SETTINGS_VERSION = 9
 
 export const DEFAULT_REPORT_SETTINGS = {
   version: SETTINGS_VERSION,
@@ -235,7 +246,12 @@ export const DEFAULT_REPORT_SETTINGS = {
  * Confident, Moving Beyond, with a description of each level for the key.
  * Before version 8 Master Minds (Year 1, a specialist area with a comment) is
  * added after Movement, in the area list and in the template that covers
- * Year 1; nothing else in the saved settings changes.
+ * Year 1; nothing else in the saved settings changes. Before version 9 Physical
+ * Development (still vocational) takes an individual comment instead of the
+ * course description, Cooking opens to Nursery and Kindergarten and joins the
+ * Early Years template after Applied English, and that template's vocational
+ * subtitle, if still "What the {yearGroup} class explored together this
+ * quarter", now names both kinds of card.
  * Saving in Report settings then stores the upgraded version.
  */
 export function normalizeReportSettings(stored) {
@@ -311,6 +327,32 @@ export function normalizeReportSettings(stored) {
         areas.splice(afterMovement(areas, (k) => subjects.find((sub) => sub.key === k)?.kind === 'specialist'), 0, 'master_minds')
         templates[key] = { ...t, areas }
       }
+    }
+  }
+  if ((Number(v.version) || 1) < 9 && (v.subjects || v.templates)) {
+    // Physical Development takes a comment for each child, and Early Years gains Cooking.
+    const physical = subjects.find((sub) => sub.key === 'physical')
+    if (physical && physical.kind === 'vocational' && physical.comment == null) physical.comment = true
+    const cooking = subjects.find((sub) => sub.key === 'cooking')
+    if (!cooking) {
+      const last = subjects.map((sub) => sub.kind).lastIndexOf('specialist')
+      subjects.splice(last < 0 ? subjects.length : last + 1, 0, { ...SUBJECTS.find((sub) => sub.key === 'cooking') })
+    } else if ((cooking.yearGroups || []).length) {
+      cooking.yearGroups = [...EARLY_YEARS.filter((g) => !cooking.yearGroups.includes(g)), ...cooking.yearGroups]
+    }
+    const key = Object.keys(templates).find((k) => (templates[k].yearGroups || []).some((g) => EARLY_YEARS.includes(g)))
+    if (key) {
+      const t = templates[key]
+      const areas = t.areas ? [...t.areas] : [...(t.academic || []), ...(t.specialist || []), ...(t.vocational || [])]
+      if (!areas.includes('cooking')) {
+        const english = areas.indexOf('applied_english')
+        areas.splice(english >= 0 ? english + 1 : areas.length, 0, 'cooking')
+      }
+      // The old subtitle said every card was what the class explored; Physical Development is now about the child.
+      const titles = { ...(t.titles || {}) }
+      if (titles.vocationalNote === 'What the {yearGroup} class explored together this quarter') titles.vocationalNote = TEMPLATES.early_years.titles.vocationalNote
+      if (titles.vocationalNote_vi === 'Những gì lớp {yearGroup} đã cùng khám phá trong quý này') titles.vocationalNote_vi = TEMPLATES.early_years.titles.vocationalNote_vi
+      templates[key] = { ...t, areas, titles }
     }
   }
   let levels = s.levels

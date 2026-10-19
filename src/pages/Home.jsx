@@ -222,7 +222,7 @@ const finished = (a) => a.done === a.total && (!a.description || a.description.d
 /** One class's areas in the report table: what is done for each student and whether the course description is written. */
 function AreaRow({ area: a, t }) {
   const homeroom = a.key === HOMEROOM_PART
-  const writing = homeroom ? WRITING.specialist : WRITING[a.tier] || WRITING.vocational
+  const writing = homeroom ? WRITING.specialist : a.writing || WRITING[a.tier] || WRITING.vocational
   const studentsDone = a.done === a.total
   const unit = writing.comment ? t('commentsWord') : t('writingLevels')
   return (

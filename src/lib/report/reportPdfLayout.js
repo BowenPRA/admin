@@ -2,7 +2,8 @@
 // per report, in English or in Vietnamese. Top to bottom: header, level key,
 // student and homeroom comment, academic rows (course description above the
 // individual comment), review scores and learner skills, specialist cards
-// (individual comments), vocational cards (course descriptions), a slim
+// (individual comments), vocational cards (course descriptions, or a comment
+// where the area takes one), a slim
 // signature row and the footer, each part with its own colour.
 //
 // Text is measured with pdfmake itself before it is placed. All comments share
@@ -21,8 +22,13 @@
 // specialist cards, so the level pill moves to the teacher's line): Year 1 at
 // every limit 7.75pt in both languages, nothing cut, and 8.25pt with boxes 85%
 // full. Every other year group's page came out exactly as before.
+// Measured 19 October 2026, when Early Years gained Cooking (two specialist
+// comments of 600) and Physical Development took a comment of 600 in the
+// vocational band, beside Expressive Arts & Design's description (cards 3:2):
+// Nursery and Kindergarten at every limit 8pt in both languages, nothing cut,
+// and 8.25pt with boxes 85% full; Year 1 (7.75pt) and Year 7 (8pt) unchanged.
 
-import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor } from './utils'
+import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor } from './utils'
 import { reportStrings, reportTitle, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
 import { partialFrom } from '../studentRecords'
 
@@ -552,8 +558,17 @@ function buildPage(item, M, { proof, icons = {} }) {
   })
 
   const cardTiers = ['specialist', 'vocational'].filter((k) => tiers[k].length)
-  // Each tier's cards share the full width (two areas make two wide cards, one area one full-width card).
-  const cardW = Object.fromEntries(cardTiers.map((k) => [k, W / tiers[k].length]))
+  // A card holds an individual comment (specialist areas, and a vocational area
+  // ticked for one, as Early Years Physical Development) or the course description.
+  const commentCard = (s) => writingFor(settings, s.subject_key).comment
+  // Each tier's cards share the full width (two areas make two wide cards, one
+  // area one full-width card). Where a tier mixes the two kinds, a comment card
+  // is half as wide again as a description card, so the longer comment and the
+  // shorter description come out closer in height.
+  const cardWs = Object.fromEntries(cardTiers.map((k) => {
+    const shares = tiers[k].map((s) => (commentCard(s) ? 1.5 : 1))
+    return [k, shares.map((v) => (W * v) / sum(shares))]
+  }))
   // Card header: the icon badge, area name and level pill on one line under the
   // band. The teacher's name joins that line when it fits on every card of the
   // tier ('one'), else each card gives it a line of its own ('two'), so the
@@ -567,11 +582,11 @@ function buildPage(item, M, { proof, icons = {} }) {
   const HEAD_TWO = TEACHER_Y + F.teacher * LINE + 1
   const STACK_PILL_Y = CARD_HEAD + PILL_H // the pill's top when it shares the teacher's line
   const TITLE_STYLE = { bold: true, color: C.navy }
-  const cards = Object.fromEntries(cardTiers.map((tier) => [tier, tiers[tier].map((s) => {
+  const cards = Object.fromEntries(cardTiers.map((tier) => [tier, tiers[tier].map((s, i) => {
     const sub = subjectByKey(settings, s.subject_key)
     const note = noteFor(s.subject_key)
-    const voc = tier === 'vocational'
-    const cw = cardW[tier]
+    const desc = !commentCard(s)
+    const cw = cardWs[tier][i]
     const teacher = teacherOf(s)
     const titleW = M.width({ text: nameIn(sub), ...T(F.cardTitle, { bold: true, pitch: 1 }) })
     const teacherW = teacher ? M.width({ text: teacher, ...T(F.teacher, { pitch: 1 }) }) : 0
@@ -580,12 +595,12 @@ function buildPage(item, M, { proof, icons = {} }) {
     const teacherBeside = !teacher || teacherW <= roomForTeacher
     // Beside the pill the name may be set a little smaller (as putLine does), but not cut.
     const titleBeside = oneLine(nameIn(sub), F.cardTitle, cw - 27 - 8 - pillBox.w - 5, TITLE_STYLE).node.text === nameIn(sub)
-    // Specialist cards hold the individual comment (the shared body size); vocational cards the course description.
+    // A comment is set at the shared body size; a course description in the smaller topics style.
     return {
-      ...(voc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, teacher, titleW, teacherBeside, titleBeside, pillH: pillBox.h,
-      name: `${sub.name} ${voc ? 'course description' : 'comment'}`, w: cw - 16,
-      label: voc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
-      ...(voc ? picked(note?.description, note?.description_vi) : picked(s.comment, s.comment_vi)),
+      ...(desc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, teacher, titleW, teacherBeside, titleBeside, pillH: pillBox.h,
+      name: `${sub.name} ${desc ? 'course description' : 'comment'}`, w: cw - 16,
+      label: desc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
+      ...(desc ? picked(note?.description, note?.description_vi) : picked(s.comment, s.comment_vi)),
     }
   })]))
   const tierLayout = Object.fromEntries(cardTiers.map((k) => [k,
@@ -804,12 +819,13 @@ function buildPage(item, M, { proof, icons = {} }) {
   for (const tier of cardTiers) {
     const theme = THEME[tier]
     const h = heights[tier]
-    const cw = cardW[tier]
+    const ws = cardWs[tier]
     frame(X, y, W, h, theme, title(tier), title(tier === 'specialist' ? 'specialistNote' : 'vocationalNote'))
     const top = cardTop[tier]
     const layout = tierLayout[tier]
     const boxes = cards[tier].map((c, i) => {
-      const cx = X + i * cw
+      const cw = ws[i]
+      const cx = X + sum(ws.slice(0, i))
       const cy = y + BAR
       if (i > 0) dotted(cx, cy + 6, cx, y + h - 6, theme.edge)
       const p = pill(c.s.level, cx + cw - 8, cy + (layout === 'stacked' ? STACK_PILL_Y : CARD_HEAD), cw * 0.55, 'right')

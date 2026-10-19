@@ -42,12 +42,13 @@ const Y2_5 = ['Year 2', 'Year 3', 'Year 4', 'Year 5']
 const PRIMARY = ['Year 1', ...Y2_5, 'Year 6']
 // Nursery and Kindergarten homeroom teachers write every Early Years area except
 // Applied English, which the class's English teacher writes (Ms. Solo teaches the
-// Nursery afternoon session, Ms. Kiu Kindergarten Literacy).
+// Nursery afternoon session, Ms. Kiu Kindergarten Literacy), and Cooking (added
+// 18 October 2026), which Mr. Seth teaches, as he does in Primary.
 const EARLY_YEARS_AREAS = ['communication', 'math', 'understanding_world', 'physical', 'expressive_arts']
 const earlyYears = (group) => EARLY_YEARS_AREAS.map((k) => `${k}:${group}`)
 
 export const TEACHER_SCHEDULE = [
-  { email: 'seth@pra.edu.vn', name: 'Seth', title: 'Mr.', role: 'head', subjects: ['art_of_science:Year 7', ...years('cooking', ['Year 1', ...Y2_5]), 'master_minds:Year 1'], homeroom_groups: ['*'] },
+  { email: 'seth@pra.edu.vn', name: 'Seth', title: 'Mr.', role: 'head', subjects: ['art_of_science:Year 7', ...years('cooking', ['Nursery', 'Kindergarten', 'Year 1', ...Y2_5]), 'master_minds:Year 1'], homeroom_groups: ['*'] },
   { email: 'bowen@pra.edu.vn', name: 'Bowen', title: 'Mr.', role: 'head', subjects: ['math:Year 7', 'science:Year 7'], homeroom_groups: ['Year 7'] },
   { email: 'david@pra.edu.vn', name: 'David', title: 'Mr.', role: 'teacher', subjects: ['english:Year 7', 'math:Year 5'], homeroom_groups: ['Upper Secondary'] },
   { email: 'solo@pra.edu.vn', name: 'Solo', title: 'Ms.', role: 'teacher', subjects: years('english', ['Year 1']).concat(years('math', ['Year 1']), years('science', ['Year 1']), years('presentation_play', ['Year 1']), ['applied_english:Nursery']), homeroom_groups: ['Year 1'] },

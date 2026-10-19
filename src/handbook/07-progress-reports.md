@@ -73,11 +73,12 @@ A template is the set of learning areas one stage's reports contain. The templat
 
 | Template | Year groups | Academic | Specialist | Vocational | Review scores |
 |---|---|---|---|---|---|
-| Early Years | Nursery, Kindergarten | Communication & Language, Mathematics, Understanding the World | Applied English (one full-width card, longer comment) | Physical Development, Expressive Arts & Design | None |
+| Early Years | Nursery, Kindergarten | Communication & Language, Mathematics, Understanding the World | Applied English, Cooking (longer comments) | Physical Development (an individual comment), Expressive Arts & Design | None |
 | Primary | Year 1 to Year 6 | Mathematics, Science, English | Art & Crafts, Cooking, Movement, Master Minds (Year 1 only) | Technology, Wellbeing (Years 2 to 6), Everyday Experts (Years 2 to 6), Presentation & Play (Year 1 only) | Years 4 to 6 only |
 | Lower Secondary | Year 7 to Year 9 | Mathematics, Science, English | Art of Science, History, Movement (Year 7 only) | Executive Function, Technology, Wellbeing | Every year group |
 
 - Early Years prints its own headings: "Areas of Learning" over the academic areas and "Physical & Creative Development" over the vocational ones. It has its own learner skills: Learning & Independence, and Personal, Social & Emotional, six skills each.
+- Since 19 October 2026, Early Years has Cooking beside Applied English under Specialist Learning, and Physical Development has an individual comment for each child instead of a class description. Physical Development still prints in the green "Physical & Creative Development" band, in a wider card beside Expressive Arts & Design, which keeps its class description. With every box full the page prints at 8pt, the same as Years 1 to 7. Before that, Applied English was one full-width card.
 - Primary and Lower Secondary share the learner skills: Foundational Learning Skills (Ready to Learn, Follows Instructions, Creativity, Grasps New Ideas, Continues to Try) and Social & Emotional Learning (Manages Emotions, Positive Relationships, Strong Sense of Identity, Motivation to Learn, Adaptability).
 - Years 1 to 3 have no review scores, so their learner skills print at full width.
 
@@ -88,6 +89,8 @@ A template is the set of learning areas one stage's reports contain. The templat
 | Academic | Level, review score (where the year group has scores), an individual comment | A comment for each student, plus one course description for the year group |
 | Specialist | Level and an individual comment | A comment for each student |
 | Vocational | Level | One course description for the year group, no individual comment |
+
+A vocational area can be ticked in Report settings to take an individual comment instead of the course description. It still prints with the other vocational areas. Early Years Physical Development is the only one.
 
 On the Teachers page, the Reports page and the editor, a violet speech-bubble icon means "comments to write" and a green page icon means "a course description to write". An academic area has both.
 
@@ -201,7 +204,7 @@ Under each box, as the teacher types, the checker gives advice. It never blocks 
 | Academic comment | 750 | 650 |
 | Academic course description ("topics covered") | 120 | no minimum |
 | Specialist comment | 550 | 450 |
-| Early Years Applied English comment | 600 | 300 |
+| Early Years Applied English, Cooking and Physical Development comments | 600 | 300 |
 | Vocational course description | 250 | 150 |
 
 - Every character counts, spaces included.
@@ -287,8 +290,8 @@ A report is translated when its language is set to "English and Vietnamese". The
 
 ### The settings version
 
-- The defaults for these settings are in the code. The saved settings carry a version number: 8 since 2 October 2026.
-- When Claude adds a learning area or a template in the code, it raises the version. The first time the new app reads the saved settings, it upgrades them: version 8 added Master Minds, version 7 renamed a standard four- or five-level scale to the current names (a scale changed by hand is left alone), version 5 added the Early Years template.
+- The defaults for these settings are in the code. The saved settings carry a version number: 9 since 19 October 2026.
+- When Claude adds a learning area or a template in the code, it raises the version. The first time the new app reads the saved settings, it upgrades them: version 9 gave Physical Development an individual comment and added Cooking to Early Years, version 8 added Master Minds, version 7 renamed a standard four- or five-level scale to the current names (a scale changed by hand is left alone), version 5 added the Early Years template.
 - Pressing **Save** in Report settings stores the upgraded version.
 - The upgrade adds the area to the template. Reports made before it do not have it until the head presses **Add … to N reports** on the year group's card.
 
@@ -306,6 +309,7 @@ A report is translated when its language is set to "English and Vietnamese". The
 | Amber outline on the Vietnamese page | A part has no Vietnamese | Run the translation file again, or type it in |
 | A new learning area is missing from this quarter's reports | The reports were made before it was added | **Add … to N reports** on the year group card |
 | A Year 1 report has no Master Minds card | The area has not been added to that year group's reports, or Master Minds has no teacher | **Add … to N reports**, and tick Master Minds for its teacher on the Teachers page |
+| A Nursery or Kindergarten report has no Cooking card, or no teacher on it | Cooking has not been added to that year group's reports, or nobody is ticked for it | **Add … to N reports**, and give Mr. Seth Cooking for Nursery and Kindergarten on the Teachers page (**Add … new classes from the schedule**, since 19 October 2026) |
 | The class reference is empty | **Class references** has not been pressed since the scores went in | Press it on the year group card |
 | A child is missing from Create reports | The student is Pending or Past, or in another year group | Fix the record on **Students**, then create that one student's report |
 | The Reports list shows "now Year X" beside a student | The student moved year group after the report was made | Decide with Seth which year group the report should be for |
