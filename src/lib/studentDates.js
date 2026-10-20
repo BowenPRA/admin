@@ -9,6 +9,7 @@
 
 import { endDateOf, isEnrolled } from './studentRecords'
 import { shortDate, fullDate } from './printFormat'
+import { periodQuarters } from './fees'
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
@@ -40,15 +41,13 @@ export function finishingThisQuarter(students, calendar, today = localToday()) {
 /** '8 Oct' / '8/10', with the year when it is not this year's. */
 export const dayText = (iso, lang = 'en', today = localToday()) => (!iso ? '' : iso.slice(0, 4) === today.slice(0, 4) ? shortDate(iso, lang) : fullDate(iso, lang))
 
-const PERIOD_QUARTERS = { year: ['q1', 'q2', 'q3', 'q4'], sem1: ['q1', 'q2'], sem2: ['q3', 'q4'], q1: ['q1'], q2: ['q2'], q3: ['q3'], q4: ['q4'] }
-
 /**
  * The quarters an invoice is for, from the invoice builder's choices: the quarters
  * ticked when paying by quarter, otherwise the period's. None for a custom period
  * (weekly, trial day), which has no quarter to compare with.
  */
 export function invoiceQuarters(inputs, calendar) {
-  const ids = inputs?.plan === 'quarterly' ? (inputs.billQuarters?.length ? inputs.billQuarters : ['q1']) : PERIOD_QUARTERS[inputs?.periodId] || []
+  const ids = inputs?.plan === 'quarterly' ? (inputs.billQuarters?.length ? inputs.billQuarters : ['q1']) : periodQuarters(inputs?.periodId)
   return quartersOf(calendar).filter((q) => ids.includes(q.id))
 }
 

@@ -30,7 +30,7 @@ Click your picture or initials at the top right. The menu shows **Signed in as**
 - Invoices and progress reports have their own language, chosen on each document. The switch does not change them.
 - Printouts have their own **English / Tiếng Việt** choice in their toolbar.
 - The handbook is in English whichever way the switch is set.
-- Many Vietnamese labels were written by Claude and have not all been read by Vietnamese staff. About 40 older labels still use the word for "pupil" that PRA avoids, where newer ones say "học viên". Bowen asked on 2 October 2026 to leave the older ones until he decides.
+- Many Vietnamese labels were written by Claude and have not all been read by Vietnamese staff. Every label calls students "học viên"; until 20 October 2026 about 40 older ones used the word for "pupil" that PRA avoids.
 
 ## Roles
 
@@ -252,9 +252,13 @@ Office accounts (Admin, Head Teacher, Super Admin) are made with a script on the
 The script asks for the Supabase **secret** key. You type it yourself; Claude never types or sees it. The key is in Supabase (signed in as admin@palmriveracademy.edu.vn) under Project Settings → API Keys → Secret key. Today it is held by Bowen.
 
 1. Ask Claude to add the person to the script's list with their PRA email and role (`admin`, `head` or `super_admin`).
-2. Claude runs the script with `--dry-run` first and shows you what would change.
+2. Claude starts the script with `--dry-run` in the Terminal panel. You paste the key and read what would change.
 3. Claude starts the real run in the Terminal panel. When it asks for the key, paste it there yourself.
 4. Note the temporary password it prints and give it to the person in person. They change it from their menu.
+
+The key shows on screen as you paste it, and the temporary password prints in the same tab. Claude does not read a tab once the key is in it, for the dry run too: read the result yourself and tell Claude what it says. On 20 October 2026 Claude read a dry run's output and the key reached the chat, so the key was due to be replaced (Supabase → Project Settings → API Keys).
+
+The shared office inbox admin@palmriveracademy.edu.vn has its own Admin login, named Office, since 20 October 2026.
 
 > **Ask Claude:** "Add a new Admin account to The Current for the PRA email I give you. Show me the dry run of the staff account script, then start the real run in my terminal so I can paste the secret key myself."
 

@@ -15,6 +15,7 @@ import { Field, TextInput, Select, Checkbox, Modal, Avatar } from '../ui'
 import { StudentTrips } from '../attendance/Trips'
 import EmailSlip from '../EmailSlip'
 import NewStudentChecklist from './NewStudentChecklist'
+import StudentDocuments from './StudentDocuments'
 
 function Section({ title, children }) {
   return (
@@ -251,6 +252,13 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
         {!isNew && (
           <Section title={t('travelSection')}>
             <StudentTrips student={s} />
+          </Section>
+        )}
+
+        {/* Enrollment form, ID papers and photo, from the shared drive and the website form (office only). */}
+        {!isNew && (
+          <Section title={t('docsSection')}>
+            <StudentDocuments student={saved} />
           </Section>
         )}
 

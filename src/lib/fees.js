@@ -156,7 +156,41 @@ export function totalSchoolDays(cal = DEFAULT_CALENDAR) {
   return cal.months.reduce((s, m) => s + Number(m.days || 0), 0)
 }
 
-// Days + months for a billing period id: 'year', 'sem1', 'sem2', 'q1'..'q4'.
+export const QUARTER_IDS = ['q1', 'q2', 'q3', 'q4']
+
+// A period of several quarters that is not a semester or the year is named by its
+// quarters joined with '+', e.g. 'q2+q3+q4' for a student who joins in Quarter 2.
+const NAMED_PERIODS = { year: QUARTER_IDS, sem1: ['q1', 'q2'], sem2: ['q3', 'q4'] }
+
+/** The quarters a period id covers: 'sem2' → ['q3', 'q4'], 'q2+q3+q4' → ['q2', 'q3', 'q4']. None for 'custom'. */
+export function periodQuarters(periodId) {
+  if (NAMED_PERIODS[periodId]) return NAMED_PERIODS[periodId]
+  return QUARTER_IDS.filter((k) => String(periodId || '').split('+').includes(k))
+}
+
+/** The period id for a set of quarters: the year, a semester, one quarter or 'q2+q3+q4'. */
+export function periodForQuarters(ids) {
+  const set = QUARTER_IDS.filter((k) => ids.includes(k))
+  const key = set.join('+')
+  return Object.keys(NAMED_PERIODS).find((p) => NAMED_PERIODS[p].join('+') === key) || key
+}
+
+const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`
+const dayEn = (iso, withYear) => `${MONTHS_EN[Number(iso.slice(5, 7)) - 1]} ${ordinal(Number(iso.slice(8, 10)))}${withYear ? `, ${iso.slice(0, 4)}` : ''}`
+const dayVi = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`
+
+// Transport months for a set of quarters: 3 for a quarter on its own, 5 for both
+// quarters of a semester (June's 4 class days are not charged), so 10 for the year.
+const SEMESTER_MONTHS = 5
+function monthsFor(ids, q) {
+  return [['q1', 'q2'], ['q3', 'q4']].reduce((s, pair) => {
+    const on = pair.filter((k) => ids.includes(k))
+    return s + (on.length === 2 ? SEMESTER_MONTHS : on.reduce((a, k) => a + Number(q[k]?.months || 0), 0))
+  }, 0)
+}
+
+// Days + months for a billing period id: 'year', 'sem1', 'sem2', 'q1'..'q4', or quarters joined with '+'.
 export function periodInfo(periodId, cal = DEFAULT_CALENDAR) {
   const q = Object.fromEntries(cal.quarters.map((x) => [x.id, x]))
   switch (periodId) {
@@ -164,12 +198,24 @@ export function periodInfo(periodId, cal = DEFAULT_CALENDAR) {
       return { days: totalSchoolDays(cal), months: cal.months.length - 1, // 10 transport months (June is 4 days)
         rangeEn: 'August 4th, 2026 to June 4th, 2027', rangeVi: '04.08.2026 - 04.06.2027', en: 'the year', vi: 'năm học' }
     case 'sem1':
-      return { days: q.q1.days + q.q2.days, months: 5,
+      return { days: q.q1.days + q.q2.days, months: SEMESTER_MONTHS,
         rangeEn: 'August 4th to December 17th, 2026', rangeVi: '04.08.2026 - 17.12.2026', en: 'Semester 1', vi: 'Học kỳ 1' }
     case 'sem2':
-      return { days: q.q3.days + q.q4.days, months: 5,
+      return { days: q.q3.days + q.q4.days, months: SEMESTER_MONTHS,
         rangeEn: 'January 5th to June 4th, 2027', rangeVi: '05.01.2027 - 04.06.2027', en: 'Semester 2', vi: 'Học kỳ 2' }
     default: {
+      const ids = periodQuarters(periodId)
+      if (ids.length > 1 && ids.every((k) => q[k])) {
+        const first = q[ids[0]], last = q[ids[ids.length - 1]]
+        const nums = ids.map((k) => k.slice(1))
+        const list = (and) => `${nums.slice(0, -1).join(', ')} ${and} ${nums[nums.length - 1]}`
+        const sameYear = first.start.slice(0, 4) === last.end.slice(0, 4)
+        return {
+          days: ids.reduce((s, k) => s + Number(q[k].days || 0), 0), months: monthsFor(ids, q),
+          rangeEn: `${dayEn(first.start, !sameYear)} to ${dayEn(last.end, true)}`, rangeVi: `${dayVi(first.start)} - ${dayVi(last.end)}`,
+          en: `Quarters ${list('and')}`, vi: `Quý ${list('và')}`,
+        }
+      }
       const x = q[periodId]
       if (!x) return { days: 0, months: 0, rangeEn: '', rangeVi: '', en: periodId, vi: periodId }
       return { days: x.days, months: x.months, rangeEn: x.rangeEn, rangeVi: x.rangeVi, en: x.en, vi: x.vi }

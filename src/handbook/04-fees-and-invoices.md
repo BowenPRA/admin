@@ -50,7 +50,7 @@ PRA pays the Acellus fee on the family's behalf and the family pays it back in c
 | Sibling discount | 5% | See "The sibling discount" below |
 
 - Class days come from **Settings** → **Academic calendar**: 180 in the year, 45 in each quarter.
-- Transport months: 10 for the full year (June has only 4 class days and is not charged), 5 for a semester, 3 for a quarter.
+- Transport months: 10 for the full year (June has only 4 class days and is not charged), 5 for a semester, 3 for a quarter, and 8 for Quarters 2, 3 and 4 (Quarter 2's 3 plus Semester 2's 5). The number can be changed for each student in the builder.
 
 ### Weekly plans
 
@@ -105,6 +105,16 @@ For a student who joins or leaves part-way through a quarter, on a **Pay by quar
 
 The tuition for that quarter becomes the quarter price × days ÷ 45, rounded to the nearest 1,000 VND. Meal days follow the prorated days. The invoice prints a line such as "(Quarter 1: 30 of 45 days)".
 
+### A student who joins after Quarter 1
+
+A student who joins in Quarter 2 can pay for Quarters 2, 3 and 4 on one invoice: choose **Pay by quarter** and the period **Quarters 2, 3 and 4**, which ticks those three quarters.
+
+- The invoice still prints every quarter's price, Quarter 1 included, and the **Full Year Tuition** is all four quarters. Only Quarters 2, 3 and 4 are shaded, and the blue **Tuition due in this payment** box under them gives what this invoice asks for. Bowen chose this on 20 October 2026: the shading and the box show what the family pays, so the Quarter 1 price can stay. (That morning, for a few hours, the table left out quarters that ended before the student's start date.)
+- If a quarter that is ticked to bill ended before the student's **Start date**, the builder warns: this catches Quarter 1 still ticked from the default. A wrong start date is corrected on the student record.
+- A **Tuition override** is the full-year price, shared over the four quarters in the schedule's proportions.
+- The newcomer pays the full-price Quarter 4 (see "Quarter 4" below) and, unless they are in the Global Program, the admission fee.
+- A child who joins part-way through Quarter 2 is charged for the days attended with **Prorated quarters** (see "Proration" above).
+
 ### Quarter 4
 
 - Only students on the 2026-2027 roster when the fee schedule was published pay the reduced Quarter 4.
@@ -139,7 +149,7 @@ The app knows one sibling percentage and nothing else. Anything else agreed with
 The **Invoice builder** is **Office** → **Invoices** → **New invoice**. The live total is on the right the whole time.
 
 1. **1. Choose students.** Pick a family and all its children come along, or tick students one by one. **Include inactive** shows past students; picking one offers to bring them back as Pending, with the year group worked out from the birthday.
-2. **2. Payment plan and period.** Choose the **Payment plan**: **Full year - Early Bird**, **Full year - Standard**, **Pay by quarter** (tick **Billing now** for the quarters billed on this invoice), **Installments (custom %)** (60/40 with due dates by default), **Weekly (Global / Vocational / Summer)**, **Trial day only**, **Staff child (materials + meals)** or **No tuition (meals / transport / fees only)**. Choose the period (Full year, Semester 1 or 2, Quarter 1 to 4, or Custom period). Here too: the sibling discount, the **Due date** and the **Invoice language** (English or Vietnamese; it starts as the family's preferred language).
+2. **2. Payment plan and period.** Choose the **Payment plan**: **Full year - Early Bird**, **Full year - Standard**, **Pay by quarter** (tick the **Quarters to bill now**), **Installments (custom %)** (60/40 with due dates by default), **Weekly (Global / Vocational / Summer)**, **Trial day only**, **Staff child (materials + meals)** or **No tuition (meals / transport / fees only)**. Choose the period (Full year, Semester 1 or 2, Quarters 2, 3 and 4, Quarter 1 to 4, or Custom period). On **Pay by quarter** the period and the ticked quarters move together: choosing Semester 2 ticks Quarters 3 and 4, and ticking quarters by hand names the period after them (for example "Quarters 2 and 3"). Here too: the sibling discount, the **Due date** and the **Invoice language** (English or Vietnamese; it starts as the family's preferred language).
 3. **3. Options for each student.** For each child: **Year / level** and **Program** for this invoice, the tuition override, extra discount, **Full-price Quarter 4**, the Upper Secondary boxes, **Meals** (days × rate), **Transport** (months × zone), **New student admission fee**, trial days, weeks, months of materials, and **Prorated quarters**.
 4. **4. Deductions and notes.** **Already paid / deposits** (**Add deduction**, then a label and an amount), **Extra notes on the invoice**, **Cash payment only (hide bank details)**, and **Show force majeure clause** (on by default).
 5. Press **Create invoice**. The invoice opens on its own page with its number.
@@ -147,6 +157,7 @@ The **Invoice builder** is **Office** → **Invoices** → **New invoice**. The 
 - Meals start ticked for every student whose **Meals at PRA** is Yes or not answered, and unticked for No.
 - The admission fee row appears only when the student's **New student** box is ticked. For a Global Program child, leave it unticked.
 - The printed invoice is headed "Fee announcement" in English.
+- On a **Pay by quarter** or **Installments** invoice, the last column of the tuition table is **Full Year Tuition** (Vietnamese "Học phí cả năm"): the student's tuition for the whole year. The columns billed now are shaded, and a blue box right under them gives **Tuition due in this payment** ("Học phí cần thanh toán đợt này"), the shaded amounts added up for all the children. Both were added on 20 October 2026. Invoices saved before keep "Total" as the column name until they are rebuilt; the box appears on every PDF made from then on.
 
 ## Editing an invoice
 

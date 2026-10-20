@@ -105,7 +105,7 @@ The status is at the top of the student window. It never changes by itself: not 
 
 ## The student window
 
-Click a student's row on **Students**. The window has these sections: the top part (photo, names, ID, status), **Enrollment**, **Travel**, **Personal**, **Family & contact**, **Billing**, and the **New-student checklist**. **Delete** is at the bottom left. The fields below are the ones that change what the app does.
+Click a student's row on **Students**. The window has these sections: the top part (photo, names, ID, status), **Enrollment**, **Travel**, **Documents** (see [Documents on Drive](#/handbook/students?s=documents-on-drive)), **Personal**, **Family & contact**, **Billing**, and the **New-student checklist**. **Delete** is at the bottom left. The fields below are the ones that change what the app does.
 
 ### Names
 
@@ -134,6 +134,61 @@ Click a student's row on **Students**. The window has these sections: the top pa
 - **New student (admission fee applies)**: the invoice builder adds the 10,000,000 admission fee while it is ticked. Untick it once an invoice carries the fee, or it lands on the next invoice too. Leave it unticked for the Global Program.
 - **Full-price Quarter 4**: ticked for anyone added since the 2026-2027 fee schedule came out. See [Fees, invoices and receipts](#/handbook/fees).
 - **Meals at PRA**: Yes, No, or not answered. One mark covers meals and snacks. It is also on the Students list as the **Meals** column (an amber outline until answered; **Meals not answered** filters them). It decides who is on the menu mailing list (parents_menu@) and whether meals start ticked on a new invoice. On 15 October 2026 every current student had an answer.
+
+## Documents on Drive
+
+Each student's enrollment form, ID papers and photo stay where the office files them: **Palm River Administration Drive** → **ADMISSIONS** → **Enrollment** → **Students' enrollment forms**, by year, then programme and class, then the student or the family. The Current does not copy the files. It keeps the list of file and folder names in that folder and works out from the names whose files are whose. Built 19 October 2026.
+
+### On the student window
+
+- The **Documents** section is for office accounts only; teachers do not see it. Files are grouped as **Enrollment form**, **Student's ID papers**, **Parents' ID papers**, **Photo** and **Other files**. A form sent from the website, and the files uploaded with it, show in the same list.
+- Click a file name to see it inside The Current, with **Previous** and **Next** for the student's other files. The arrow on the right of a row opens the file in Drive in a new tab. **Open their folder in Drive** opens the folder that holds most of their files.
+- Google decides who sees a file: only accounts that can open the Palm River Administration Drive (admin@ and the office staff who are members of it). If the viewer stays blank or shows a Google page, open the file in Drive and sign in with such an account.
+- For an Enrolled or Pending student, an amber line names what was not found: enrollment form, ID papers or photo. The photo on the student's record in The Current counts as a photo.
+- A file filed twice shows once, with "filed 2 times"; the newest year's copy is the one that opens.
+
+### Keeping the list up to date
+
+- The Current reads the folder when someone clicks **Check Drive** (on the student window or in the summary). The time and account of the last check show beside the button.
+- The first time in a session, Google asks which account to use: choose admin@palmriveracademy.edu.vn. After that, opening a student window reads Drive again on its own when the last check is more than half an hour old.
+- File a new student's papers in Drive as before, then click **Check Drive**.
+- The matching reads names. A form named after the student, "Passport" or "Photo" with the student's first name, a folder named "<student> - Enrollment Form" or "<family name> Family" all work. A file with a camera name such as IMG_1234.jpg goes to whoever the folder belongs to, under **Other files**.
+
+> **Careful:** a file renamed or moved in Drive keeps its place on the student window only after the next **Check Drive**. A file deleted in Drive leaves the list at the next check.
+
+### Putting a wrong guess right
+
+1. On the student window, click **Correct the list** under the documents.
+2. Use the drop-down beside a file to say what it is (for example **Student's ID papers** instead of **Other files**), or the cross to mark it **Not this student's**.
+3. To add a file the matching missed, type part of its name or its folder in **Add a file from the folder** and click it.
+4. Click **Done**.
+
+Corrections save at once and stay through later checks.
+
+### The summary
+
+**Students** → **More** → **Documents on Drive** lists every Enrolled and Pending student with a tick or a dash for enrollment form, ID papers and photo. **Only students missing something** is ticked to start with. Click a name to open the student.
+
+Below the table, **Files from this year not given to a student** lists this school year's files the matching could not place. Pick a student in **Give to…** to put a file on their record. When everything from this year is placed, the list does not show.
+
+**Previous students not in The Current** is folded away at the bottom: files from earlier years whose student or family was never added to The Current (most of the summer and Global Program families of 2025-2026), one line per family or student folder. Nothing needs doing there. If one of those students comes back, add them on **Students** and the matching picks up their old files at the next **Check Drive**.
+
+> **Careful:** two copies of the same file (same contents, different names) show once. The copy whose name says what it is wins, so "CCCD" with a name beats a phone's number-named copy.
+
+### Setting it up
+
+Done once, by Bowen:
+
+1. Run `supabase/updates-2026-10-19-drive-docs.sql` in Supabase → **SQL Editor**. Until then the section says documents are not set up.
+2. Switch on the Google Drive API for The Current's Google project: console.cloud.google.com → the project that holds The Current's Google sign-in → **APIs & Services** → **Library** → **Google Drive API** → **Enable**. Until then **Check Drive** says Drive is not switched on.
+
+The Current asks Google only for permission to read file and folder names (drive.metadata.readonly). It cannot change, download or share a file.
+
+> **Ask Claude:** "Check that the Drive documents tables are set up on the live database and that Check Drive works for admin@."
+
+If the office ever starts a new top folder for enrollment papers, The Current has to be pointed at it.
+
+> **Ask Claude:** "Point Check Drive at this folder as well: <the folder's Drive link>."
 
 ## Families
 

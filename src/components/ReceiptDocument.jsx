@@ -23,7 +23,7 @@ export default function ReceiptDocument({ payment, fees }) {
       <table className="border-0 text-[10.5pt]" style={{ borderCollapse: 'separate', borderSpacing: '0 3px' }}>
         <tbody>
           {[
-            ["Student's name/ Tên học sinh:", r.student || payment.student_names],
+            ["Student's name/ Tên học viên:", r.student || payment.student_names],
             ['Address/ Địa chỉ:', r.address || school.receiptAddress],
             ['For/ Nội dung:', <><div>{r.forVi}</div><div>{r.forEn}</div></>],
             ['Amount/ Số tiền:', `${fmt(payment.amount)} VND`],

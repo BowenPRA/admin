@@ -494,7 +494,7 @@ export default function InvoiceEditor() {
                 d.sections.push({
                   id: uid('s'), kind: 'fees', heading: vi ? `CÁC KHOẢN PHÍ KHÁC, NĂM HỌC ${d.schoolYear}` : `OTHER FEES, ACADEMIC YEAR ${d.schoolYear}`, subheading: '',
                   columns: [
-                    { key: 'name', label: vi ? 'Tên học sinh' : "Student's Name", type: 'text' },
+                    { key: 'name', label: vi ? 'Tên học viên' : "Student's Name", type: 'text' },
                     { key: 'desc', label: vi ? 'Nội dung' : 'Description', type: 'text' },
                     { key: 'total', label: vi ? 'Số tiền' : 'Amount', type: 'money' },
                   ],

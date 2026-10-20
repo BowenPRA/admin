@@ -128,6 +128,7 @@ export const PERIOD_OPTIONS = [
   { id: 'year', en: 'Full year', vi: 'Cả năm học' },
   { id: 'sem1', en: 'Semester 1', vi: 'Học kỳ 1' },
   { id: 'sem2', en: 'Semester 2', vi: 'Học kỳ 2' },
+  { id: 'q2+q3+q4', en: 'Quarters 2, 3 and 4', vi: 'Quý 2, 3 và 4' },
   { id: 'q1', en: 'Quarter 1', vi: 'Quý 1' },
   { id: 'q2', en: 'Quarter 2', vi: 'Quý 2' },
   { id: 'q3', en: 'Quarter 3', vi: 'Quý 3' },
@@ -185,6 +186,17 @@ export function quarterDays(calendar, qid) {
 export function proratedQuarters(opts, calendar) {
   return QUARTERS.filter((k) => opts?.prorate?.[k] !== undefined && opts.prorate[k] !== '' && opts.prorate[k] !== null)
     .map((k) => ({ qid: k, days: Math.max(0, Number(opts.prorate[k]) || 0), full: quarterDays(calendar, k) }))
+}
+
+/**
+ * Quarters that ended before the student's start date, leaving out any in `billQuarters`.
+ * The invoice builder warns when one of them is ticked to bill (most likely Quarter 1
+ * still ticked from the default). The invoice itself still prints every quarter's price.
+ */
+export function quartersBeforeStart(student, billQuarters, calendar) {
+  const start = String(student?.start_date || '').slice(0, 10)
+  if (!start) return []
+  return (calendar?.quarters || []).filter((q) => q.end && q.end < start && !(billQuarters || []).includes(q.id)).map((q) => q.id)
 }
 
 /** Meal days for the billed quarters, using prorated days where set. */
@@ -323,10 +335,11 @@ export function buildDocument(inputs, fees, calendar) {
   }
   // ---------- Tuition section ----------
   const isUpperAny = tuitionEntries.some((e) => e.opts.upper)
+  const billQuarters = inputs.billQuarters?.length ? inputs.billQuarters : ['q1']
   const showDiscountCol = discountId !== null
 
   if (!['staff', 'trial', 'none'].includes(plan) && tuitionEntries.length) {
-    const cols = [{ key: 'name', label: L(lang, "Student's Name", 'Tên học sinh'), type: 'text' }]
+    const cols = [{ key: 'name', label: L(lang, "Student's Name", 'Tên học viên'), type: 'text' }]
     if (isUpperAny) cols.push({ key: 'item', label: L(lang, 'Tuition Fee', 'Khoản phí'), type: 'text' })
     cols.push({ key: 'curriculum', label: L(lang, 'Curriculum', 'Chương trình'), type: 'text' })
 
@@ -340,22 +353,24 @@ export function buildDocument(inputs, fees, calendar) {
       cols.push({ key: 'total', label: lbl, type: 'money' })
       billedKeys = ['total']
     } else if (plan === 'quarterly') {
-      const dl = fees.deadlines
-      const qs = [['q1', dl.q1], ['q2', dl.q2], ['q3', dl.q3], ['q4', dl.q4]]
-      qs.forEach(([k, d], i) => {
+      // Every quarter shows its price, also for a student who joined later (Bowen, 20 October 2026):
+      // the shaded columns and the box under them say what this invoice asks for.
+      QUARTERS.forEach((k) => {
+        const n = k.slice(1)
+        const d = fees.deadlines[k]
         const lbl = isUpperAny
-          ? L(lang, `Payment ${i + 1}\n(${dueLabel('en', d)})\n25%`, `Đợt ${i + 1}\n(${dueLabel('vi', d)})\n25%`)
-          : L(lang, `QUARTER ${i + 1}\n${dueLabel('en', d)}`, `QUÝ ${i + 1}\n${dueLabel('vi', d)}`)
+          ? L(lang, `Payment ${n}\n(${dueLabel('en', d)})\n25%`, `Đợt ${n}\n(${dueLabel('vi', d)})\n25%`)
+          : L(lang, `QUARTER ${n}\n${dueLabel('en', d)}`, `QUÝ ${n}\n${dueLabel('vi', d)}`)
         cols.push({ key: k, label: lbl, type: 'money' })
       })
-      cols.push({ key: 'total', label: L(lang, 'Total', 'Tổng cộng'), type: 'money' })
-      billedKeys = inputs.billQuarters?.length ? inputs.billQuarters : ['q1']
+      cols.push({ key: 'total', label: L(lang, 'Full Year Tuition', 'Học phí cả năm'), type: 'money' })
+      billedKeys = billQuarters
     } else if (plan === 'split') {
       const splits = inputs.splits?.length ? inputs.splits : [{ pct: 50, due: fees.deadlines.q1 }, { pct: 50, due: fees.deadlines.semester2 }]
       splits.forEach((s, i) => {
         cols.push({ key: `p${i + 1}`, label: L(lang, `Payment ${i + 1}\n(${dueLabel('en', s.due)})\n${s.pct}%`, `Đợt ${i + 1}\n(${dueLabel('vi', s.due)})\n${s.pct}%`), type: 'money' })
       })
-      cols.push({ key: 'total', label: L(lang, 'Total Amount', 'Tổng cộng'), type: 'money' })
+      cols.push({ key: 'total', label: L(lang, 'Full Year Tuition', 'Học phí cả năm'), type: 'money' })
       billedKeys = [`p${(inputs.billSplit ?? 0) + 1}`]
     } else if (plan === 'weekly') {
       heading = L(lang, `TUITION FEE FOR ${(tuitionEntries[0]?.student.program === 'global' ? 'GLOBAL' : tuitionEntries[0]?.student.program === 'vocational' ? 'VOCATIONAL' : 'SHORT-TERM')} PROGRAM, YEAR ${sy}`,
@@ -366,7 +381,11 @@ export function buildDocument(inputs, fees, calendar) {
       billedKeys = ['total']
     }
     if (showDiscountCol) {
-      cols.push({ key: 'disc', label: L(lang, `Total\n(after ${sibPct}% discount for the 2nd child)`, `Tổng cộng\n(sau khi giảm ${sibPct}% cho con thứ 2)`), type: 'money' })
+      // Paying part of the year now (by quarter or in installments), the last columns are the year's tuition.
+      const part = plan === 'quarterly' || plan === 'split'
+      cols.push({ key: 'disc', label: part
+        ? L(lang, `Full Year Tuition\n(after ${sibPct}% discount for the 2nd child)`, `Học phí cả năm\n(sau khi giảm ${sibPct}% cho con thứ 2)`)
+        : L(lang, `Total\n(after ${sibPct}% discount for the 2nd child)`, `Tổng cộng\n(sau khi giảm ${sibPct}% cho con thứ 2)`), type: 'money' })
     }
 
     const rows = []
@@ -408,11 +427,10 @@ export function buildDocument(inputs, fees, calendar) {
             cells.curriculum += '\n' + pro.map((p) => L(lang, `(Quarter ${p.qid.slice(1)}: ${p.days} of ${p.full} days)`, `(Quý ${p.qid.slice(1)}: ${p.days}/${p.full} ngày)`)).join('\n')
           }
           const disc = qa.map(applyDisc)
-          const vals = showDiscountCol ? qa : disc
-          ;['q1', 'q2', 'q3', 'q4'].forEach((k, i) => { cells[k] = vals[i] })
-          cells.total = vals.reduce((a, b) => a + b, 0)
+          const vals = showDiscountCol && !dPct ? qa : disc
+          QUARTERS.forEach((k, i) => { cells[k] = vals[i] })
+          cells.total = (showDiscountCol ? qa : disc).reduce((a, b) => a + b, 0)
           if (showDiscountCol) cells.disc = disc.reduce((a, b) => a + b, 0)
-          if (showDiscountCol && dPct) { ['q1', 'q2', 'q3', 'q4'].forEach((k, i) => { cells[k] = disc[i] }) }
         } else if (plan === 'split') {
           const splits = inputs.splits?.length ? inputs.splits : [{ pct: 50 }, { pct: 50 }]
           // Installments split the full-year price chosen in `splitBase`
@@ -466,7 +484,7 @@ export function buildDocument(inputs, fees, calendar) {
       heading: L(lang, `TUITION FEE FOR TRIAL DAY, YEAR ${sy}`, `PHÍ NGÀY HỌC THỬ, NĂM HỌC ${sy}`),
       subheading: period.rangeEn && inputs.periodId === 'custom' ? `(${L(lang, period.rangeEn, period.rangeVi)})` : '',
       columns: [
-        { key: 'name', label: L(lang, "Student's Name", 'Tên học sinh'), type: 'text' },
+        { key: 'name', label: L(lang, "Student's Name", 'Tên học viên'), type: 'text' },
         { key: 'curriculum', label: L(lang, 'Curriculum', 'Chương trình'), type: 'text' },
         { key: 'days', label: L(lang, 'Number of days', 'Số ngày'), type: 'number' },
         { key: 'rate', label: L(lang, 'Price per day', 'Đơn giá'), type: 'money' },
@@ -505,7 +523,7 @@ export function buildDocument(inputs, fees, calendar) {
       heading: L(lang, `MEAL FEE FOR ${periodPhraseEn.toUpperCase()}, YEAR ${sy}`, `PHÍ TIỀN ĂN CHO ${periodLabelVi.toUpperCase()}, NĂM HỌC ${sy}`),
       subheading: `(${L(lang, period.rangeEn, period.rangeVi)})`,
       columns: [
-        { key: 'name', label: L(lang, "Student's Name", 'Tên học sinh'), type: 'text' },
+        { key: 'name', label: L(lang, "Student's Name", 'Tên học viên'), type: 'text' },
         { key: 'days', label: L(lang, 'Number of days', 'Số bữa ăn'), type: 'number' },
         { key: 'rate', label: L(lang, 'Price per day', 'Đơn giá'), type: 'money' },
         { key: 'total', label: L(lang, 'Total', 'Tổng cộng'), type: 'money' },
@@ -526,7 +544,7 @@ export function buildDocument(inputs, fees, calendar) {
       heading: L(lang, `TRANSPORTATION FEE FOR ${periodPhraseEn.toUpperCase()}, YEAR ${sy}`, `PHÍ XE ĐƯA ĐÓN CHO ${periodLabelVi.toUpperCase()}, NĂM HỌC ${sy}`),
       subheading: `(${L(lang, period.rangeEn, period.rangeVi)})`,
       columns: [
-        { key: 'name', label: L(lang, "Student's Name", 'Tên học sinh'), type: 'text' },
+        { key: 'name', label: L(lang, "Student's Name", 'Tên học viên'), type: 'text' },
         { key: 'months', label: L(lang, 'Number of months', 'Số tháng'), type: 'number' },
         { key: 'rate', label: L(lang, 'Price per month', 'Đơn giá/tháng'), type: 'money' },
         { key: 'total', label: L(lang, 'Total', 'Tổng cộng'), type: 'money' },
@@ -558,7 +576,7 @@ export function buildDocument(inputs, fees, calendar) {
       heading: L(lang, `ADMISSION AND OTHER FEES, YEAR ${sy}`, `PHÍ NHẬP HỌC VÀ CÁC KHOẢN PHÍ KHÁC, NĂM HỌC ${sy}`),
       subheading: '',
       columns: [
-        { key: 'name', label: L(lang, "Student's Name", 'Tên học sinh'), type: 'text' },
+        { key: 'name', label: L(lang, "Student's Name", 'Tên học viên'), type: 'text' },
         { key: 'desc', label: L(lang, 'Description', 'Nội dung'), type: 'text' },
         { key: 'total', label: L(lang, 'Amount', 'Số tiền'), type: 'money' },
       ],

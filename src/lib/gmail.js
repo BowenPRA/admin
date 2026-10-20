@@ -13,8 +13,8 @@ export const gmailConfigured = Boolean(CLIENT_ID)
 
 // gmail.compose covers creating drafts and sending.
 const SCOPE = 'https://www.googleapis.com/auth/gmail.compose'
-let token = null
-let tokenExp = 0
+// One token per permission: Gmail drafts here, reading the Drive folder's list in lib/driveDocs.js.
+const tokens = new Map() // scope -> { token, exp }
 
 function loadGis() {
   if (window.google?.accounts?.oauth2) return Promise.resolve()
@@ -32,24 +32,36 @@ function loadGis() {
 export function prepareGmail() { if (gmailConfigured) loadGis().catch(() => {}) }
 
 // Call first thing in a click handler: the sign-in popup needs the click.
-export async function getToken() {
-  if (!gmailConfigured) throw new Error('Gmail is not connected yet (VITE_GOOGLE_CLIENT_ID is missing). See README → Google setup.')
-  if (token && Date.now() < tokenExp - 60_000) return token
+export const getToken = () => googleToken(SCOPE)
+
+/** Drops a token Google refused, so the next call signs in again. */
+export const forgetGoogleToken = (scope) => { tokens.delete(scope) }
+
+/** True while this tab holds a Google token for `scope` that has not run out. */
+export const hasGoogleToken = (scope) => { const t = tokens.get(scope); return !!t && Date.now() < t.exp - 60_000 }
+
+/**
+ * A Google token for one permission (scope), from the admin@ account by default. The first
+ * call in a session opens Google's sign-in; later ones reuse the token until it runs out.
+ */
+export async function googleToken(scope, hint = SENDER) {
+  if (!gmailConfigured) throw new Error('Google is not connected yet (VITE_GOOGLE_CLIENT_ID is missing). See README → Google setup.')
+  if (hasGoogleToken(scope)) return tokens.get(scope).token
   await loadGis()
+  const had = tokens.has(scope)
   return new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
-      scope: SCOPE,
-      hint: SENDER,
+      scope,
+      hint,
       callback: (resp) => {
         if (resp.error) { reject(new Error(resp.error_description || resp.error)); return }
-        token = resp.access_token
-        tokenExp = Date.now() + (Number(resp.expires_in) || 3600) * 1000
-        resolve(token)
+        tokens.set(scope, { token: resp.access_token, exp: Date.now() + (Number(resp.expires_in) || 3600) * 1000 })
+        resolve(resp.access_token)
       },
       error_callback: (e) => reject(new Error(e?.message || 'Google sign-in was closed')),
     })
-    client.requestAccessToken({ prompt: token ? '' : 'consent' })
+    client.requestAccessToken({ prompt: had ? '' : 'consent' })
   })
 }
 
@@ -134,7 +146,7 @@ async function gmailPost(path, body) {
   if (!res.ok) {
     let msg = `${res.status}`
     try { msg = (await res.json()).error?.message || msg } catch { /* ignore */ }
-    if (res.status === 401 || res.status === 403) token = null
+    if (res.status === 401 || res.status === 403) forgetGoogleToken(SCOPE)
     throw new Error(`Gmail: ${msg}`)
   }
   return res.json()
@@ -162,13 +174,13 @@ export async function createDraftUpload(m, replaceId = '') {
   if (replaceId) {
     const up = await send('PUT', `https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts/${encodeURIComponent(replaceId)}?uploadType=media`)
     if (up.ok) { const d = await up.json(); return { id: d.id, messageId: d.message?.id, link: draftLink(d.message?.id), replaced: true } }
-    if (up.status === 401 || up.status === 403) { token = null; throw new Error(`Gmail: ${up.status}`) }
+    if (up.status === 401 || up.status === 403) { forgetGoogleToken(SCOPE); throw new Error(`Gmail: ${up.status}`) }
   }
   const res = await send('POST', 'https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts?uploadType=media')
   if (!res.ok) {
     let msg = `${res.status}`
     try { msg = (await res.json()).error?.message || msg } catch { /* ignore */ }
-    if (res.status === 401 || res.status === 403) token = null
+    if (res.status === 401 || res.status === 403) forgetGoogleToken(SCOPE)
     throw new Error(`Gmail: ${msg}`)
   }
   const d = await res.json()

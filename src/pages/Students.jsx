@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet, Printer, Copy, Utensils } from 'lucide-react'
+import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet, Printer, Copy, Utensils, FolderOpen } from 'lucide-react'
 import { db } from '../lib/db'
 import { exportStudentList } from '../lib/exportExcel'
 import { useT } from '../lib/i18n'
@@ -14,6 +14,7 @@ import { normalizeCode, needsCodeUpdate, nextStudentCode } from '../lib/studentI
 import { Card, Checkbox, Empty, Spinner, Avatar, Segmented, SearchInput, PageHeader, Menu } from '../components/ui'
 import StudentModal from '../components/students/StudentModal'
 import FamilyModal from '../components/students/FamilyModal'
+import DriveDocsModal from '../components/students/DriveDocsModal'
 import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact, isEnrolled, isPending, isPast, statusOf, familyStatus, partialFrom, endDateOf, startsLater } from '../lib/studentRecords'
 import { finishingThisQuarter, dayText } from '../lib/studentDates'
 import { todayIso } from '../lib/attendanceSummary'
@@ -89,6 +90,7 @@ export default function Students() {
   const [sort, setSort] = useState({ col: 'level', dir: 'asc' })
   const [editing, setEditing] = useState(null)
   const [editingFam, setEditingFam] = useState(null)
+  const [docsOpen, setDocsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const rosterInput = useRef(null)
 
@@ -373,6 +375,7 @@ export default function Students() {
             { label: t('buildFamilies'), icon: Users, onClick: buildFamilies, disabled: busy, hint: lang === 'vi' ? 'Theo email / điện thoại phụ huynh chung' : 'Match siblings by shared parent email or phone' },
             { label: t('addFamily'), icon: Users, onClick: () => setEditingFam(blankFamily()) },
             { label: t('exportStudentList'), icon: FileSpreadsheet, onClick: exportList, disabled: busy || !rows.length, hint: t('exportStudentListHint', { n: rows.length }) },
+            { label: t('docsSummary'), icon: FolderOpen, onClick: () => setDocsOpen(true), hint: t('docsSummaryHint') },
           ]} />
         )}
         {canEdit && <input ref={rosterInput} type="file" accept=".json,application/json" className="hidden"
@@ -567,6 +570,7 @@ export default function Students() {
           students={students} families={families} schoolYear={fees?.schoolYear} calendar={calendar} canEdit={canEdit} t={t} lang={lang}
           checklist={canEdit ? { ctx: checklistCtx, me, onChanged: reloadAll } : null} onError={(m) => toast.error(m)} />
       )}
+      {docsOpen && <DriveDocsModal onClose={() => setDocsOpen(false)} onOpenStudent={(s) => { setDocsOpen(false); setEditing({ ...blankStudent(), ...s }) }} />}
       {editingFam && (
         <FamilyModal key={editingFam.id || 'new-family'} value={editingFam} onClose={() => setEditingFam(null)} onSave={saveFamily} onDelete={removeFamily}
           kids={kidsByFamily[editingFam.id] || []} t={t} />

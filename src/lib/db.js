@@ -39,6 +39,9 @@ const TABLES = {
   enrollmentPrivate: 'adm_enrollment_private',
   // To-Do: tasks for staff and for Claude (office only)
   todos: 'adm_todos',
+  // Students' documents on Google Drive: the folder's list of files, and the office's corrections (office only)
+  driveFiles: 'adm_drive_files',
+  driveDocLinks: 'adm_drive_doc_links',
 }
 
 // Rows that come straight from form inputs may hold '' where Postgres wants
@@ -132,6 +135,12 @@ const localAdapter = {
     lsWrite(d)
   },
   async removeStrict(table, id) { return this.remove(table, id) },
+  async removeMany(table, ids) {
+    const d = lsRead()
+    const drop = new Set(ids)
+    d[table] = (d[table] || []).filter((r) => !drop.has(r.id))
+    lsWrite(d)
+  },
   // Database functions only exist in Supabase.
   async rpc() { throw new Error('This only works when connected to the shared database.') },
   async getSetting(key) {
@@ -220,6 +229,13 @@ const supaAdapter = {
     const { data, error } = await supabase.from(table).delete().eq('id', id).select('id')
     throwIf(error)
     if (!data?.length) throw new Error('This could not be removed: your account is not allowed to, or it was already removed.')
+  },
+  // In batches: a long list of ids in one request would make the address too long.
+  async removeMany(table, ids) {
+    for (let i = 0; i < ids.length; i += 200) {
+      const { error } = await supabase.from(table).delete().in('id', ids.slice(i, i + 200))
+      throwIf(error)
+    }
   },
   async rpc(name, args) {
     const { data, error } = await supabase.rpc(name, args)
@@ -431,6 +447,26 @@ export const db = {
     /** Adds the pending student for a form that came in without one; returns the student's id. */
     makeStudent: (id) => A.rpc('adm_enrollment_make_student', { p_id: id }),
   },
+  // Students' documents on Drive (supabase/updates-2026-10-19-drive-docs.sql, lib/driveDocs.js).
+  driveFiles: {
+    list: () => A.list(TABLES.driveFiles),
+    /** Puts in the list Drive gave, in batches, and takes out what Drive no longer has. */
+    async replaceAll(rows) {
+      const old = await A.list(TABLES.driveFiles)
+      for (let i = 0; i < rows.length; i += 500) await A.upsertMany(TABLES.driveFiles, rows.slice(i, i + 500))
+      const keep = new Set(rows.map((r) => r.id))
+      await A.removeMany(TABLES.driveFiles, old.filter((r) => !keep.has(r.id)).map((r) => r.id))
+    },
+  },
+  driveDocLinks: {
+    list: () => A.list(TABLES.driveDocLinks),
+    /** One correction per file and student: saving again changes it. */
+    save: (row) => A.upsertBy(TABLES.driveDocLinks, [row], ['file_id', 'student_id']).then((r) => r[0]),
+    remove: (id) => A.removeStrict(TABLES.driveDocLinks, id),
+  },
+  /** When Drive was last read, by whom, and how many files it held. */
+  getDriveCheck: () => A.getSetting('driveDocs'),
+  setDriveCheck: (v) => A.setSetting('driveDocs', v),
   async getFees() {
     const v = await A.getSetting('fees')
     // `school` is merged key by key so fields added later (e.g. the center name) reach older saved settings.

@@ -73,9 +73,12 @@ const LOWER_SECONDARY_YEARS = ['Year 7', 'Year 8', 'Year 9']
 // emotional development is in the Early Years learner skills.
 export const SUBJECTS = [
   { key: 'communication', kind: 'academic', name: 'Communication & Language', name_vi: 'Giao tiếp & Ngôn ngữ', icon: 'chat', scored: false, yearGroups: EARLY_YEARS },
-  { key: 'math', kind: 'academic', name: 'Mathematics', name_vi: 'Toán học', icon: 'calculator', scored: true },
-  { key: 'science', kind: 'academic', name: 'Science', name_vi: 'Khoa học', icon: 'flask', scored: true },
-  { key: 'english', kind: 'academic', name: 'English', name_vi: 'Tiếng Anh', icon: 'book', scored: true },
+  // The academic areas carry last year's names, which present them as English classes
+  // (Ms. Xuan, 20 October 2026). `short` / `short_vi` is the label in the narrow scores
+  // table, where the full name would need three lines.
+  { key: 'math', kind: 'academic', name: 'Intensive English in Math topics', name_vi: 'Tiếng Anh nâng cao theo chủ đề Toán học', short: 'Math topics', short_vi: 'Chủ đề Toán học', icon: 'calculator', scored: true },
+  { key: 'science', kind: 'academic', name: 'Intensive English in Science topics', name_vi: 'Tiếng Anh nâng cao theo chủ đề Khoa học', short: 'Science topics', short_vi: 'Chủ đề Khoa học', icon: 'flask', scored: true },
+  { key: 'english', kind: 'academic', name: 'English Literacy', name_vi: 'Tiếng Anh', icon: 'book', scored: true },
   { key: 'understanding_world', kind: 'academic', name: 'Understanding the World', name_vi: 'Hiểu biết về thế giới', icon: 'sprout', scored: false, yearGroups: EARLY_YEARS },
   { key: 'applied_english', kind: 'specialist', name: 'Applied English', name_vi: 'Tiếng Anh ứng dụng', icon: 'languages', scored: false, yearGroups: EARLY_YEARS },
   { key: 'art_of_science', kind: 'specialist', name: 'Art of Science', name_vi: 'Nghệ thuật Khoa học', icon: 'palette', scored: false },

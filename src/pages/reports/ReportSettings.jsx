@@ -119,6 +119,12 @@ function SettingsForm({ initial }) {
                 </div>
               </div>
               {sub.kind === 'academic' && <div className="sm:col-span-6"><Checkbox checked={sub.scored !== false} onChange={(v) => set(`subjects.${i}.scored`, v)} label="Has scores (Q1–Q4 quarterly reviews and the end-of-year summative assessment)" /></div>}
+              {sub.kind === 'academic' && sub.scored !== false && (
+                <div className="grid gap-2 sm:col-span-6 sm:grid-cols-2">
+                  <Field label="Name in the scores table" hint="Optional. The scores table has a narrow column: a name longer than about two short lines needs a shorter label here."><TextInput value={sub.short || ''} onChange={(v) => set(`subjects.${i}.short`, v)} /></Field>
+                  <Field label="Name in the scores table (Vietnamese)"><TextInput value={sub.short_vi || ''} onChange={(v) => set(`subjects.${i}.short_vi`, v)} /></Field>
+                </div>
+              )}
               {sub.kind === 'vocational' && <div className="sm:col-span-6"><Checkbox checked={!!sub.comment} onChange={(v) => set(`subjects.${i}.comment`, v)} label="Individual comment for each student instead of the course description (still prints with the vocational areas)" /></div>}
             </div>
           ))}

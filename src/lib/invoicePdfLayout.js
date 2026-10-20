@@ -3,7 +3,7 @@
 // loads pdfmake + images and picks the largest size that fits one A4 page.
 
 import { fmt, fmtSigned } from './money.js'
-import { columnTotal, docTotals } from './pricing.js'
+import { columnTotal, docTotals, sectionBilled } from './pricing.js'
 import { FORCE_MAJEURE } from './forceMajeure.js'
 
 // Sacombank · CN CTY TNHH PALM RIVER TAI HOI AN · 040103245445.
@@ -100,7 +100,7 @@ export function invoicePdfDefinition({ doc, fees, number, issueDate, dueDate, st
   const metaItems = [
     number && [metaCell(vi ? 'Số' : 'Invoice no.', number), 'auto'],
     issueDate && [metaCell(vi ? 'Ngày' : 'Date', issueDate), 'auto'],
-    students && [metaCell(vi ? 'Học sinh' : 'Student(s)', students), '*'],
+    students && [metaCell(vi ? 'Học viên' : 'Student(s)', students), '*'],
     [metaCell(vi ? 'Tổng thanh toán (VNĐ)' : 'Total due (VND)', fmt(totals.total), { big: true, color: C.green, right: true }), 'auto'],
   ].filter(Boolean)
   const meta = {
@@ -192,6 +192,41 @@ export function invoicePdfDefinition({ doc, fees, number, issueDate, dueDate, st
     }
     const extra = []
     const partBilled = moneyCols.filter((c) => c.key !== 'rate').length > s.billedKeys.length && s.billedKeys.length > 0
+    // Only part of the table is due now (some quarters, one installment): a box right
+    // under the highlighted columns gives the amount this payment asks for.
+    const billedAt = cols.map((c, i) => (billed(c) ? i : -1)).filter((i) => i > 0)
+    if (partBilled && billedAt.length) {
+      const first = billedAt[0]
+      const last = billedAt[billedAt.length - 1]
+      const off = [false, false, false, false]
+      const label = s.kind === 'tuition'
+        ? (vi ? 'Học phí cần thanh toán đợt này' : 'Tuition due in this payment')
+        : (vi ? 'Cần thanh toán đợt này' : 'Due in this payment')
+      const row = cols.map((c, i) => {
+        if (i === 0) return { text: label, colSpan: first, alignment: 'right', bold: true, fontSize: 8 * k, color: C.navy, border: off, margin: [0, 1.5 * k, 0, 0] }
+        if (i < first) return {}
+        if (i === first) {
+          return {
+            text: fmt(sectionBilled(s)), colSpan: last - first + 1, alignment: 'center', bold: true, fontSize: 10 * k, color: C.navy,
+            fillColor: C.billed, border: [true, true, true, true], borderColor: [C.blue, C.blue, C.blue, C.blue],
+          }
+        }
+        if (i <= last) return {}
+        return { text: '', border: off }
+      })
+      extra.push({
+        table: { widths, body: [row], dontBreakRows: true },
+        layout: {
+          // No borders unless a cell asks for one: pdfmake replaces the cells under a colSpan
+          // with its own placeholders, which would otherwise draw a line over the label.
+          defaultBorder: false,
+          // Side lines only at the box's edges, so its columns line up with the table above.
+          hLineWidth: () => 1, vLineWidth: (i) => (i === first || i === last + 1 ? 1 : 0), hLineColor: () => C.blue, vLineColor: () => C.blue,
+          paddingLeft: () => pad.x, paddingRight: () => pad.x, paddingTop: () => pad.y + 0.6 * k, paddingBottom: () => pad.y + 0.6 * k,
+        },
+        margin: [0, 3 * k, 0, 0],
+      })
+    }
     if (partBilled && !legendShown) {
       legendShown = true
       extra.push({

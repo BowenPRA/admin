@@ -5,8 +5,8 @@ import { db, isDuplicate } from '../lib/db'
 import { useToast } from '../lib/toast'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
-import { LEVELS, PROGRAMS, hasProgram, periodInfo, mealRateFor, nextLevel } from '../lib/fees'
-import { buildDocument, defaultStudentOptions, docTotals, PERIOD_OPTIONS, PLAN_OPTIONS, studentDisplayName, quarterDays, billedDays, withStudentChoice, onRoster, defaultQ4Full, orderedStudents, smartDueDate } from '../lib/pricing'
+import { LEVELS, PROGRAMS, hasProgram, periodInfo, periodQuarters, periodForQuarters, mealRateFor, nextLevel } from '../lib/fees'
+import { buildDocument, defaultStudentOptions, docTotals, PERIOD_OPTIONS, PLAN_OPTIONS, studentDisplayName, quarterDays, billedDays, withStudentChoice, onRoster, defaultQ4Full, orderedStudents, smartDueDate, quartersBeforeStart } from '../lib/pricing'
 import { fmt, fmtDate, todayISO } from '../lib/money'
 import { suggestClass } from '../lib/placement'
 import { ageOf, isBillable, isPast, isPending, endDateOf } from '../lib/studentRecords'
@@ -165,6 +165,8 @@ function Builder() {
 
   // Period or plan change: refresh day/month counts for everyone.
   const changePeriod = (periodId) => {
+    // Paying by quarter, the period picks the quarters billed: Semester 2 ticks Quarters 3 and 4.
+    if (inputs.plan === 'quarterly' && periodQuarters(periodId).length) return setQuarters(periodQuarters(periodId))
     const p = periodInfo(periodId, calendar)
     set({ periodId, students: keptFor({ ...inputs, periodId }).map((e) => ({ ...e, opts: { ...e.opts, mealDays: periodId === 'custom' ? e.opts.mealDays : p.days, transportMonths: periodId === 'custom' ? e.opts.transportMonths : p.months } })) })
   }
@@ -174,14 +176,15 @@ function Builder() {
     const p = periodInfo(periodId, calendar)
     set({ plan, periodId, billQuarters, students: keptFor({ ...inputs, plan, periodId, billQuarters }).map((e) => ({ ...e, opts: { ...e.opts, mealDays: periodId === 'custom' ? e.opts.mealDays : p.days, transportMonths: periodId === 'custom' ? e.opts.transportMonths : p.months, meals: plan === 'trial' ? false : e.opts.meals } })) })
   }
-  const toggleQuarter = (qid) => {
-    const next = inputs.billQuarters.includes(qid) ? inputs.billQuarters.filter((x) => x !== qid) : [...inputs.billQuarters, qid].sort()
+  // The quarters billed now, and the period they make (Quarters 2, 3 and 4; Semester 2; ...).
+  // Meal days add up the quarters' days; transport months are the period's.
+  const setQuarters = (next) => {
     if (!next.length) return
-    // billing one quarter: meals/transport for that quarter; several: sum them
-    const months = next.reduce((s, x) => s + periodInfo(x, calendar).months, 0)
-    const periodId = next.length === 1 ? next[0] : (next.join('') === 'q1q2' ? 'sem1' : next.join('') === 'q3q4' ? 'sem2' : next.length === 4 ? 'year' : inputs.periodId)
+    const periodId = periodForQuarters(next)
+    const months = periodInfo(periodId, calendar).months
     set({ billQuarters: next, periodId, students: keptFor({ ...inputs, billQuarters: next, periodId }).map((e) => ({ ...e, opts: { ...e.opts, mealDays: billedDays(next, e.opts, calendar), transportMonths: months } })) })
   }
+  const toggleQuarter = (qid) => setQuarters(inputs.billQuarters.includes(qid) ? inputs.billQuarters.filter((x) => x !== qid) : [...inputs.billQuarters, qid].sort())
   // Prorate one quarter for a student (days = null turns it off). Meal days
   // follow the prorated days for the quarters billed now.
   const prorateStudent = (e, qid, days) => {
@@ -352,7 +355,11 @@ function Builder() {
         <Card title={t('choosePlan')}>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field label={t('plan')}><Select value={inputs.plan} onChange={changePlan} options={PLAN_OPTIONS.map((p) => ({ value: p.id, label: uiLang === 'vi' ? p.vi : p.en }))} /></Field>
-            <Field label={t('period')}><Select value={inputs.periodId} onChange={changePeriod} options={PERIOD_OPTIONS.map((p) => ({ value: p.id, label: uiLang === 'vi' ? p.vi : p.en }))} /></Field>
+            <Field label={t('period')}><Select value={inputs.periodId} onChange={changePeriod} options={[
+              ...PERIOD_OPTIONS.map((p) => ({ value: p.id, label: uiLang === 'vi' ? p.vi : p.en })),
+              // Other quarters ticked together (Quarters 2 and 3, ...) are listed while they are chosen.
+              ...(PERIOD_OPTIONS.some((p) => p.id === inputs.periodId) ? [] : [{ value: inputs.periodId, label: periodInfo(inputs.periodId, calendar)[uiLang === 'vi' ? 'vi' : 'en'] }]),
+            ]} /></Field>
             <Field label={t('dueDate')}>
               <input type="date" className="input" value={inputs.dueDate || autoDue} onChange={(e) => set({ dueDate: e.target.value })} />
               {inputs.dueDate
@@ -434,6 +441,15 @@ function Builder() {
                         {t(ends.out ? 'endOutOnInvoice' : 'endPartInvoice', { name: s.nickname || s.full_name, date: dayText(ends.end, uiLang), quarter: uiLang === 'vi' ? ends.first.vi : ends.first.en })}
                       </p>
                     )
+                  })()}
+                  {(() => {
+                    // Started after a quarter that is ticked to bill had ended: more likely a slip.
+                    const before = quarterly ? quartersBeforeStart(s, [], calendar) : []
+                    const billed = before.filter((k) => inputs.billQuarters.includes(k))
+                    if (!billed.length) return null
+                    const args = { name: s.nickname || s.full_name, date: dayText(String(s.start_date).slice(0, 10), uiLang) }
+                    const named = (ids) => periodInfo(ids.join('+'), calendar)[uiLang === 'vi' ? 'vi' : 'en']
+                    return <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{t('startBilledBefore', { ...args, quarters: named(billed) })}</p>
                   })()}
                   <div className="mb-3 grid gap-3 sm:grid-cols-2">
                     <Field label={t('levelForInvoice')}>

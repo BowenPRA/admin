@@ -694,6 +694,9 @@ function buildPage(item, M, { proof, icons = {} }) {
     const rowHeights = shareHeight(sum(comfyRows) <= h - BAR ? comfyRows : plainRows, h - BAR)
     const comments = []
     let ry = y + BAR
+    // One icon size for every academic row, set by the row with the least room (a two-line
+    // name takes some), so the icons match; below 14pt none of them shows.
+    const iconD = Math.min(26, ...rows.map((r, i) => rowHeights[i] - 12 - 4 - r.label.textH))
     rows.forEach((r, i) => {
       const rowH = rowHeights[i]
       const sub = subjectByKey(settings, r.s.subject_key)
@@ -705,9 +708,8 @@ function buildPage(item, M, { proof, icons = {} }) {
       // Subject column, centred: the icon on top, then the name, teacher and level.
       const colMid = X + nameW / 2
       const { teacher, wrap, nameH, textH } = r.label
-      const iconD = Math.min(26, rowH - 12 - 4 - textH)
       let cy = ry + 6.5
-      if (iconD >= 16) {
+      if (iconD >= 14) {
         badge(sub.icon, colMid, cy + iconD / 2, iconD, theme.tint, theme.accent)
         cy += iconD + 4
       } else {
@@ -783,7 +785,23 @@ function buildPage(item, M, { proof, icons = {} }) {
         const ry = bodyY + i * rh
         if (i > 0) line(x + 6, ry, x + w - 6, ry, { color: C.line })
         const cy = ry + rh / 2
-        putLine(x + 8, midTop(cy, 7.6), aw - 10, nameIn(subjectByKey(settings, r.key)), 7.6, { bold: true, color: C.navy })
+        // The area's short label if it has one ("Math topics"), else its name. A long one
+        // wraps onto two lines, a little smaller (three at 6.8pt if it must), centred on
+        // the row, rather than being cut.
+        const sub = subjectByKey(settings, r.key)
+        const areaName = (vi ? sub?.short_vi : sub?.short) || nameIn(sub)
+        const areaW = aw - 10
+        if (M.width({ text: areaName, ...T(7.6, { pitch: 1, bold: true, color: C.navy }) }) <= areaW) {
+          putLine(x + 8, midTop(cy, 7.6), areaW, areaName, 7.6, { bold: true, color: C.navy })
+        } else {
+          let wrap = null
+          for (const size of [7.6, 7.2, 6.8]) {
+            const node = { text: areaName, ...T(size, { bold: true, color: C.navy, pitch: 1.1 }) }
+            wrap = { node, size, lines: Math.round(M.height(node, areaW) / (size * 1.1)) }
+            if (wrap.lines <= 2) break
+          }
+          put(x + 8, midTop(cy - ((wrap.lines - 1) * wrap.size * 1.1) / 2, wrap.size), areaW, wrap.node)
+        }
         r.cells.forEach((c, k) => cell(c, x + aw + k * pw, pw, cy))
         cell(r.summative, sx, sw, cy)
       })

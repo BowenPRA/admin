@@ -179,7 +179,6 @@ A commit that is not pushed exists only on the laptop. Push once the work is che
 |---|---|---|
 | 16 October 2026 | Nga cannot own a lead | She is an office account in the script but not in `OFFICE_ACCOUNTS`. Whether that is intended is not known |
 | 16 October 2026 | Newsletter build function | Needs a GitHub key so the website rebuilds when an issue is published |
-| 2 October 2026 | Older Vietnamese wording | About 43 older strings in The Current (an invoice column, receipts, the force majeure clause, staff labels) use the older word for student. Bowen said to hold them; only new text uses "học viên" |
 | 7 October 2026 | A documents section on the student window | Passports and uploads reachable from the student's own record |
 | 1 October 2026 | Practice packets in the Assessments library | Keep them beside the assessment papers, or take them out |
 
@@ -278,6 +277,7 @@ Do not "fix" these.
 
 Move items here when they are fixed, newest first, with the date and one line on how.
 
+- **Older Vietnamese wording in The Current.** About 43 older strings used the old word for students; Bowen held them on 2 October 2026. Closed 20 October 2026: the invoices, the receipt, the force majeure clause and every screen label say "học viên". Invoices saved before then keep the old word in their saved table until they are rebuilt.
 - **The menu mailing list waited for the meals answers.** Closed 15 October 2026: every meals answer filled in, list synced.
 - **Student Google accounts could email anyone.** Closed 9 October 2026: delivery rules per unit.
 - **The invoice bug list of 17 September 2026** (a student's level written back from an invoice, receipt numbers not unique, last save wins on paid). Closed 1 October 2026 in the code; the receipt-number file is listed above as unconfirmed.

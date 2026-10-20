@@ -73,14 +73,16 @@ A template is the set of learning areas one stage's reports contain. The templat
 
 | Template | Year groups | Academic | Specialist | Vocational | Review scores |
 |---|---|---|---|---|---|
-| Early Years | Nursery, Kindergarten | Communication & Language, Mathematics, Understanding the World | Applied English, Cooking (longer comments) | Physical Development (an individual comment), Expressive Arts & Design | None |
-| Primary | Year 1 to Year 6 | Mathematics, Science, English | Art & Crafts, Cooking, Movement, Master Minds (Year 1 only) | Technology, Wellbeing (Years 2 to 6), Everyday Experts (Years 2 to 6), Presentation & Play (Year 1 only) | Years 4 to 6 only |
-| Lower Secondary | Year 7 to Year 9 | Mathematics, Science, English | Art of Science, History, Movement (Year 7 only) | Executive Function, Technology, Wellbeing | Every year group |
+| Early Years | Nursery, Kindergarten | Communication & Language, Intensive English in Math topics, Understanding the World | Applied English, Cooking (longer comments) | Physical Development (an individual comment), Expressive Arts & Design | None |
+| Primary | Year 1 to Year 6 | Intensive English in Math topics, Intensive English in Science topics, English Literacy | Art & Crafts, Cooking, Movement, Master Minds (Year 1 only) | Technology, Wellbeing (Years 2 to 6), Everyday Experts (Years 2 to 6), Presentation & Play (Year 1 only) | Years 4 to 6 only |
+| Lower Secondary | Year 7 to Year 9 | Intensive English in Math topics, Intensive English in Science topics, English Literacy | Art of Science, History, Movement (Year 7 only) | Executive Function, Technology, Wellbeing | Every year group |
 
 - Early Years prints its own headings: "Areas of Learning" over the academic areas and "Physical & Creative Development" over the vocational ones. It has its own learner skills: Learning & Independence, and Personal, Social & Emotional, six skills each.
 - Since 19 October 2026, Early Years has Cooking beside Applied English under Specialist Learning, and Physical Development has an individual comment for each child instead of a class description. Physical Development still prints in the green "Physical & Creative Development" band, in a wider card beside Expressive Arts & Design, which keeps its class description. With every box full the page prints at 8pt, the same as Years 1 to 7. Before that, Applied English was one full-width card.
 - Primary and Lower Secondary share the learner skills: Foundational Learning Skills (Ready to Learn, Follows Instructions, Creativity, Grasps New Ideas, Continues to Try) and Social & Emotional Learning (Manages Emotions, Positive Relationships, Strong Sense of Identity, Motivation to Learn, Adaptability).
 - Years 1 to 3 have no review scores, so their learner skills print at full width.
+- Since 20 October 2026 the academic areas print with last year's names: "Intensive English in Math topics", "Intensive English in Science topics" and "English Literacy" (see [Rules and wording](#/handbook/rules)). In the narrow scores table Mathematics and Science print as "Math topics" and "Science topics". The names and the scores-table labels (**Name in the scores table**) are set in Reports → Settings.
+- A long name wraps onto two lines, a little smaller, in the name column and in the scores table instead of being cut; every academic row then shows its icon at the same, smaller size. With every box full the page still prints at the same size as before.
 
 ### The three tiers
 
