@@ -102,7 +102,7 @@ Every page you can open is listed in the menu down the left side of the screen, 
 ### ECAs
 
 - **What it is for:** the after-class activities (3:30 to 4:15 in Quarter 2): each quarter's term, its activities, who is on each list, and a register for each session. Added 21 October 2026, in place of keeping the lists from the Google Form by hand.
-- **Main things you do:** open an activity's card; on **Register** pick the session and tap **Present**, **Late** or **Absent**, or **Mark everyone else present**; on **Students** add students, move one to the waiting list or take one off; on **Summary** see each student's sessions; **Print register** for a paper copy. Office accounts also add a term (**New term**), change it (**Edit term**) and add or change activities.
+- **Main things you do:** see which activity runs on which day (each weekday has its own colour) and every week of the term on the term calendar; open an activity's tile; on **Register** pick the session and tap **Present**, **Late** or **Absent**, or **Mark everyone else present**; on **Students** add students, move one to the waiting list or take one off; on **Summary** see each student's sessions; **Print register** for a paper copy. Office accounts also add a term (**New term**), change it (**Edit term**) and add or change activities (**Add activity**, **Edit activity**); teachers cannot.
 - **Who sees it:** office accounts, and teachers who run an ECA this term. The teacher who runs an activity takes its register and changes its list; other activities are read-only for them.
 - Deeper: [Attendance and the schedule](#/handbook/attendance?s=ecas).
 
@@ -226,7 +226,7 @@ Each printout opens in a new tab with a toolbar: **Back**, the period or year gr
 | What prints | Opened from | Who |
 |---|---|---|
 | Attendance summary: an overview sheet, then one register per year group with its notes (A4 landscape) | **Attendance** → **Summary** → **Print summary** | Everyone; teachers their own year groups |
-| ECA register: one A4 page per activity with its students, allergies, a box per session (marks taken so far filled in) and the waiting list | **ECAs** → an activity → **Print register**, or **Print all registers** on the ECAs page | Everyone who can open ECAs |
+| ECA register: one A4 page per activity with its students, allergies, a box per week (marks taken so far filled in) and the waiting list | **ECAs** → an activity → **Print register**, or **Print all registers** on the ECAs page | Everyone who can open ECAs |
 | Class lists: one A4 page per class with photo, birthday, allergies and health notes, who to call, emergency contacts and pick-up list | **Students** → **Class lists** | Everyone; teachers their own classes; emergency contacts and pick-up for office accounts only. Marked confidential |
 | Fees summary: money received, invoiced, still owed and how late, for a month or the year | **Invoices** → **Print summary** | Office accounts |
 | Admissions summary: enquiries, stages, sources, tours and calls, enrollment forms, follow-ups due | **Leads** → **Print summary** | Office accounts |

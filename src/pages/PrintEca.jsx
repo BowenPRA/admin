@@ -5,7 +5,7 @@ import { useData } from '../lib/DataContext'
 import { useAuth } from '../lib/AuthContext'
 import { useT, tFor } from '../lib/i18n'
 import { many } from '../lib/printFormat'
-import { useOffDays, sessionDates, activitiesOf, membersOf, weekdayName, timeText, yearGroupsText, activityName, teacherName, todayLocal } from '../lib/eca'
+import { useOffDays, sessionDates, activitiesOf, membersOf, weekdayName, timeText, yearGroupsText, activityName, teacherName, todayLocal, awayFromPra } from '../lib/eca'
 import { PrintShell, Masthead, layout, usePrintLang, H, mm, bodyWidth } from '../components/print/Sheets'
 
 // ECA registers on paper: one A4 portrait sheet per activity, its students down the side
@@ -21,7 +21,7 @@ const dayShort = (iso, lang) => { const [y, m, d] = iso.split('-').map(Number); 
 
 export default function PrintEca() {
   const { t } = useT()
-  const { loading, eca, students, teachers } = useData()
+  const { loading, eca, students, teachers, travel: trips } = useData()
   const { displayName } = useAuth()
   const [params, setParams] = useSearchParams()
   const { lang, setLang } = usePrintLang(params, setParams)
@@ -31,18 +31,29 @@ export default function PrintEca() {
   const term = eca.terms.find((x) => x.id === (one ? one.term_id : params.get('term')))
   const activities = useMemo(() => (one ? [one] : term ? activitiesOf(eca, term.id) : []), [one, term, eca])
 
-  // The marks taken so far, for every activity printed.
+  // The marks taken so far, for every activity printed, and the day register for the sessions
+  // held (a student absent from PRA that day is counted absent on the ECA register too).
   const [marks, setMarks] = useState(null)
+  const [daily, setDaily] = useState(null)
   const ids = activities.map((a) => a.id).join(',')
+  const today = todayLocal()
+  const heldKey = offDays && term ? [...new Set(activities.flatMap((a) => sessionDates(a, term, offDays)).filter((d) => d <= today))].sort().join(',') : null
   useEffect(() => {
     let alive = true
     Promise.all(activities.map((a) => db.eca.attendance.list({ activity_id: a.id }).catch(() => [])))
       .then((lists) => alive && setMarks(lists.flat()))
     return () => { alive = false }
   }, [ids]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (heldKey === null) return
+    let alive = true
+    ;(heldKey ? db.attendance.list({ date: heldKey.split(',') }) : Promise.resolve([])).catch(() => [])
+      .then((rows) => alive && setDaily(Object.fromEntries(rows.map((r) => [`${r.student_id}|${r.date}`, r.status]))))
+    return () => { alive = false }
+  }, [heldKey])
 
   const sheets = useMemo(() => {
-    if (!marks || !offDays || !term) return []
+    if (!marks || !daily || !offDays || !term) return []
     const blocks = [{ type: 'masthead', h: H.masthead }]
     activities.forEach((a, i) => {
       const list = membersOf(eca, a.id, students)
@@ -56,7 +67,7 @@ export default function PrintEca() {
         head: (first) => (first && named ? HEAD : 0) + H.listHead, tail: (last) => (last && waiting.length ? 6 : 0) + H.gap })
     })
     return layout(blocks, ORIENT)
-  }, [marks, offDays, term, activities, eca, students])
+  }, [marks, daily, offDays, term, activities, eca, students])
 
   const title = one ? activityName(one, lang) : T('ecaPrintAllTitle')
   const sub = one
@@ -66,19 +77,19 @@ export default function PrintEca() {
 
   return (
     <PrintShell T={T} lang={lang} setLang={setLang} orientation={ORIENT} back={back} by={displayName}
-      loading={loading || !marks || !offDays} sheets={sheets} empty={t('ecaNoActivities')}
+      loading={loading || (!!term && (!marks || !daily || !offDays))} sheets={sheets} empty={t('ecaNoActivities')}
       docTitle={`${T('ecaPrintTitle')} - ${title}`}
       running={<><span className="font-bold text-pra-navy">{T('ecaPrintTitle')}</span>  ·  {title}</>}
       footLeft={() => <span>{[term?.note, T('ecaPrintKey')].filter(Boolean).join('  ·  ')}</span>}
       renderBlock={(b) => {
         if (b.type === 'masthead') return <Masthead overline={`${T('ecaPrintTitle')}  ·  ${term?.name || ''}`} title={title} sub={sub} />
-        if (b.type === 'reg') return <RegisterBlock b={b} T={T} lang={lang} term={term} teachers={teachers} marks={marks} />
+        if (b.type === 'reg') return <RegisterBlock b={b} T={T} lang={lang} term={term} teachers={teachers} marks={marks} away={(sid, d) => awayFromPra(d <= today ? daily : null, trips, sid, d)} />
         return null
       }} />
   )
 }
 
-function RegisterBlock({ b, T, lang, term, teachers, marks }) {
+function RegisterBlock({ b, T, lang, term, teachers, marks, away }) {
   const { a, sessions } = b
   const today = todayLocal()
   // Name, year group and allergies on the left; one box per session; the total on the right.
@@ -121,7 +132,9 @@ function RegisterBlock({ b, T, lang, term, teachers, marks }) {
           {health > 0 && <span className="truncate text-[7pt] font-semibold text-red-700">{s?.allergies || ''}</span>}
           {sessions.map((d) => {
             const st = s && markOf(s.id, d)
-            return <span key={d} className="flex justify-center"><span className={`flex h-[5mm] w-[5mm] items-center justify-center rounded-[0.8mm] border border-slate-300 text-[8pt] ${st ? tone[st] : ''}`}>{st ? glyph[st] : ''}</span></span>
+            // Absent from PRA that day and not marked here: a pale A.
+            const off = s && !st && away(s.id, d)
+            return <span key={d} className="flex justify-center"><span className={`flex h-[5mm] w-[5mm] items-center justify-center rounded-[0.8mm] border border-slate-300 text-[8pt] ${st ? tone[st] : off ? 'bg-red-50 text-red-400' : ''}`}>{st ? glyph[st] : off ? glyph.absent : ''}</span></span>
           })}
           <span className="text-right text-[8pt] font-bold tabular-nums text-slate-700">{s && held.length ? `${held.filter((d) => ['present', 'late'].includes(markOf(s.id, d))).length}/${held.length}` : ''}</span>
         </div>
