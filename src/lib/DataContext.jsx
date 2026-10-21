@@ -12,24 +12,30 @@ const Ctx = createContext(null)
 // Data that came back the same keeps its old object, so pages (and PDFs) are not rebuilt for nothing.
 const keep = (prev, next) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next)
 const STALE_MS = 2 * 60 * 1000
+// ECAs: none until supabase/updates-2026-10-21-ecas.sql has run.
+const NO_ECA = { terms: [], activities: [], members: [], ready: false }
+const loadEca = () => Promise.all([db.eca.terms.list(), db.eca.activities.list(), db.eca.members.list()])
+  .then(([terms, activities, members]) => ({ terms, activities, members, ready: true }))
+  .catch(() => NO_ECA)
 
 export function DataProvider({ children }) {
-  const [state, setState] = useState({ loading: true, error: null, families: [], students: [], teachers: [], travel: [], fees: null, calendar: null, reportSettings: null, schedule: null })
+  const [state, setState] = useState({ loading: true, error: null, families: [], students: [], teachers: [], travel: [], eca: NO_ECA, fees: null, calendar: null, reportSettings: null, schedule: null })
 
   const loadedAt = useRef(0)
 
   // `quiet` is the refresh nobody asked for (the tab was looked at again): if it fails, what is on screen stays.
   const refresh = useCallback(async (quiet = false) => {
     try {
-      const [families, students, fees, calendar, teachers, reportSettings, schedule, travel] = await Promise.all([
+      const [families, students, fees, calendar, teachers, reportSettings, schedule, travel, eca] = await Promise.all([
         db.families.list(), db.students.list(), db.getFees(), db.getCalendar(),
         db.teachers.list().catch(() => []), db.getReportSettings(), db.getSchedule().catch(() => normalizeSchedule(null)),
         // Trips: none until supabase/updates-2026-10-01-travel.sql has run.
         db.travel.list().catch(() => []),
+        loadEca(),
       ])
       await preparePhotos(students.map((s) => s.photo)).catch(() => {})
       loadedAt.current = Date.now()
-      const next = { families, students, teachers, travel, fees, calendar, reportSettings, schedule }
+      const next = { families, students, teachers, travel, eca, fees, calendar, reportSettings, schedule }
       setState((s) => ({ loading: false, error: null, ...Object.fromEntries(Object.entries(next).map(([k, v]) => [k, keep(s[k], v)])) }))
     } catch (e) {
       if (quiet !== true) setState((s) => ({ ...s, loading: false, error: e.message || String(e) }))
@@ -40,6 +46,12 @@ export function DataProvider({ children }) {
   const refreshTravel = useCallback(async () => {
     const travel = await db.travel.list().catch(() => null)
     if (travel) setState((s) => ({ ...s, travel: keep(s.travel, travel) }))
+  }, [])
+
+  // After an ECA term, activity or list changes: only the ECAs are read again.
+  const refreshEca = useCallback(async () => {
+    const eca = await loadEca()
+    setState((s) => ({ ...s, eca: keep(s.eca, eca) }))
   }, [])
 
   useEffect(() => { refresh() }, [refresh])
@@ -61,7 +73,7 @@ export function DataProvider({ children }) {
     return () => clearInterval(id)
   }, [students])
 
-  return <Ctx.Provider value={{ ...state, refresh, refreshTravel }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ ...state, refresh, refreshTravel, refreshEca }}>{children}</Ctx.Provider>
 }
 
 export function useData() {

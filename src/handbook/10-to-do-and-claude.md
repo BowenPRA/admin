@@ -2,7 +2,7 @@ The To-Do tab is the office's shared task list, and the place where work for Cla
 
 ## What the tab is
 
-- **To-Do** in the header, at https://current.pra.edu.vn/#/todo. Office accounts only: Super Admin, Head, Admin. Teachers do not see it, and Ms. Xuan has no account.
+- **To-Do** in the menu on the left, at https://current.pra.edu.vn/#/todo. Office accounts only: Super Admin, Head, Admin. Teachers do not see it, and Ms. Xuan has no account.
 - It replaced the "Team To-Do & Issues Tracker" spreadsheet on 1 October 2026. Its 31 rows came across with their numbers (17 open, 14 done). The spreadsheet stays on Bowen's laptop as a record and is no longer used.
 - Why it moved: staff could not add or tick off tasks in a spreadsheet on one laptop, and an automatic run should not be writing a spreadsheet into a code project.
 - The Home page shows your share of it: "n for you · n late · n to check". Each opens the list.

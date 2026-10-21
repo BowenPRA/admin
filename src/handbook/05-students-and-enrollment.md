@@ -141,7 +141,8 @@ Each student's enrollment form, ID papers and photo stay where the office files 
 
 ### On the student window
 
-- The **Documents** section is for office accounts only; teachers do not see it. Files are grouped as **Enrollment form**, **Student's ID papers**, **Parents' ID papers**, **Photo** and **Other files**. A form sent from the website, and the files uploaded with it, show in the same list.
+- The **Documents** section is for office accounts only; teachers do not see it. Files are grouped as **Enrollment form**, **Not sorted yet**, **Student's ID papers**, **Parents' ID papers**, **Photo** and **Other files**. A form sent from the website, and the files uploaded with it, show in the same list.
+- **Not sorted yet** (in an amber box) holds the student's files whose names do not say what they are, such as a phone picture named IMG_1234.jpg. They do not count as ID papers or a photo until someone says what they are: click **Sort them** (see below).
 - Click a file name to see it inside The Current, with **Previous** and **Next** for the student's other files. The arrow on the right of a row opens the file in Drive in a new tab. **Open their folder in Drive** opens the folder that holds most of their files.
 - Google decides who sees a file: only accounts that can open the Palm River Administration Drive (admin@ and the office staff who are members of it). If the viewer stays blank or shows a Google page, open the file in Drive and sign in with such an account.
 - For an Enrolled or Pending student, an amber line names what was not found: enrollment form, ID papers or photo. The photo on the student's record in The Current counts as a photo.
@@ -152,9 +153,16 @@ Each student's enrollment form, ID papers and photo stay where the office files 
 - The Current reads the folder when someone clicks **Check Drive** (on the student window or in the summary). The time and account of the last check show beside the button.
 - The first time in a session, Google asks which account to use: choose admin@palmriveracademy.edu.vn. After that, opening a student window reads Drive again on its own when the last check is more than half an hour old.
 - File a new student's papers in Drive as before, then click **Check Drive**.
-- The matching reads names. A form named after the student, "Passport" or "Photo" with the student's first name, a folder named "<student> - Enrollment Form" or "<family name> Family" all work. A file with a camera name such as IMG_1234.jpg goes to whoever the folder belongs to, under **Other files**.
+- The matching reads names. A form named after the student, "Passport" or "Photo" with the student's first name, a folder named "<student> - Enrollment Form" or "<family name> Family" all work. A file with a camera name such as IMG_1234.jpg goes to whoever the folder belongs to, under **Not sorted yet**. Renaming such a file in Drive ("Passport Mia.jpg") also sorts it, at the next **Check Drive**.
+- The same picture copied into two children's folders (brothers and sisters) is taken to be the parents' ID papers and goes under **Parents' ID papers**, marked "Also in a brother's or sister's folder".
 
 > **Careful:** a file renamed or moved in Drive keeps its place on the student window only after the next **Check Drive**. A file deleted in Drive leaves the list at the next check.
+
+### Sorting files whose names say nothing
+
+Click a file to open it, or **Sort them** in the **Not sorted yet** box. Under the file, **What is this file?** has a button for each kind: **Student's ID papers**, **Parents' ID papers**, **Photo**, **Enrollment form**, **Other files**, and **Not this student's**. Click one: it saves at once and the next file not sorted yet opens. Files already sorted show the same buttons under **Filed as**, with their kind in blue, so a wrong one can be changed the same way.
+
+Built 20 October 2026, after a new student's passport pictures, named IMG_7091.JPG and so on, sat under Other files while the summary said they had no ID papers.
 
 ### Putting a wrong guess right
 
@@ -168,6 +176,8 @@ Corrections save at once and stay through later checks.
 ### The summary
 
 **Students** → **More** → **Documents on Drive** lists every Enrolled and Pending student with a tick or a dash for enrollment form, ID papers and photo. **Only students missing something** is ticked to start with. Click a name to open the student.
+
+An amber page with a question mark instead of a dash means the paper may be among files not sorted yet. Click **Sort 3** (the number of files) beside the student: the files open one after another with the buttons described above, and the window closes when nothing is left to sort or nothing is missing any more.
 
 Below the table, **Files from this year not given to a student** lists this school year's files the matching could not place. Pick a student in **Give to…** to put a file on their record. When everything from this year is placed, the list does not show.
 

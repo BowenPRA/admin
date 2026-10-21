@@ -1,8 +1,8 @@
-The Current is PRA's own web app for the office and the teachers: students, attendance, invoices, progress reports, leads, enrollment forms, photos and the task list. This chapter covers signing in, who can see what, and every page in the order the header shows them. Open it when you are new to the app, when you give someone access, or when someone leaves. Each page has its own chapter for the detail; the links are at the end of each part.
+The Current is PRA's own web app for the office and the teachers: students, attendance, invoices, progress reports, leads, enrollment forms, photos and the task list. This chapter covers signing in, who can see what, and every page in the order the menu lists them. Open it when you are new to the app, when you give someone access, or when someone leaves. Each page has its own chapter for the detail; the links are at the end of each part.
 
 ## What The Current is
 
-The Current runs in a web browser at https://current.pra.edu.vn, on a laptop or a phone (the register and the header are built for thumbs). It is one web page that talks straight to a database run by a company called Supabase. That database is shared with another PRA app, the student Dashboard, which is why every table in it starts with `adm_`. PRA has no server of its own apart from one small function that posts photos to Facebook. The page is hosted for free on GitHub Pages; the code is in `C:/Users/sbowe/admin` on the laptop that holds the code, and on GitHub as BowenPRA/admin. A change to how the app works is a change to that code followed by a deploy (see [Behind the scenes](#/handbook/behind)). The app replaced the Google Sheets invoices in September 2026, the Inquiries Tracker spreadsheet on 30 September 2026, Jotform for enrollment on 30 September 2026, and the Team To-Do spreadsheet on 1 October 2026.
+The Current runs in a web browser at https://current.pra.edu.vn, on a laptop or a phone (the register and the phone menu are built for thumbs). It is one web page that talks straight to a database run by a company called Supabase. That database is shared with another PRA app, the student Dashboard, which is why every table in it starts with `adm_`. PRA has no server of its own apart from one small function that posts photos to Facebook. The page is hosted for free on GitHub Pages; the code is in `C:/Users/sbowe/admin` on the laptop that holds the code, and on GitHub as BowenPRA/admin. A change to how the app works is a change to that code followed by a deploy (see [Behind the scenes](#/handbook/behind)). The app replaced the Google Sheets invoices in September 2026, the Inquiries Tracker spreadsheet on 30 September 2026, Jotform for enrollment on 30 September 2026, and the Team To-Do spreadsheet on 1 October 2026.
 
 ## Signing in
 
@@ -18,7 +18,7 @@ The Current runs in a web browser at https://current.pra.edu.vn, on a laptop or 
 
 ### Your menu and your password
 
-Click your picture or initials at the top right. The menu shows **Signed in as** with your email, your role and one line on what it allows, **Change password** and **Log out**. On a phone it also holds the EN / VI switch.
+Click your name at the foot of the menu on the left (on a phone, open the menu first). A small window shows **Signed in as** with your email, your role and one line on what it allows, **Change password** and **Log out**.
 
 1. **Change password** opens a small window.
 2. Type the new password twice. It needs at least 8 characters, and the two boxes must match.
@@ -26,7 +26,7 @@ Click your picture or initials at the top right. The menu shows **Signed in as**
 
 ### English and Vietnamese
 
-- The **EN | VI** switch in the header changes every label on the screen. On a phone it is in your menu.
+- The **English | Tiếng Việt** switch at the foot of the menu changes every label on the screen. When the menu is narrow it shows as **EN** or **VI**; click it to change.
 - Invoices and progress reports have their own language, chosen on each document. The switch does not change them.
 - Printouts have their own **English / Tiếng Việt** choice in their toolbar.
 - The handbook is in English whichever way the switch is set.
@@ -54,34 +54,34 @@ Every login carries a role. The role decides which pages and buttons the app sho
 
 > **Careful:** one of Bowen's personal email addresses is written into the code as a stand-by Super Admin for an account that has no role. It should come out before the handover. It is listed in [Known problems and open items](#/handbook/open).
 
-## The header
+## The menu
 
-The top row, left to right:
+Every page you can open is listed in the menu down the left side of the screen, under a few headings. The page you are on is shaded blue. (Until 20 October 2026 the pages sat in a row of tabs along the top, with a second row for each group.)
 
-| Item | What it holds | Who sees it |
+| Heading | Pages | Who sees it |
 |---|---|---|
-| **The Current** (the house icon) | The Home page | Everyone |
-| **Students** | Students and families | Everyone (teachers read-only) |
-| **Attendance** | The register and the summary | Everyone (teachers their year groups) |
-| **To-Do** | The shared task list | Office accounts |
+| None, at the top | **Home**, **Students**, **Attendance**, **ECAs**, **To-Do** | Everyone; ECAs for office accounts and for teachers who run an ECA this term; To-Do for office accounts only |
 | **Teaching** | Reports, Schedule, Assessments; for teachers also Newsletter | Everyone |
 | **Office** | Invoices, Leads, Enrollments | Office accounts |
 | **Outreach** | Photos, Newsletter | Office accounts |
-| The gear icon (**Setup**) | Settings, Teachers (Super Admin and Head Teacher only), Handbook | Office accounts |
+| **Setup**, at the foot | Settings, Teachers (Super Admin and Head Teacher only), Handbook | Office accounts |
 
-- Clicking a group (Teaching, Office, Outreach, Setup) opens a second row of tabs with its pages. A group opens on the page you last used in it, on that device.
-- A group in which you can see only one page shows as that page directly. A teacher sees no Office, Outreach or gear icon.
-- On a narrow screen the labels hide and only the icons show; the row scrolls sideways.
-- After the groups come the **EN | VI** switch and your name.
-- A red band under the header reading "Could not load data." with an error after it means the app could not read the database. Reload the page. If it stays, copy the whole message and give it to Claude.
+- A heading with no page you may open is left out. A teacher sees no Office, Outreach or Setup.
+- Under the pages come the **English | Tiếng Việt** switch and your name, which opens your own menu.
+- On a laptop, the small round arrow button on the edge of the menu, beside the logo, makes the menu narrow: icons only, and each page's name shows when you point at its icon. The same button makes it wide again. Each computer remembers the choice. On a screen under 1,100 pixels wide the menu starts narrow.
+- On a phone or a tablet the menu is hidden. Tap the three lines at the top left to open it. It closes when you pick a page, tap outside it, or press the cross.
+- On a short screen the menu scrolls, and it scrolls itself to the page you are on.
+- From 8:00 to 9:00 on a class day, **Attendance** glows amber with "by 8:45" beside it, as a reminder of the morning register. [Attendance and the schedule](#/handbook/attendance?s=taking-the-register) has the detail.
+- The browser tab shows the name of the page you are on, for example "Invoices · The Current".
+- A red band at the top of the page reading "Could not load data." with an error after it means the app could not read the database. Reload the page. If it stays, copy the whole message and give it to Claude.
 
 ## The pages
 
 ### Home
 
-- **What it is for:** a first look at the day. The header tab is labelled **The Current**.
-- **Office accounts see:** a greeting band with today's numbers as chips you can click (classes still to register, report parts left this quarter, leads that are new or due a follow-up, website messages waiting, who is traveling today, students finishing this quarter, new students with checklist steps open, enrollment forms to check, and To-Do counts for you, late and to check); four quick links (**New invoice**, **Attendance**, **Students**, **Reports**); **Today's lessons** if you are on the Schedule; **Attendance today** with one row per class (Done, In progress, Not taken yet); **Your reports**; the Invoiced, Paid and Outstanding totals in VND (void invoices left out); and the most recent invoices.
-- **Teachers see:** the greeting band, Today's lessons, Attendance today for their classes, Your reports, and **Your classes** (each year group with its learning areas and what each still needs).
+- **What it is for:** a first look at the day. It is **Home** at the top of the menu; clicking the logo opens it too.
+- **Office accounts see:** a greeting band with today's numbers as chips you can click (classes still to register, report parts left this quarter, leads that are new or due a follow-up, website messages waiting, who is traveling today, the ECAs meeting today (or, in the week before a term, the day ECAs start), students finishing this quarter, new students with checklist steps open, enrollment forms to check, and To-Do counts for you, late and to check); four quick links (**New invoice**, **Attendance**, **Students**, **Reports**); **Today's lessons** if you are on the Schedule; **Attendance today** with one row per class (Done, In progress, Not taken yet); **Your reports**; the Invoiced, Paid and Outstanding totals in VND (void invoices left out); and the most recent invoices.
+- **Teachers see:** the greeting band (with their own ECA when it meets today), Today's lessons, Attendance today for their classes, Your reports, and **Your classes** (each year group with its learning areas and what each still needs).
 - Deeper: each chip leads to the page that holds the work.
 
 ### Students
@@ -98,6 +98,13 @@ The top row, left to right:
 - **Main things you do:** on **Take attendance**, pick the day and a year group and tap **Present**, **Late** or **Absent** for each student, or **Mark everyone else present**; add a note or a trip. On **Summary**, read the totals for a month, a quarter or the year, and print them with **Print summary**.
 - **Who sees it:** everyone. Office accounts take every year group; a teacher takes the year groups on their Teachers row.
 - Deeper: [Attendance and the schedule](#/handbook/attendance).
+
+### ECAs
+
+- **What it is for:** the after-class activities (3:30 to 4:15 in Quarter 2): each quarter's term, its activities, who is on each list, and a register for each session. Added 21 October 2026, in place of keeping the lists from the Google Form by hand.
+- **Main things you do:** open an activity's card; on **Register** pick the session and tap **Present**, **Late** or **Absent**, or **Mark everyone else present**; on **Students** add students, move one to the waiting list or take one off; on **Summary** see each student's sessions; **Print register** for a paper copy. Office accounts also add a term (**New term**), change it (**Edit term**) and add or change activities.
+- **Who sees it:** office accounts, and teachers who run an ECA this term. The teacher who runs an activity takes its register and changes its list; other activities are read-only for them.
+- Deeper: [Attendance and the schedule](#/handbook/attendance?s=ecas).
 
 ### To-Do
 
@@ -184,7 +191,7 @@ Under **Outreach**.
 
 ### Settings
 
-Under the gear icon.
+Under **Setup**.
 
 - **What it is for:** the numbers and names the invoices are built from.
 - **Main things you do:** **Fee schedule** (every price, the sibling discount, the deadlines); **Academic calendar** (class days per month and per quarter, the printed date ranges, transport months); **Bank account**; **Center details** (the names on invoices, email, address, the legal name and tax code for receipts); **Data export** (**Export Excel**, **Export student list**, **Import roster (Excel)**); **Export to a folder** (Super Admin only); **Save**; **Reset to defaults**.
@@ -196,7 +203,7 @@ Under the gear icon.
 
 ### Teachers
 
-Under the gear icon.
+Under **Setup**.
 
 - **What it is for:** who teaches what. Each teacher's row decides which parts of the progress reports they can write and which registers they can take.
 - **Main things you do:** **Add teacher**; open a row to set the title, name, sign-in email (or "No login"), the **Head** flag, **Active**, the learning areas ticked per year group and the homeroom year groups; make a login for a teacher (see "Giving someone access"). "Who teaches what" lists every year group with enrolled students and flags any learning area with nobody, and any homeroom teacher on the Schedule who cannot yet write the homeroom parts. The buttons **Add n from 2026-27 schedule**, **Add n new classes from the schedule** and **Add n homerooms from the schedule** fill rows from the timetable.
@@ -206,7 +213,7 @@ Under the gear icon.
 
 ### Handbook
 
-Under the gear icon.
+Under **Setup**.
 
 - **What it is for:** this handbook. Search, read a chapter, **Print this chapter**, or open **The whole handbook** to print every chapter.
 - **Who sees it:** office accounts. Teachers do not: it covers fees and the inner workings.
@@ -219,6 +226,7 @@ Each printout opens in a new tab with a toolbar: **Back**, the period or year gr
 | What prints | Opened from | Who |
 |---|---|---|
 | Attendance summary: an overview sheet, then one register per year group with its notes (A4 landscape) | **Attendance** → **Summary** → **Print summary** | Everyone; teachers their own year groups |
+| ECA register: one A4 page per activity with its students, allergies, a box per session (marks taken so far filled in) and the waiting list | **ECAs** → an activity → **Print register**, or **Print all registers** on the ECAs page | Everyone who can open ECAs |
 | Class lists: one A4 page per class with photo, birthday, allergies and health notes, who to call, emergency contacts and pick-up list | **Students** → **Class lists** | Everyone; teachers their own classes; emergency contacts and pick-up for office accounts only. Marked confidential |
 | Fees summary: money received, invoiced, still owed and how late, for a month or the year | **Invoices** → **Print summary** | Office accounts |
 | Admissions summary: enquiries, stages, sources, tours and calls, enrollment forms, follow-ups due | **Leads** → **Print summary** | Office accounts |
@@ -236,7 +244,7 @@ Every staff member also needs a Google account (name@pra.edu.vn) to receive emai
 
 A teacher's login is made on the Teachers page by the Super Admin or the Head Teacher.
 
-1. **Setup** (gear icon) → **Teachers** → **Add teacher**. Type the title (Mr., Ms.), the name and their PRA email.
+1. **Setup** → **Teachers** → **Add teacher**. Type the title (Mr., Ms.), the name and their PRA email.
 2. Tick the learning areas they teach in each year group, and their homeroom year groups. Press **Save**.
 3. Open their row again. At the bottom, open **Create a login for this teacher**.
 4. Type a temporary password of at least 6 characters in **Temporary password** and press **Create login**. The message under it says whether the login was made.
@@ -303,7 +311,7 @@ Ask Claude to take the person out of the staff account script and out of `src/da
 
 ## The offline mode band
 
-The Current can run without the database, keeping everything in that one browser. It is meant for trying things on the laptop. When it does, a yellow band under the header reads "Offline mode: data is stored in this browser only.", you are signed in as "Offline admin", and your menu has **Preview as (offline only)** to see the app as any teacher.
+The Current can run without the database, keeping everything in that one browser. It is meant for trying things on the laptop. When it does, a yellow band at the top of the page reads "Offline mode: data is stored in this browser only.", you are signed in as "Offline admin", and your menu has **Preview as (offline only)** to see the app as any teacher.
 
 - On your own laptop, while Claude is testing a change, the band is expected. Nothing typed there reaches the real records.
 - On https://current.pra.edu.vn the band should never appear. If it does, the last deploy was built without the database settings (this happened on 14 September 2026, and on 19 October 2026 after the move to a new laptop). Do not type anything into it: it would be lost. Real records are safe in the database; the page cannot see them. Anything staff typed while the band was showing stays in their own browser only, so ask them to check and enter it again once the real site is back, and to reload the page.

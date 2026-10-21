@@ -20,8 +20,12 @@ const SHORTCUT = 'application/vnd.google-apps.shortcut'
 /** The folders "Check Drive" reads, with everything inside them. */
 export const DRIVE_ROOTS = [{ id: '1p6geOYezVE9h4t2uzrbIL0bbltadcdhS', name: "Students' enrollment forms" }]
 
-// The order documents are listed in on the student window.
+// What a document can be filed as (the office's corrections keep one of these).
 export const DOC_KINDS = ['form', 'student_id', 'parent_id', 'photo', 'other']
+// A file whose name does not say what it is (a phone's IMG_1234.jpg) waits as 'unsorted' until
+// the office looks at it (Bowen, 20 October 2026: a new student's passport pictures were under
+// Other files and the summary said there were none). The order they are listed in on the student window.
+export const LIST_KINDS = ['form', 'unsorted', 'student_id', 'parent_id', 'photo', 'other']
 // What every current student should have; the summary marks the gaps.
 export const NEEDED_KINDS = ['form', 'student_id', 'photo']
 
@@ -152,7 +156,7 @@ const yearOf = (chain) => { for (const f of chain) { const m = String(f.name).ma
  * students: all students, past ones too (a past sibling's papers then go to them, not to a namesake).
  * links: adm_drive_doc_links rows ({ file_id, student_id, kind, hidden }), the office's corrections.
  * Returns { byStudent: Map(student id -> docs), unplaced: [{ file, year, path, group }] }.
- * A doc is { id, file, kind, label, year, path, folderId, how: 'name'|'folder'|'office', copies }.
+ * A doc is { id, file, kind (LIST_KINDS), label, year, path, folderId, how: 'name'|'folder'|'office', copies }.
  */
 export function matchDocuments(items, students, links = []) {
   const byId = new Map(items.map((i) => [i.id, i]))
@@ -264,7 +268,7 @@ export function matchDocuments(items, students, links = []) {
       // A passport that names someone else, in a student's folder, is a parent's.
       if (kind === 'student_id' && others.length) kind = 'parent_id'
       if (!kind) {
-        kind = isPdf(f) && o.how === 'name' ? 'form' : 'other'
+        kind = isPdf(f) && o.how === 'name' ? 'form' : 'unsorted'
         label = kind === 'form' ? 'form' : isImage(f) ? 'image' : 'file'
       } else if (kind === 'form' && others.length) { kind = 'other'; label = 'file' } // a sibling's form in the family folder
       if (o.kind) { kind = o.kind; if (kind === 'form') label = 'form'; else if (kind === 'photo') label = 'photo'; else if (!['passport', 'birth', 'idcard'].includes(label) && kind !== 'other') label = 'idpapers' }
@@ -281,12 +285,24 @@ export function matchDocuments(items, students, links = []) {
     for (const d of list) if (d.kind === 'student_id' && d.how === 'folder' && namedIdIn.has(d.folderId)) d.kind = 'parent_id'
   }
 
+  // The same picture copied into two children's folders is their parents' ID papers: the
+  // brothers and sisters share the parents, not their own passports ("IMG_7095.JPG" in both).
+  const sameFile = (d) => d.file.md5 || `${foldName(d.file.name)}|${d.file.size ?? ''}`
+  const copies = new Map() // contents -> [{ student, file id }]
+  for (const [id, list] of byStudent) for (const d of list) { const k = sameFile(d); if (!copies.has(k)) copies.set(k, []); copies.get(k).push({ id, fileId: d.file.id }) }
+  for (const [id, list] of byStudent) {
+    for (const d of list) {
+      if (d.kind !== 'unsorted' || !isImage(d.file)) continue
+      if (copies.get(sameFile(d)).some((c) => c.id !== id && c.fileId !== d.file.id)) { d.kind = 'parent_id'; d.label = 'shared' }
+    }
+  }
+
   // One entry for a file filed twice. The copy shown is the one the office labelled, else one whose
   // name says what it is ("CCCD Hart.jpg" over the phone's "1787195360276_…jpg"), else the newest year's.
   for (const [id, list] of byStudent) {
     const keep = new Map()
     const keyOf = (d) => d.file.md5 || `${foldName(d.file.name)}|${d.file.size ?? ''}`
-    const rank = (d) => [d.how === 'office' ? 1 : 0, d.kind !== 'other' ? 1 : 0, d.how === 'name' ? 1 : 0, d.year, String(d.file.modified_at || '')]
+    const rank = (d) => [d.how === 'office' ? 1 : 0, d.kind !== 'other' && d.kind !== 'unsorted' ? 1 : 0, d.how === 'name' ? 1 : 0, d.year, String(d.file.modified_at || '')]
     const better = (a, b) => { const x = rank(a); const y = rank(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false }
     for (const d of list) {
       const k = keyOf(d)
@@ -294,7 +310,7 @@ export function matchDocuments(items, students, links = []) {
       if (!had) keep.set(k, d)
       else { const win = better(d, had) ? d : had; win.copies = had.copies + 1; keep.set(k, win) }
     }
-    const order = (d) => DOC_KINDS.indexOf(d.kind)
+    const order = (d) => LIST_KINDS.indexOf(d.kind)
     byStudent.set(id, [...keep.values()].sort((a, b) => order(a) - order(b) || b.year.localeCompare(a.year) || String(a.file.name).localeCompare(String(b.file.name))))
   }
   unplaced.sort((a, b) => b.year.localeCompare(a.year) || a.path.join('/').localeCompare(b.path.join('/')) || String(a.file.name).localeCompare(String(b.file.name)))
@@ -330,6 +346,9 @@ export function websiteDocs(forms, privates) {
 
 /** Which of NEEDED_KINDS a student's documents (Drive and website) lack. The photo on their record in The Current counts as a photo. */
 export const missingKinds = (docs, student) => NEEDED_KINDS.filter((k) => !docs.some((d) => d.kind === k) && !(k === 'photo' && student?.photo))
+
+/** The Drive files still waiting for the office to say what they are. */
+export const toSort = (docs) => docs.filter((d) => d.kind === 'unsorted' && d.source !== 'web' && d.file)
 
 // ---------------- reading Drive ----------------
 

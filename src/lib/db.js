@@ -42,11 +42,16 @@ const TABLES = {
   // Students' documents on Google Drive: the folder's list of files, and the office's corrections (office only)
   driveFiles: 'adm_drive_files',
   driveDocLinks: 'adm_drive_doc_links',
+  // ECAs, the after-class activities: terms, their activities, each activity's students and its register
+  ecaTerms: 'adm_eca_terms',
+  ecaActivities: 'adm_eca_activities',
+  ecaMembers: 'adm_eca_members',
+  ecaAttendance: 'adm_eca_attendance',
 }
 
 // Rows that come straight from form inputs may hold '' where Postgres wants
 // null (date / numeric columns). Applied to the report tables and students.
-const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes, TABLES.attendance, TABLES.travel, TABLES.photoEvents, TABLES.eventPhotos, TABLES.eventPosts, TABLES.leads, TABLES.todos])
+const CLEAN = new Set([TABLES.students, TABLES.teachers, TABLES.reports, TABLES.sections, TABLES.courseNotes, TABLES.attendance, TABLES.travel, TABLES.photoEvents, TABLES.eventPhotos, TABLES.eventPosts, TABLES.leads, TABLES.todos, TABLES.ecaTerms, TABLES.ecaActivities, TABLES.ecaMembers, TABLES.ecaAttendance])
 // Invoices and payments keep their text as typed; only a date that was cleared needs to be null.
 const DATE_COLS = { [TABLES.invoices]: ['issue_date', 'due_date'], [TABLES.payments]: ['paid_on'] }
 const cleanRow = (table, row) => {
@@ -132,6 +137,12 @@ const localAdapter = {
     if (table === TABLES.invoices) d[TABLES.payments] = (d[TABLES.payments] || []).filter((p) => p.invoice_id !== id)
     if (table === TABLES.reports) d[TABLES.sections] = (d[TABLES.sections] || []).filter((p) => p.report_id !== id)
     if (table === TABLES.photoEvents) for (const t of [TABLES.eventPhotos, TABLES.eventPosts]) d[t] = (d[t] || []).filter((p) => p.event_id !== id)
+    // A term takes its activities with it, and an activity its list and register (as in the database).
+    const gone = table === TABLES.ecaTerms ? (d[TABLES.ecaActivities] || []).filter((a) => a.term_id === id).map((a) => a.id) : table === TABLES.ecaActivities ? [id] : []
+    if (gone.length) {
+      d[TABLES.ecaActivities] = (d[TABLES.ecaActivities] || []).filter((a) => !gone.includes(a.id))
+      for (const t of [TABLES.ecaMembers, TABLES.ecaAttendance]) d[t] = (d[t] || []).filter((r) => !gone.includes(r.activity_id))
+    }
     lsWrite(d)
   },
   async removeStrict(table, id) { return this.remove(table, id) },
@@ -346,6 +357,23 @@ export const db = {
     list: () => A.list(TABLES.travel),
     save: (row) => A.upsert(TABLES.travel, row),
     remove: (id) => A.removeStrict(TABLES.travel, id),
+  },
+  // ECAs (supabase/updates-2026-10-21-ecas.sql). The register is kept apart from daily attendance.
+  eca: {
+    terms: { list: () => A.list(TABLES.ecaTerms), save: (row) => A.upsert(TABLES.ecaTerms, row), remove: (id) => A.removeStrict(TABLES.ecaTerms, id) },
+    activities: { list: () => A.list(TABLES.ecaActivities), save: (row) => A.upsert(TABLES.ecaActivities, row), remove: (id) => A.removeStrict(TABLES.ecaActivities, id) },
+    members: {
+      list: () => A.list(TABLES.ecaMembers),
+      // One row per student per activity: adding someone already on the list changes their row.
+      add: (rows) => A.upsertBy(TABLES.ecaMembers, rows, ['activity_id', 'student_id']),
+      patch: (id, fields) => A.patch(TABLES.ecaMembers, id, fields),
+      remove: (id) => A.removeStrict(TABLES.ecaMembers, id),
+    },
+    attendance: {
+      list: (filter) => A.list(TABLES.ecaAttendance, filter),
+      mark: (rows) => A.upsertBy(TABLES.ecaAttendance, rows, ['activity_id', 'student_id', 'date']),
+      clear: (id) => A.removeStrict(TABLES.ecaAttendance, id),
+    },
   },
   invoices: {
     list: () => A.list(TABLES.invoices),

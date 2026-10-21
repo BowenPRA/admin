@@ -333,7 +333,7 @@ function IssueEditor({ id }) {
           {!office && <button type="button" className="btn-secondary xl:hidden" onClick={() => setPreviewOpen(true)}><Eye size={16} />{L('See how it looks', 'Xem trước')}</button>}
         </div>
 
-        <aside className="hidden min-w-0 xl:sticky xl:top-24 xl:block">
+        <aside className="hidden min-w-0 xl:sticky xl:top-[calc(var(--header-h,0px)+1.5rem)] xl:block">
           {payloads && <Preview payload={payloads.pub} families={payloads.fam} L={L} onFull={openFull} />}
         </aside>
       </div>

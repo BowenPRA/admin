@@ -1,18 +1,20 @@
-import { useState } from 'react'
-import { AlertTriangle, Check, ExternalLink, Minus } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { AlertTriangle, Check, ExternalLink, FileQuestion, Minus } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { useToast } from '../../lib/toast'
 import { useData } from '../../lib/DataContext'
 import { LEVELS, SCHOOL_YEAR } from '../../lib/fees'
 import { statusOf } from '../../lib/studentRecords'
-import { NEEDED_KINDS, driveUrl, missingKinds, openId } from '../../lib/driveDocs'
+import { NEEDED_KINDS, driveUrl, missingKinds, openId, toSort } from '../../lib/driveDocs'
 import { driveMessage, saveDocLink, useDriveDocs } from '../../lib/useDriveDocs'
 import { Checkbox, Modal } from '../ui'
-import { CheckDriveButton } from './StudentDocuments'
+import { CheckDriveButton, DocViewer } from './StudentDocuments'
 
 // Students > More > Documents on Drive: for every enrolled and pending student, whether a form,
 // ID papers and a photo were found; and the files in the folder that went to nobody, so the
-// office can hand them to the right student.
+// office can hand them to the right student. A student whose missing papers may be among files
+// whose names say nothing (IMG_1234.jpg) gets a Sort button: the viewer shows those files one
+// after another with a button for each kind.
 
 export default function DriveDocsModal({ onClose, onOpenStudent }) {
   const { t } = useT()
@@ -21,14 +23,28 @@ export default function DriveDocsModal({ onClose, onOpenStudent }) {
   const { files, check, error, loaded, checking, match, web } = useDriveDocs()
   const [onlyMissing, setOnlyMissing] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [sorting, setSorting] = useState(null) // student id
+  const stopSorting = useCallback(() => setSorting(null), [])
 
   const levelIndex = (l) => { const i = LEVELS.indexOf(l); return i < 0 ? 99 : i }
   const current = students.filter((s) => statusOf(s) !== 'inactive')
     .sort((a, b) => levelIndex(a.level) - levelIndex(b.level) || a.full_name.localeCompare(b.full_name))
   const rows = current.map((s) => {
-    const docs = [...(match.byStudent.get(s.id) || []), ...(web.get(s.id) || [])]
-    return { s, docs, missing: missingKinds(docs, s) }
+    const drive = (match.byStudent.get(s.id) || []).map((d) => ({ ...d, source: 'drive', name: d.file.name }))
+    const docs = [...drive, ...(web.get(s.id) || [])]
+    const missing = missingKinds(docs, s)
+    // Files to sort only matter while something is missing that they could be.
+    return { s, docs, missing, waiting: missing.some((k) => k !== 'form') ? toSort(drive) : [] }
   })
+  const withWaiting = rows.filter((r) => r.waiting.length).length
+  const sortRow = rows.find((r) => r.s.id === sorting)
+  const sortAs = async (d, kind) => {
+    try {
+      await saveDocLink({ file_id: d.file.id, student_id: sorting, kind: kind === 'hidden' ? null : kind, hidden: kind === 'hidden' })
+      toast(kind === 'hidden' ? t('docsNotTheirsDone') : t('docsSaved'))
+      return true
+    } catch (e) { toast.error(driveMessage(e, t)); return false }
+  }
   const shown = onlyMissing ? rows.filter((r) => r.missing.length) : rows
   // This year's files that went to nobody need a look; earlier years' are students who left before
   // The Current had them (Bowen, 19 October 2026: keep those in a list of their own).
@@ -70,6 +86,7 @@ export default function DriveDocsModal({ onClose, onOpenStudent }) {
             : !files.length ? <p className="text-sm text-slate-500">{t('docsNeverChecked')}</p> : (<>
               <div>
                 <Checkbox checked={onlyMissing} onChange={setOnlyMissing} label={`${t('docsMissingOnly')} (${rows.filter((r) => r.missing.length).length})`} />
+                {withWaiting > 0 && <p className="mt-1.5 flex items-start gap-1.5 text-xs text-slate-600"><FileQuestion size={14} className="mt-px flex-none text-amber-600" />{t('docsToSortNote', { n: withWaiting })}</p>}
                 {shown.length === 0 ? <p className="mt-2 text-sm text-green-700">{t('docsAllFound')}</p> : (
                   <div className="mt-2 overflow-x-auto">
                     <table className="w-full text-sm">
@@ -81,7 +98,7 @@ export default function DriveDocsModal({ onClose, onOpenStudent }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {shown.map(({ s, docs, missing }) => (
+                        {shown.map(({ s, docs, missing, waiting }) => (
                           <tr key={s.id}>
                             <td className="py-1.5 pr-3">
                               <button type="button" className="text-left font-semibold text-pra-blue hover:underline" onClick={() => onOpenStudent(s)}>{s.full_name}</button>
@@ -89,10 +106,15 @@ export default function DriveDocsModal({ onClose, onOpenStudent }) {
                             </td>
                             {NEEDED_KINDS.map((k) => (
                               <td key={k} className="px-2 py-1.5 text-center">
-                                {missing.includes(k) ? <Minus size={16} className="mx-auto text-amber-500" aria-label="—" /> : <Check size={16} className="mx-auto text-green-600" aria-label="✓" />}
+                                {!missing.includes(k) ? <Check size={16} className="mx-auto text-green-600" aria-label="✓" />
+                                  : k !== 'form' && waiting.length ? <FileQuestion size={16} className="mx-auto text-amber-600" aria-label={t('docsMaybeHere', { n: waiting.length })}><title>{t('docsMaybeHere', { n: waiting.length })}</title></FileQuestion>
+                                    : <Minus size={16} className="mx-auto text-amber-500" aria-label="—" />}
                               </td>
                             ))}
-                            <td className="px-2 py-1.5 text-right text-slate-500">{docs.filter((d) => d.source !== 'webform').length}</td>
+                            <td className="whitespace-nowrap px-2 py-1.5 text-right text-slate-500">
+                              {waiting.length > 0 && <button type="button" className="btn-secondary mr-2 !px-2 !py-0.5 text-xs" onClick={() => setSorting(s.id)}>{t('docsSortN', { n: waiting.length })}</button>}
+                              {docs.filter((d) => d.source !== 'webform').length}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -123,6 +145,7 @@ export default function DriveDocsModal({ onClose, onOpenStudent }) {
               )}
             </>)}
       </div>
+      {sortRow && <DocViewer docs={sortRow.waiting} startId={sortRow.waiting[0]?.id} onSort={sortAs} onClose={stopSorting} closeWhenDone />}
     </Modal>
   )
 }

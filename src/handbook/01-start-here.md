@@ -2,7 +2,7 @@ This handbook is how the admin work at Palm River Academy is done: the admin app
 
 ## What this handbook is
 
-- Nineteen chapters, in English, inside The Current under the gear icon: **Setup** → **Handbook**. Office accounts see it; teachers do not, because it covers fees and the inner workings.
+- Nineteen chapters, in English, inside The Current under **Setup** → **Handbook**, at the foot of the menu on the left. Office accounts see it; teachers do not, because it covers fees and the inner workings.
 - The search box at the top looks through every chapter. The list under a chapter's title jumps to its parts. **Print this chapter** prints what you are reading; **The whole handbook** at the bottom of the chapter list prints everything.
 - It was written on 15 and 16 October 2026 from the code of the three systems, Claude's notes of every decision since September 2026, and about 600 of Bowen's own instructions to Claude since August 2026. Each chapter shows the date it was last gone through. A date more than a quarter old means the chapter may have drifted; [Keeping this handbook up to date](#/handbook/updating) says what to do about that.
 - Where a step needs the computer rather than the browser, the chapter gives the sentence to say to Claude in a box that starts **Ask Claude:**. Copy it as it is. [Working with Claude](#/handbook/claude) explains why that works and where it stops.

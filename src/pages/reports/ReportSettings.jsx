@@ -41,7 +41,7 @@ function SettingsForm({ initial }) {
 
   return (
     <div className="space-y-5">
-      <div className="sticky top-[57px] z-30 -mx-4 flex items-center gap-2 border-b border-slate-200 bg-[#f5f7fa]/95 px-4 py-2 backdrop-blur">
+      <div className="sticky top-[var(--header-h,0px)] z-30 -mx-4 flex items-center gap-2 border-b border-slate-200 bg-[#f5f7fa]/95 px-4 py-2 backdrop-blur">
         <Link to="/reports" className="btn-ghost"><ArrowLeft size={16} /></Link>
         <h1 className="mr-auto text-2xl font-black text-slate-800">Report settings</h1>
         {msg && <span className="text-sm font-semibold text-green-700">{msg}</span>}

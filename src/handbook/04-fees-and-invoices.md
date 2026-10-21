@@ -2,7 +2,7 @@ This chapter covers the money side of The Current: the fee schedule for 2026-202
 
 ## Where the numbers live
 
-- The live prices are in **Setup** (gear icon) → **Settings** → **Fee schedule**. The invoice builder always reads that saved copy.
+- The live prices are in **Setup** → **Settings** → **Fee schedule**. The invoice builder always reads that saved copy.
 - The same numbers are also written into the code (`src/lib/fees.js`) as defaults. They are used until **Save** is first pressed in Settings, and **Reset to defaults** puts them back into the form.
 - The prices on the website's fees page are typed separately and must be changed there too (see [The website](#/handbook/website)).
 - All amounts are in VND. The tables below are the 2026-2027 schedule as the app holds it on 15 October 2026. If Settings shows something different, Settings is what invoices use.

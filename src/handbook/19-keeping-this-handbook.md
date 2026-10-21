@@ -4,7 +4,7 @@ The handbook is only useful while it is true. This chapter says what it is made 
 
 - Each chapter is one text file, written in Markdown (plain text with `##` for headings and `-` for bullets), inside The Current's code at `src/handbook/`. The chapter list, with the order, the titles and the "Last gone through" dates, is `src/handbook/index.js` in the same folder.
 - The **Handbook** page reads those files when The Current is built. Nothing about the handbook is stored in the database, so a change is a change to the code, followed by a deploy (see [Behind the scenes](#/handbook/behind)).
-- Office accounts (Super Admin, Head Teacher, Admin) see the page under the gear icon, **Setup** → **Handbook**. Teachers do not see it: it covers fees and the inner workings.
+- Office accounts (Super Admin, Head Teacher, Admin) see the page under **Setup** → **Handbook**, at the foot of the menu on the left. Teachers do not see it: it covers fees and the inner workings.
 - The handbook is written in English. The page title and buttons follow the EN/VI switch, the chapters do not.
 
 ## Changing a chapter

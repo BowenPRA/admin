@@ -17,6 +17,8 @@ import Teachers from './pages/reports/Teachers'
 import ReportSettings from './pages/reports/ReportSettings'
 import Attendance from './pages/Attendance'
 import PrintAttendance from './pages/PrintAttendance'
+import Ecas from './pages/Ecas'
+import PrintEca from './pages/PrintEca'
 import PrintFees from './pages/PrintFees'
 import PrintClassLists from './pages/PrintClassLists'
 import PrintAdmissions from './pages/PrintAdmissions'
@@ -59,6 +61,7 @@ export default function App() {
         <Route path="/print/reports" element={<Guard><PrintBatch /></Guard>} />
         <Route path="/print/attendance" element={<Guard><PrintAttendance /></Guard>} />
         <Route path="/print/class-lists" element={<Guard><PrintClassLists /></Guard>} />
+        <Route path="/print/eca" element={<Guard><PrintEca /></Guard>} />
         <Route path="/print/fees" element={<Guard><Office><PrintFees /></Office></Guard>} />
         <Route path="/print/admissions" element={<Guard><Office><PrintAdmissions /></Office></Guard>} />
         <Route element={<Guard><Layout /></Guard>}>
@@ -75,6 +78,7 @@ export default function App() {
           <Route path="/enrollments" element={<Office><Enrollments /></Office>} />
           <Route path="/todo" element={<Office><Todos /></Office>} />
           <Route path="/attendance" element={<Attendance />} />
+          <Route path="/eca" element={<Ecas />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/assessments" element={<Assessments />} />
           <Route path="/photos" element={<Office><Photos /></Office>} />

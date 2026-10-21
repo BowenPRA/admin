@@ -4,7 +4,7 @@ This chapter covers PRA's photos from the moment staff upload them to the moment
 
 | Place | What is there | Public? |
 |---|---|---|
-| The shared drive: PRA Shared Drive → "PHOTOS BY CLASS 2026-2027" | What staff upload after an event, one folder per event (for example "20261015 Showcase Term 1"), and the finished albums copied back | No: PRA accounts only |
+| The shared drive: PRA Shared Drive → "PHOTOS BY CLASS 2026-2027" | What staff upload: each class's week folders, one folder per event (for example "20261015 Showcase Term 1"), and the finished albums copied back. Every file is named by Claude (see Class photos each week) | No: PRA accounts only |
 | The photo library on the laptop: `C:\Users\sbowe\PRA Photos` | Every event Claude has worked on: copies of the originals, scores, tags, privacy flags, the edited album | No: one laptop |
 | The Current's **Photos** tab | Photos still under review, their captions and sign-off, the draft Facebook posts | No: office accounts only |
 | The website's git project: `C:\Users\sbowe\pra-website` | Photos signed off and chosen for the website | Yes: anyone, for good |
@@ -63,7 +63,7 @@ Bowen's taste, from 22 September 2026 and the taste log since:
 
 ## The three photo skills
 
-A skill is a written procedure Claude follows for one kind of job (see [Working with Claude](#/handbook/claude)). Three work on the library. Each is used in a session on the laptop, never by an automatic run.
+A skill is a written procedure Claude follows for one kind of job (see [Working with Claude](#/handbook/claude)). Three work on the library. Each is used in a session on the laptop; the only automatic photo work is the Friday run for class photos (next section).
 
 | Skill | What it does | Ends with |
 |---|---|---|
@@ -86,9 +86,20 @@ A skill is a written procedure Claude follows for one kind of job (see [Working 
 
 > **Ask Claude:** "Prepare a Facebook recap post for the [event] from its album: choose and crop the photos, write the caption and alt text, and show me the text here. Do not post it."
 
+## Class photos each week
+
+Teachers upload their class photos to their class's week folders in "PHOTOS BY CLASS 2026-2027" during the week. Since 21 October 2026 Claude names every file there so the drive can be searched, and picks the best of each week for the Photos tab.
+
+- **The names.** `KQ1W7 043 science - three children blowing through straws at dishes [6.5].HEIC`: the class code (N Nursery, K Kindergarten, Y1, Y23 Year 2-3, Y5, Y7, US Upper Secondary), the quarter and week, the photo's number in its folder (in the order taken), what is in it, and a score out of 10 at the end. Event folders start with the event (`MidAutumn 014 …`); videos end `[video]`. Search the drive for "KQ1W7", "Y1 cooking" or "lion dance". The score is a guide: 8 and above is the best few of a week.
+- **The Friday run.** Every Friday at noon a scheduled Claude task on the office laptop reads the new photos, judges them closely, renames them, picks up to 16 of the best taken since the previous Friday noon (one per moment, spread across the classes, nothing with swimwear or a readable name), writes titles, captions, a description and one draft Facebook post, and packages them with the four looks. It needs the laptop on, the Claude app open and Google Drive for desktop running; if the app was closed it runs the next time it opens. It never uploads, posts or deletes anything, and it leaves a short report in `PRA Photos\_year\2026-2027\weekly\<week>\report.md`.
+- **Your part.** Upload the week's album like an event (Photos → Upload event…, the album's `current` folder, named in the report). It appears under **Class weeks**. Sign the photos off, choose looks and post exactly as for an event.
+- Nothing is polished on the drive itself: the looks exist only in the album. Renames are logged; Claude can put any run's names back.
+
+> **Ask Claude:** "The Friday photo run didn't happen (or failed). Run this week's class-photo routine now and tell me the album folder."
+
 ## The Photos tab
 
-**Outreach** → **Photos** (office accounts only). The tab shows the work done on the laptop and is where people sign photos off, edit captions and post.
+**Outreach** → **Photos** (office accounts only). The tab shows the work done on the laptop and is where people sign photos off, edit captions and post. It has two lists: **Events** (Mid-Autumn, the Showcase and other events) and **Class weeks** (the Friday albums of the best class photos). The tab remembers which list you last opened.
 
 ### Uploading an event
 

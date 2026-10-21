@@ -4,9 +4,14 @@ import { ShieldCheck, Star } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { db } from '../../lib/db'
 import { useToast } from '../../lib/toast'
-import { Chip, Empty, PageHeader, Spinner } from '../../components/ui'
+import { Chip, Empty, PageHeader, Segmented, Spinner } from '../../components/ui'
 import UploadEvent from '../../components/photos/UploadEvent'
 import { fileKey, fileUrl, photoError, prepareFiles } from '../../lib/eventPhotos'
+
+const VIEW_KEY = 'pra-photos-view'
+// The weekly albums of the best class photos (made on the laptop by weekalbum.py) are
+// marked in their notes; older uploads are known by their name.
+const isClassWeek = (e) => e.notes?.kind === 'class-week' || /^class photos week of /i.test(e.name || '')
 
 async function fetchRows() {
   try {
@@ -20,26 +25,37 @@ async function fetchRows() {
   } catch (e) { return { rows: [], error: photoError(e).message } }
 }
 
-// The list of events. Each card leads to the event's photos, description and
+// The list of albums, in two views: events (Mid-Autumn, the Showcase) and the weekly
+// albums of the best class photos. Each card leads to the album's photos, description and
 // draft posts.
 export default function Photos() {
   const { t, lang } = useT()
   const toast = useToast()
   const [state, setState] = useState(null)
+  const [view, setViewState] = useState(() => { try { return localStorage.getItem(VIEW_KEY) || 'events' } catch { return 'events' } })
+  const setView = (v) => { setViewState(v); try { localStorage.setItem(VIEW_KEY, v) } catch { /* ignore */ } }
   const load = () => fetchRows().then(setState)
   useEffect(() => { let on = true; fetchRows().then((s) => on && setState(s)); return () => { on = false } }, [])
-  const rows = state?.rows
+  const all = state?.rows
   const error = state?.error
+  const weeks = all ? all.filter((r) => isClassWeek(r.event)) : []
+  const events = all ? all.filter((r) => !isClassWeek(r.event)) : []
+  const rows = view === 'weeks' ? weeks : events
   const day = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '')
 
-  if (!rows) return <Spinner />
+  if (!all) return <Spinner />
   return (
     <div className="space-y-5">
       <PageHeader title={t('phTitle')} subtitle={t('phSubtitle')}>
         <UploadEvent onDone={() => { toast(t('phLoaded')); load() }} />
       </PageHeader>
+      <Segmented value={view} onChange={setView} options={[
+        { value: 'events', label: t('phViewEvents', { n: events.length }) },
+        { value: 'weeks', label: t('phViewWeeks', { n: weeks.length }) },
+      ]} />
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {!rows.length && !error && <Empty text={t('phNone')}><p className="mt-1">{t('phNoneHint')}</p></Empty>}
+      {!rows.length && !error && view === 'events' && <Empty text={t('phNone')}><p className="mt-1">{t('phNoneHint')}</p></Empty>}
+      {!rows.length && !error && view === 'weeks' && <Empty text={t('phNoWeeks')}><p className="mt-1">{t('phNoWeeksHint')}</p></Empty>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map(({ event, photos, lead, posts }) => {
           const checked = photos.filter((p) => p.cleared).length

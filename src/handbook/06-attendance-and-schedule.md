@@ -25,6 +25,7 @@ This chapter covers the daily register in The Current, the students it treats di
 5. Or mark the ones who are away, then press **Mark everyone else present**. It reads the day again first, so marks made on another phone in the meantime stay.
 6. The speech bubble beside a student opens a **Note**. It saves when you leave the box. A note on its own does not mark anyone.
 
+- The morning register is due by 8:45. From 8:00 to 9:00 on a class day, **Attendance** in the menu turns amber with a pulse and a "by 8:45" tag, and the menu button on a phone shows an amber dot. A class day here means Monday to Friday and not a day off ("no classes") on the academic calendar the website publishes. It goes by the clock of the computer or phone. It does not check whether the registers are already done.
 - Only Enrolled students of that year group are on the register. Pending students are not, until their status is set to Enrolled.
 - The counts at the top show Present, Late, Absent, A(T) and **Not marked**, with a coloured bar.
 
@@ -196,6 +197,49 @@ Whether a saved copy exists on the live database has not been checked since 15 O
 > **Ask Claude:** "From Monday, Year 5's Science lesson moves to Thursday afternoon. Update the built-in schedule in The Current, deploy, and tell me whether I then need to press Built-in schedule and Save on the Schedule page."
 
 A new academic year needs a new timetable, and the Teachers page buttons read the 2026-2027 staff list. Attendance keeps every earlier year's marks, and the summary's list of months and quarters follows the calendar saved in Settings. See [The year at PRA](#/handbook/the-year).
+
+## ECAs
+
+ECAs are the after-class activities. Each quarter is a **term** with its own dates and times (Quarter 2 2026-2027: Monday 26 October to Wednesday 2 December, 3:30 to 4:15, pick-up at 4:15). Each term has its own **activities**, each with a day of the week, the teacher who runs it and the year groups it is open to. Families still sign up on a Google Form each quarter; the lists then live on the **ECAs** page. The ECA register is kept apart from the daily register: it never changes anyone's attendance rate.
+
+### Setting up a term
+
+Office accounts and the head teacher do this, once a quarter.
+
+1. On **ECAs**, press **New term**. Fill in the name (for example "Quarter 3"), the first and last day, the start and end time, and a note such as "Pick-up at 4:15" (it prints on the register).
+2. Under **Start with the activities of**, pick last quarter to copy its activities (names, days, teachers, year groups; never the students), or "None" to start empty.
+3. Press **Add activity** for each new one, or open a card and press **Edit activity**: the name in English and Vietnamese, the day, the teacher, the year groups (from one year group to another, or "And up"), the room and what students do.
+
+- The sessions are worked out from the term's dates and the activity's day, leaving out the days the academic calendar marks as closed. A card shows how many sessions there are and the next one.
+- Deleting a term deletes its activities, their lists and their registers. Deleting an activity deletes its list and register. Neither can be undone.
+
+### The lists
+
+Open an activity, then **Students**.
+
+- **Add students** lists the enrolled students in the activity's year groups first. **Show other year groups** shows everyone else, marked "Not in its year groups"; Nursery is marked in red.
+- A half-day student goes onto the **Waiting list** when added, as the sign-up form promises. **Off the waiting list** moves them onto the register.
+- Each student has a note for the teacher: who collects them, a health point, anything else.
+- A student on two activities in the same term is marked "Also on ...". The form says one activity each to start; the office decides.
+- On the ECAs page, office accounts see a **To check** card listing every student with one of these marks.
+
+> **Ask Claude:** "The ECA sign-ups for Quarter 3 are in. Read the responses on the Google Form, match each child to a student in The Current, tell me anything unclear, and give me the lists to load."
+
+For Quarter 2 Claude matched the form's 16 responses to 18 students and wrote the lists as a database file to run once (`eca-q2-2026-lists.sql`, kept in Bowen's Admin Email folder, not in the code, because it names students).
+
+### Taking the ECA register
+
+1. Open the activity's card. **Register** opens on today's session; on another day it opens on the last session held, so a missed register can be caught up.
+2. Tap **Present**, **Late** or **Absent** for each student, or **Mark everyone else present**. Tapping the lit mark again takes it off.
+3. A student marked absent on that day's PRA register, or away on a trip, shows "Absent from PRA this day" (or "Traveling") and is left out of **Mark everyone else present**.
+
+- The teacher who runs the activity and the office take its register. Other teachers can read it.
+- Waiting-list students are not on the register.
+
+### The ECA summary and printout
+
+- **Summary** has one row per student and one column per session: a tick for present, L for late, A for absent (T and V in Vietnamese). **Came** counts present and late out of the sessions held so far. A student taken off the list still shows, marked "no longer on the list", if they had marks.
+- **Print register** prints one A4 page with the students, their allergies, a box per session (marks already taken filled in) and the waiting list. **Print all registers** on the ECAs page prints every activity of the term, one page each.
 
 ## What can go wrong
 

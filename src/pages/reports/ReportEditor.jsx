@@ -309,7 +309,7 @@ export default function ReportEditor() {
   return (
     <div className={`grid gap-6 ${preview ? 'xl:grid-cols-[1fr_auto]' : ''}`}>
       <div className="min-w-0 space-y-5">
-        <div className="sticky top-[57px] z-30 -mx-4 border-b border-slate-200 bg-[#f5f7fa]/95 px-4 py-2 backdrop-blur">
+        <div className="sticky top-[var(--header-h,0px)] z-30 -mx-4 border-b border-slate-200 bg-[#f5f7fa]/95 px-4 py-2 backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
             <Link to="/reports" className="btn-ghost"><ArrowLeft size={16} /></Link>
             {photoSrc(student?.photo) ? <img src={photoSrc(student.photo)} alt="" className="h-9 w-9 rounded-full object-cover" /> : null}
@@ -437,7 +437,7 @@ export default function ReportEditor() {
 
       {preview && (
         <div className="hidden xl:block">
-          <div className="sticky top-[70px] max-h-[calc(100vh-80px)] overflow-auto rounded-xl border border-slate-300 bg-slate-200 p-3 shadow-inner" style={{ width: 'calc(210mm * 0.62 + 24px)' }}>
+          <div className="sticky top-[calc(var(--header-h,0px)+13px)] max-h-[calc(100vh-var(--header-h,0px)-23px)] overflow-auto rounded-xl border border-slate-300 bg-slate-200 p-3 shadow-inner" style={{ width: 'calc(210mm * 0.62 + 24px)' }}>
             {bi && (
               <div className="seg mb-2" role="group">
                 <button type="button" aria-pressed={previewLang === 'en'} onClick={() => setPreviewLang('en')}>English</button>

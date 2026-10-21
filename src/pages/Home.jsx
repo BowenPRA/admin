@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PlusCircle, Users, CalendarCheck, CalendarDays, CalendarX, ClipboardList, ClipboardCheck, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane } from 'lucide-react'
+import { PlusCircle, Users, CalendarCheck, CalendarDays, CalendarX, ClipboardList, ClipboardCheck, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane, Shapes } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
@@ -14,6 +14,7 @@ import { withOpenSteps } from '../lib/onboarding'
 import { summarize } from '../lib/leads'
 import { summarizeTodos } from '../lib/todos'
 import { tripOn, statusOn, travelingOn, tripLine, TRAVEL } from '../lib/travel'
+import { useOffDays, sessionsToday, sameEmail, activityName, timeText, currentTerm } from '../lib/eca'
 import { teacherDay, todayIndex, isNow, subjectTone } from '../lib/schedule'
 import { currentPeriod, reportWork, studentSections, HOMEROOM_PART, WRITING } from '../lib/report/utils'
 import { Card, StatusChip, Empty, Spinner } from '../components/ui'
@@ -56,6 +57,26 @@ function travelFact(trips, students, t, lang) {
   if (!away.length) return null
   const names = away.slice(0, 4).map((x) => `${x.s.nickname || x.s.full_name} (${tripLine(x.trip, lang)})`).join(', ')
   return { icon: Plane, to: '/attendance', text: t('travelingNow', { names: away.length > 4 ? `${names} +${away.length - 4}` : names }) }
+}
+
+/**
+ * 'ECA today: Table Games 3:30–4:15 pm' when an ECA meets today: a teacher's own, or every one
+ * for the office. In the week before a term starts the office sees when it starts.
+ */
+function ecaFact(eca, offDays, { email, office }, t, lang) {
+  if (!offDays) return null
+  const { term, list } = sessionsToday(eca, offDays)
+  const mine = office ? list : list.filter((a) => sameEmail(a.teacher_email, email))
+  if (mine.length) {
+    return { icon: Shapes, to: mine.length === 1 ? `/eca?activity=${mine[0].id}` : '/eca', text: t('ecaHomeToday', { names: `${mine.map((a) => activityName(a, lang)).join(', ')} · ${timeText(term, lang)}` }) }
+  }
+  const next = currentTerm(eca.terms)
+  const days = next ? daysUntil(next.from_date) : null
+  if (office && days != null && days > 0 && days <= 7) {
+    const [y, m, d] = next.from_date.split('-').map(Number)
+    return { icon: Shapes, to: '/eca', text: t('ecaHomeStarts', { date: new Date(y, m - 1, d).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) }) }
+  }
+  return null
 }
 
 /**
@@ -356,6 +377,7 @@ function OfficeHome() {
   const { t, lang } = useT()
   const data = useData()
   const { me } = useAuth()
+  const offDays = useOffDays()
   const [invoices, setInvoices] = useState(null)
   const [leadRows, setLeadRows] = useState(null)
   const [webWaiting, setWebWaiting] = useState(0)
@@ -406,6 +428,7 @@ function OfficeHome() {
           !reports.hidden && reports.work && !reports.work.error && reports.work.total > 0 && { icon: ClipboardList, text: `${reports.period.label}: ${reports.work.total - reports.work.done ? t('nLeft', { n: reports.work.total - reports.work.done }) : t('reportsAllDone')}` },
           leads && (leads.new || leads.due || webWaiting) && { icon: Sprout, to: '/leads', text: `${t('leadsNav')}: ${[leads.new && t('ldNewShort', { n: leads.new }), leads.due && t('ldDueShort', { n: leads.due }), webWaiting && t('ldWebShort', { n: webWaiting })].filter(Boolean).join(' · ')}` },
           travelFact(data.travel, data.students, t, lang),
+          ecaFact(data.eca, offDays, { email: me?.email, office: true }, t, lang),
           finishing > 0 && { icon: CalendarX, to: '/students?ending=1', text: t('endingHome', { n: finishing }) },
           newSteps > 0 && { icon: ClipboardCheck, to: '/students?steps=1', text: t(newSteps === 1 ? 'stepsHomeOne' : 'stepsHome', { n: newSteps }) },
           formsToCheck > 0 && { icon: FileSignature, to: '/enrollments', text: t('enHomeShort', { n: formsToCheck }) },
@@ -462,6 +485,7 @@ function TeacherHome() {
   const { t, lang } = useT()
   const data = useData()
   const { me, displayName, isHead } = useAuth()
+  const offDays = useOffDays()
   const today = useTodayAttendance(data.students, data.travel)
   const reports = useReportWork()
   const lessons = useTodayLessons()
@@ -486,6 +510,7 @@ function TeacherHome() {
           lessons.onSchedule && { icon: CalendarDays, text: lessons.items.length === 1 ? t('lessonToday') : lessons.items.length ? t('lessonsToday', { n: lessons.items.length }) : t('noLessonsToday') },
           groups.length > 0 && att[0]?.loaded && { icon: CalendarCheck, text: toRegister ? t(toRegister === 1 ? 'classToRegister' : 'classesToRegister', { n: toRegister }) : t('allRegistered') },
           travelFact(data.travel, data.students.filter((s) => groups.includes(s.level)), t, lang),
+          ecaFact(data.eca, offDays, { email: me?.email, office: false }, t, lang),
           !reports.hidden && work && { icon: ClipboardList, text: work.total ? `${reports.period.label}: ${partsLeft ? t('nLeft', { n: partsLeft }) : t('reportsAllDone')}` : t('noReportsYet') },
         ]} />
 
