@@ -69,7 +69,7 @@ Photo = { src, small, w, h, alt: { en, vi }, focus: '50% 30%' | null }
    // focus is the point a crop keeps (the cover's is set by clicking it in the editor)
 
 Part (by type):
-  { type: 'story', id, icon, tone, heading, when, body, photos: [Photo] (0–3),
+  { type: 'story', id, icon, tone, heading, when, body, photos: [Photo] (0–4: four make a 2 × 2 grid),
     button: { label: { en, vi }, url } | null }
   { type: 'class', id, class: 'Nursery', class_key: 'nursery', tone,
     teacher: { name: 'Ms. Tham N', photo: url | null } | null,

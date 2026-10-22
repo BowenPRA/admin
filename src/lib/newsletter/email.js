@@ -31,6 +31,17 @@ const link = (url, from, id) => `${url}?from=${from}${id ? `#s-${id}` : ''}`
 
 // The editor's preview shows photos from their private links too (they work for the person looking).
 let previewing = false
+// A test of an issue still being written: a part with no Vietnamese yet says so in the
+// Vietnamese half, instead of the English a second time.
+let drafting = false
+/** Whether any of these fields has English but no Vietnamese yet. */
+const viMissing = (...objs) => objs.some((o) => o && pick(o, 'vi').english)
+const partFields = (p) => [p.heading, p.when, p.body, p.text, p.who, p.blurb, p.button?.label]
+const partViMissing = (p) => viMissing(...partFields(p))
+/** Whether the issue has no Vietnamese anywhere yet. */
+const noViAtAll = (payload) => ![payload.opening?.lead, payload.opening?.body, ...(payload.parts || []).flatMap(partFields)]
+  .some((o) => { if (!o) return false; const r = pick(o, 'vi'); return !r.english && !!plain(r.text) })
+const NO_VI = 'chưa có tiếng Việt (no Vietnamese yet)'
 /** A photo address the email can show: public http(s) only (a signed link expires, a data URL is too big). */
 function publicSrc(photo, big = false) {
   const s = (big ? photo?.src || photo?.small : photo?.small || photo?.src) || ''
@@ -109,9 +120,19 @@ function fullSection(payload, lang, tone) {
   const pad = (html, p = '0 24px') => rows.push(`<tr><td style="padding:${p};">${html}</td></tr>`)
   const h2 = (text) => `<h2 style="margin:0 0 10px;${font(21, 28, { bold: true, color: NAVY })}">${esc(text)}</h2>`
 
+  const noVi = drafting && L === 'vi'
+  const missingRow = (head) => pad(`<p style="margin:0;padding:10px 14px;background:#F3F5F8;border-radius:10px;${font(14, 20, { color: INK_SOFT })}">${head ? `<b style="color:${NAVY};">${esc(head)}</b>: ` : ''}${esc(NO_VI)}</p>`, '12px 24px 2px')
+  const closingPart = (payload.parts || []).find((p) => p.type === 'closing')
+  // Nothing in Vietnamese yet: one line for the whole half.
+  if (noVi && noViAtAll(payload)) {
+    pad(`<p style="margin:0;padding:14px 16px;background:#F3F5F8;border-radius:10px;${font(15, 22, { color: INK_SOFT })}"><b style="color:${NAVY};">Chưa có tiếng Việt.</b> No Vietnamese yet: it is added before the issue goes out to families.</p>`, '18px 24px 8px')
+    return rows.join('\n')
+  }
+
   const lead = t(payload.opening?.lead, L)
   const body = t(payload.opening?.body, L)
-  if (lead || plain(body)) pad(`${lead ? `<p style="margin:0 0 8px;${font(18, 25, { bold: true, color: NAVY })}">${esc(lead)}</p>` : ''}${bodyHtml(body)}`, '24px 24px 4px')
+  if (noVi && viMissing(payload.opening?.lead, payload.opening?.body)) missingRow('Mở đầu')
+  else if (lead || plain(body)) pad(`${lead ? `<p style="margin:0 0 8px;${font(18, 25, { bold: true, color: NAVY })}">${esc(lead)}</p>` : ''}${bodyHtml(body)}`, '24px 24px 4px')
 
   // Dates and reminders, when they are shown (HIDDEN_PARTS).
   const dates = payload.need?.dates || []
@@ -124,6 +145,10 @@ function fullSection(payload, lang, tone) {
   }
 
   for (const p of payload.parts || []) {
+    if (noVi && p.type !== 'closing' && partViMissing(p)) {
+      missingRow(p.type === 'class' ? p.class : p.type === 'press' ? p.title : t(p.heading, 'en'))
+      continue
+    }
     if (p.type === 'story') {
       const when = t(p.when, L)
       const button = p.button ? `<p style="margin:4px 0 0;"><a href="${esc(p.button.url)}" style="display:inline-block;padding:10px 20px;border-radius:999px;background:${tone.button};${font(15, 20, { bold: true, color: '#FFFFFF' })}text-decoration:none;">${esc(t(p.button.label, L))}&nbsp;&rarr;</a></p>` : ''
@@ -143,7 +168,7 @@ function fullSection(payload, lang, tone) {
     }
   }
 
-  const closing = (payload.parts || []).find((p) => p.type === 'closing')
+  const closing = noVi && closingPart && viMissing(closingPart.body) ? null : closingPart
   pad(`${closing && plain(t(closing.body, L)) ? bodyHtml(t(closing.body, L)) : ''}<p style="margin:4px 0 0;${font(16, 24)}">${esc(word(L, 'signoff'))}<br><b style="color:${NAVY};">${esc(word(L, 'from'))}</b></p>`, '18px 24px 8px')
   // The issue's page on pra.edu.vn, in this language.
   const href = link(payload.url[L] || payload.url.en, 'email')
@@ -240,7 +265,8 @@ function section(payload, lang, tone) {
  */
 export function newsletterEmail(payload, opts = {}) {
   previewing = !!opts.preview
-  try { return buildEmail(payload, opts) } finally { previewing = false }
+  drafting = !!opts.draft
+  try { return buildEmail(payload, opts) } finally { previewing = false; drafting = false }
 }
 
 function buildEmail(payload, { logoUrl = 'https://pra.edu.vn/assets/img/logo.png' } = {}) {
@@ -253,6 +279,7 @@ function buildEmail(payload, { logoUrl = 'https://pra.edu.vn/assets/img/logo.png
   const pre = [t(payload.preheader, 'en'), t(payload.preheader, 'vi')].filter(Boolean)
   const preheader = [...new Set(pre)].join(' · ')
   const viHref = link(payload.url.vi, 'email')
+  const enHref = link(payload.url.en, 'email')
   const cover = publicSrc(payload.cover, true)
   const coverAlt = t(payload.cover?.alt, 'en')
 
@@ -274,12 +301,18 @@ function buildEmail(payload, { logoUrl = 'https://pra.edu.vn/assets/img/logo.png
 <tr><td style="padding:18px 24px 14px;background-color:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
 <td valign="middle"><img src="${esc(logoUrl)}" width="134" height="54" alt="Palm River Academy" style="display:block;width:134px;height:54px;border:0;"></td>
-<td valign="middle" align="right" style="${font(13, 18, { color: EMAIL_STYLE === 'full' ? INK_SOFT : LINK })}">${EMAIL_STYLE === 'full' ? `Tiếng Việt bên dưới 🇻🇳<br><a href="${esc(viHref)}" style="color:${LINK};text-decoration:underline;">${esc(word('en', 'readVi'))}</a>` : `<a href="${esc(viHref)}" style="color:${LINK};text-decoration:underline;">${esc(word('en', 'readVi'))}</a>`}</td>
+<td valign="middle" align="right" style="${font(13, 18, { color: EMAIL_STYLE === 'full' ? INK_SOFT : LINK })}">${EMAIL_STYLE === 'full' ? 'Tiếng Việt bên dưới 🇻🇳' : `<a href="${esc(viHref)}" style="color:${LINK};text-decoration:underline;">${esc(word('en', 'readVi'))}</a>`}</td>
 </tr></table>
 </td></tr>
 <tr><td bgcolor="${band}" style="background:${band};padding:22px 24px 20px;">
 <p style="margin:0;${font(26, 32, { bold: true, color: '#FFFFFF' })}">${esc(t(payload.edition_name, 'en'))}</p>
 <p style="margin:6px 0 0;${font(14, 20, { color: '#FFFFFF', extra: 'opacity:.92;' })}">${esc(t(payload.label, 'en'))} &middot; ${esc(t(payload.day, 'en'))}</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 0;"><tr>
+<td bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:999px;"><a href="${esc(enHref)}" style="display:inline-block;padding:10px 18px;${font(15, 20, { bold: true, color: band })}text-decoration:none;border-radius:999px;">Read it online&nbsp;&rarr;</a></td>
+<td width="10" style="font-size:0;line-height:0;">&nbsp;</td>
+<td style="border:2px solid #FFFFFF;border-radius:999px;"><a href="${esc(viHref)}" style="display:inline-block;padding:8px 16px;${font(15, 20, { bold: true, color: '#FFFFFF' })}text-decoration:none;border-radius:999px;">Đọc trên web</a></td>
+</tr></table>
+<p style="margin:8px 0 0;${font(12, 17, { color: '#FFFFFF', extra: 'opacity:.88;' })}">Bigger photos, easy to share with family &middot; Ảnh lớn hơn, dễ chia sẻ với người thân</p>
 </td></tr>
 ${cover ? `<tr><td style="padding:0;"><img src="${esc(cover)}" width="600" alt="${esc(coverAlt)}" style="display:block;width:100%;max-width:600px;height:auto;border:0;"></td></tr>
 ${coverAlt ? `<tr><td style="padding:8px 24px 0;${font(12, 17, { color: INK_SOFT })}">${esc(coverAlt)}</td></tr>` : ''}` : ''}
@@ -315,10 +348,19 @@ function emailText(payload) {
   const line = (s = '') => out.push(s)
   const half = (lang) => {
     const L = lang
+    const noVi = drafting && L === 'vi'
+    const closingPart = (payload.parts || []).find((p) => p.type === 'closing')
+    if (noVi && noViAtAll(payload)) {
+      line('Chưa có tiếng Việt. No Vietnamese yet: it is added before the issue goes out to families.')
+      return
+    }
     const lead = t(payload.opening?.lead, L)
     const body = plainLines(t(payload.opening?.body, L))
-    if (lead) line(lead)
-    if (body) line(body)
+    if (noVi && viMissing(payload.opening?.lead, payload.opening?.body)) line(`Mở đầu: ${NO_VI}`)
+    else {
+      if (lead) line(lead)
+      if (body) line(body)
+    }
     const dates = payload.need?.dates || []
     const reminders = (payload.need?.reminders || []).filter((r) => t(r, L).trim())
     if (dates.length || reminders.length) {
@@ -339,6 +381,7 @@ function emailText(payload) {
     if (EMAIL_STYLE === 'full') {
       for (const p of payload.parts || []) {
         if (p.type === 'closing') continue
+        if (noVi && partViMissing(p)) { line(); line(`${p.type === 'class' ? p.class : p.type === 'press' ? p.title : t(p.heading, 'en')}: ${NO_VI}`); continue }
         const head = p.type === 'class' ? p.class : p.type === 'press' ? `${word(L, 'pressFrom')}: ${p.title}` : t(p.heading, L) || (p.type === 'welcome' ? word(L, 'welcome') : '')
         line()
         if (head) line(head)
@@ -349,7 +392,7 @@ function emailText(payload) {
         if (p.type === 'welcome' && (p.names || []).length) line(p.names.map((n) => `${n.name}${n.class ? ` (${n.class})` : ''}`).join(', '))
         if (p.button) line(`${t(p.button.label, L)}: ${p.button.url}`)
       }
-      const closing = (payload.parts || []).find((p) => p.type === 'closing')
+      const closing = noVi && closingPart && viMissing(closingPart.body) ? null : closingPart
       line()
       if (closing && plain(t(closing.body, L))) line(plainLines(t(closing.body, L)))
       line(word(L, 'signoff'))
@@ -383,6 +426,8 @@ function emailText(payload) {
   line(t(payload.edition_name, 'en'))
   line(`${t(payload.label, 'en')} · ${t(payload.day, 'en')}`)
   line(EMAIL_STYLE === 'full' ? 'Tiếng Việt bên dưới' : `${word('en', 'readVi')}: ${link(payload.url.vi, 'email')}`)
+  line(`Read it online: ${link(payload.url.en, 'email')}`)
+  line(`Đọc trên web: ${link(payload.url.vi, 'email')}`)
   line()
   half('en')
   line()

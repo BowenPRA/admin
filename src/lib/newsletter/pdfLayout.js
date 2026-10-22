@@ -747,7 +747,8 @@ export function newsletterPdfDefinition(payload, lang = 'en', { images = {}, ico
       if (when) head.push({ text: when, font: F.strong, bold: true, fontSize: 9.4, color: green.ink, margin: [31, -1, 0, 6] })
       else head[head.length - 1] = { ...head[head.length - 1], margin: [...(head[head.length - 1].margin || [0, 0, 0, 0]).slice(0, 3), 7] }
       const nPhotos = (p.photos || []).filter((x) => photoOf(x)).length
-      const est = 40 + estimateText(lengthOf(b.text), nPhotos === 1 ? W * 0.6 : W) + (nPhotos > 1 ? 150 : 0)
+      // Two to three photos make one row; four make two (photoRows).
+      const est = 40 + estimateText(lengthOf(b.text), nPhotos === 1 ? W * 0.6 : W) + (nPhotos > 1 ? (nPhotos === 4 ? 300 : 150) : 0)
       const body = textWithPhotos([...blocks, ...(btn ? [btn] : [])], p.photos)
       block.push(...keepTogether(head, body, nPhotos === 1 ? Math.max(est, 260) : est))
     } else if (p.type === 'class') {

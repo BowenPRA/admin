@@ -175,7 +175,7 @@ export async function sendTest(issue0, { jobId = null, to = '', note = '', me } 
   const links = await lastingPhotoLinks(issuePhotos(issue, parts))
   const fam = buildPayload(issue, parts, { audience: 'families', photo: (p) => links.get(p.key) || photoLink(p) })
   const { newsletterEmail } = await import('./email.js')
-  const { subject, html, text } = newsletterEmail(fam, { preview: true })
+  const { subject, html, text } = newsletterEmail(fam, { preview: true, draft: true })
   return sendNewsletterTest({ issueId: issue.id, mail: { subject, html, text }, to, note, me })
 }
 
