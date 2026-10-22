@@ -122,8 +122,9 @@ export const SUBJECTS = [
   { key: 'everyday_experts', kind: 'vocational', ...lifeSkills('everyday_experts'), icon: 'lightbulb', scored: false, yearGroups: YEARS_2_TO_6 },
   { key: 'presentation_play', kind: 'vocational', ...lifeSkills('presentation_play'), icon: 'drama', scored: false, yearGroups: ['Year 1'] },
   // Movement was a specialist area with a comment on each student until 22 October 2026.
+  // That evening Year 7 (Mr. Caleb's comments) went back to that; Years 1 to 6 keep the description.
   { key: 'movement', kind: 'vocational', name: 'Movement', name_vi: 'Vận động', icon: 'movement', scored: false, yearGroups: [...PRIMARY_YEARS, 'Year 7'],
-    description: MOVEMENT_DESCRIPTION, description_vi: MOVEMENT_DESCRIPTION_VI },
+    description: MOVEMENT_DESCRIPTION, description_vi: MOVEMENT_DESCRIPTION_VI, specialistIn: ['Year 7'] },
   { key: 'physical', kind: 'vocational', comment: true, name: 'Physical Development', name_vi: 'Phát triển thể chất', icon: 'footprints', scored: false, yearGroups: EARLY_YEARS },
   { key: 'expressive_arts', kind: 'vocational', name: 'Expressive Arts & Design', name_vi: 'Nghệ thuật & Sáng tạo', icon: 'music', scored: false, yearGroups: EARLY_YEARS },
 ]
@@ -241,7 +242,7 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
-const SETTINGS_VERSION = 12
+const SETTINGS_VERSION = 13
 
 export const DEFAULT_REPORT_SETTINGS = {
   version: SETTINGS_VERSION,
@@ -428,6 +429,11 @@ export function normalizeReportSettings(stored) {
     const movement = subjects.find((sub) => sub.key === 'movement')
     if (movement?.description === MOVEMENT_DESCRIPTION_OLD) movement.description = MOVEMENT_DESCRIPTION
     if (movement?.description_vi === MOVEMENT_DESCRIPTION_VI_OLD) movement.description_vi = MOVEMENT_DESCRIPTION_VI
+  }
+  if ((Number(v.version) || 1) < 13 && v.subjects) {
+    // Year 7 Movement takes Mr. Caleb's comment again, with the specialist areas.
+    const movement = subjects.find((sub) => sub.key === 'movement')
+    if (movement && !movement.specialistIn) movement.specialistIn = ['Year 7']
   }
   let levels = s.levels
   if ((Number(v.version) || 1) < 7 && ['EPCM', 'EPCAM'].includes((v.levels || []).map((l) => l.code).join(''))) levels = LEVELS.map((l) => ({ ...l }))

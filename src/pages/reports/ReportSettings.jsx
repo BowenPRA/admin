@@ -136,6 +136,18 @@ function SettingsForm({ initial }) {
                   </Field>
                 </div>
               )}
+              {sub.kind === 'vocational' && !sub.comment && (
+                <div className="sm:col-span-6">
+                  <div className="label">Specialist area instead in <span className="font-normal normal-case text-slate-400">(ticked year groups: an individual comment on each student, printed with the specialist areas; Movement in Year 7)</span></div>
+                  <div className="flex flex-wrap gap-1">
+                    {((sub.yearGroups || []).length ? sub.yearGroups : YEAR_GROUPS).map((g) => {
+                      const on = (sub.specialistIn || []).includes(g)
+                      return <button key={g} type="button" aria-pressed={on} onClick={() => set(`subjects.${i}.specialistIn`, on ? sub.specialistIn.filter((x) => x !== g) : [...(sub.specialistIn || []), g])}
+                        className={`chip ${on ? 'bg-violet-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-violet-100'}`}>{g}</button>
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
           <button className="btn-secondary text-xs" onClick={() => add('subjects', { key: `subject_${s.subjects.length + 1}`, kind: 'specialist', name: 'New area', name_vi: '', icon: 'star', scored: false })}><Plus size={14} /> Add learning area</button>

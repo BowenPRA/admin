@@ -15,7 +15,7 @@ import { Card, Field, TextInput, Select, Checkbox, Modal, Empty, Spinner, Chip, 
 import { WritingTags, WritingLegend } from '../../components/report/WritingTags'
 
 // Inside a year-group pill: core areas (both) first, then comment areas, then description areas, then level-only ones (Movement).
-const writingOrder = (settings, k) => { const w = writingFor(settings, k); return w.comment && w.description ? 0 : w.comment ? 1 : w.description ? 2 : 3 }
+const writingOrder = (settings, k, g) => { const w = writingFor(settings, k, g); return w.comment && w.description ? 0 : w.comment ? 1 : w.description ? 2 : 3 }
 
 const blank = () => ({ email: '', name: '', title: 'Mr.', role: 'teacher', subjects: [], homeroom_groups: [], active: true })
 const shortLevel = (g) => (g === 'Nursery' ? 'N' : g === 'Kindergarten' ? 'K' : g === 'Upper Secondary' ? 'US' : g === '*' ? 'All' : g.replace('Year ', 'Y'))
@@ -196,8 +196,8 @@ export default function Teachers() {
                           <span key={g} className="inline-flex items-center overflow-hidden rounded-full border border-sky-200 text-xs">
                             <span className="bg-sky-100 px-2 py-0.5 font-bold text-sky-800">{g === 'any' ? 'Any year' : shortLevel(g)}</span>
                             <span className="flex flex-wrap items-center gap-x-2 px-2 py-0.5 text-slate-700">
-                              {[...subs].sort((a, b) => writingOrder(settings, a) - writingOrder(settings, b)).map((k) => (
-                                <span key={k} className="inline-flex items-center gap-0.5 whitespace-nowrap">{subjName(k)} <WritingTags settings={settings} subjectKey={k} compact size={11} /></span>
+                              {[...subs].sort((a, b) => writingOrder(settings, a, g) - writingOrder(settings, b, g)).map((k) => (
+                                <span key={k} className="inline-flex items-center gap-0.5 whitespace-nowrap">{subjName(k)} <WritingTags settings={settings} subjectKey={k} yearGroup={g} compact size={11} /></span>
                               ))}
                             </span>
                           </span>

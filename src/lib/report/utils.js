@@ -11,8 +11,14 @@ export const fmtDate = (d, opts) => {
   return dt.toLocaleDateString('en-GB', opts || { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export function subjectByKey(settings, key) {
-  return (settings?.subjects || []).find((s) => s.key === key) || { key, name: key, kind: 'vocational' }
+/**
+ * A learning area from Report settings. With `yearGroup`, as that year group has
+ * it: an area with `specialistIn` (Movement: Year 7, since 22 October 2026) is a
+ * specialist area there, with an individual comment and no fixed description.
+ */
+export function subjectByKey(settings, key, yearGroup) {
+  const sub = (settings?.subjects || []).find((s) => s.key === key) || { key, name: key, kind: 'vocational' }
+  return yearGroup && (sub.specialistIn || []).includes(yearGroup) ? { ...sub, kind: 'specialist', comment: false } : sub
 }
 
 export function levelInfo(settings, value) {
@@ -53,7 +59,9 @@ export const TIER_KEYS = ['academic', 'specialist', 'vocational']
  * The tier (subject.kind) decides, except that a vocational area with
  * `comment: true` (Early Years Physical Development) takes a comment instead of
  * the description, and one with a fixed description in Report settings
- * (Movement) needs only a level. Every screen reads writingFor() so they agree.
+ * (Movement) needs only a level. Every screen reads writingFor() so they agree;
+ * given the year group, it also follows `specialistIn` (Year 7 Movement takes a
+ * comment, as a specialist area).
  */
 export const WRITING = {
   academic: { comment: true, description: true },
@@ -61,8 +69,8 @@ export const WRITING = {
   vocational: { comment: false, description: true },
   levelOnly: { comment: false, description: false },
 }
-export function writingFor(settings, key) {
-  const sub = subjectByKey(settings, key)
+export function writingFor(settings, key, yearGroup) {
+  const sub = subjectByKey(settings, key, yearGroup)
   if (sub.kind === 'vocational' && sub.comment) return WRITING.specialist
   if (fixedDescription(sub)) return WRITING.levelOnly
   return WRITING[sub.kind] || WRITING.vocational
@@ -72,17 +80,18 @@ export function writingFor(settings, key) {
 export const fixedDescription = (sub) =>
   (sub?.kind === 'vocational' && !sub.comment && String(sub.description || '').trim() ? { description: sub.description, description_vi: sub.description_vi || '' } : null)
 
-/** A section's tier comes from the current settings, so re-tiering an area applies to existing reports. */
-export function tierOf(settings, section) {
-  return (settings?.subjects || []).find((s) => s.key === section.subject_key)?.kind || section.kind || 'vocational'
+/** A section's tier comes from the current settings (as `yearGroup` has the area), so re-tiering an area applies to existing reports. */
+export function tierOf(settings, section, yearGroup) {
+  const known = (settings?.subjects || []).some((s) => s.key === section.subject_key)
+  return (known && subjectByKey(settings, section.subject_key, yearGroup).kind) || section.kind || 'vocational'
 }
 
-/** { academic: [...], specialist: [...], vocational: [...] } in the order areas are listed in settings. */
-export function sectionsByTier(settings, sections) {
+/** { academic: [...], specialist: [...], vocational: [...] } in the order areas are listed in settings, for one report's year group. */
+export function sectionsByTier(settings, sections, yearGroup) {
   const keys = (settings?.subjects || []).map((s) => s.key)
   const order = (k) => (keys.includes(k) ? keys.indexOf(k) : keys.length)
   const sorted = [...sections].sort((a, b) => order(a.subject_key) - order(b.subject_key) || (a.sort ?? 0) - (b.sort ?? 0))
-  return Object.fromEntries(TIER_KEYS.map((t) => [t, sorted.filter((s) => tierOf(settings, s) === t)]))
+  return Object.fromEntries(TIER_KEYS.map((t) => [t, sorted.filter((s) => tierOf(settings, s, yearGroup) === t)]))
 }
 
 export const templateAreas = (t) => t?.areas || [...(t?.academic || []), ...(t?.specialist || []), ...(t?.vocational || [])]
@@ -210,8 +219,8 @@ const written = (text, min) => charCount(text) >= Math.max(1, min || 0)
  */
 export function sectionDone(settings, s, report = null) {
   if (!s.level) return false
-  const tier = tierOf(settings, s)
-  if (!writingFor(settings, s.subject_key).comment) return true
+  const tier = tierOf(settings, s, report?.year_group)
+  if (!writingFor(settings, s.subject_key, report?.year_group).comment) return true
   return written(s.comment, textMinimums(settings, report)[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
 }
 
@@ -250,7 +259,7 @@ export function descriptionTasks(settings, reports, sections, { subjects = [], n
     const ids = new Set(rs.map((r) => r.id))
     const keys = [...new Set(sections.filter((s) => ids.has(s.report_id)).map((s) => s.subject_key))]
     for (const key of keys) {
-      if (!subjects.includes(`${key}:${yearGroup}`) || !writingFor(settings, key).description) continue
+      if (!subjects.includes(`${key}:${yearGroup}`) || !writingFor(settings, key, yearGroup).description) continue
       const note = notes.find((n) => n.year_group === yearGroup && n.subject_key === key) || null
       const done = rs.every((r) => r.status === 'published') || descriptionDone(settings, note || { subject_key: key }, yearGroup)
       const open = rs.filter((r) => r.status !== 'published')
@@ -282,7 +291,7 @@ export function reportWork(settings, reports, sections, { subjects = [], homeroo
     const g = groups.get(yearGroup)
     if (!g.areas.has(key)) {
       const homeroom = key === HOMEROOM_PART
-      g.areas.set(key, { key, name: homeroom ? 'Homeroom' : subjectByKey(settings, key).name, tier: homeroom ? null : subjectByKey(settings, key).kind, writing: homeroom ? null : writingFor(settings, key), done: 0, total: 0, description: null })
+      g.areas.set(key, { key, name: homeroom ? 'Homeroom' : subjectByKey(settings, key).name, tier: homeroom ? null : subjectByKey(settings, key, yearGroup).kind, writing: homeroom ? null : writingFor(settings, key, yearGroup), done: 0, total: 0, description: null })
     }
     return [g, g.areas.get(key)]
   }

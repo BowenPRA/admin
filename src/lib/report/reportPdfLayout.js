@@ -287,7 +287,7 @@ function buildPage(item, M, { proof, icons = {} }) {
   const nameIn = (x) => (vi && x?.name_vi) || x?.name || ''
   const org = settings.org || {}
   const levels = settings.levels || []
-  const tiers = sectionsByTier(settings, sections)
+  const tiers = sectionsByTier(settings, sections, report.year_group)
   const nick = firstName(student)
   const template = templateOf(settings, report) || {}
   const yearGroup = yearGroupLabel(report.year_group, lang)
@@ -583,7 +583,7 @@ function buildPage(item, M, { proof, icons = {} }) {
   const cardTiers = ['specialist', 'vocational'].filter((k) => tiers[k].length)
   // A card holds an individual comment (specialist areas, and a vocational area
   // ticked for one, as Early Years Physical Development) or the course description.
-  const commentCard = (s) => writingFor(settings, s.subject_key).comment
+  const commentCard = (s) => writingFor(settings, s.subject_key, report.year_group).comment
   // Each tier's cards share the full width (two areas make two wide cards, one
   // area one full-width card). Where a tier mixes the two kinds, a comment card
   // is half as wide again as a description card, so the longer comment and the
@@ -615,7 +615,7 @@ function buildPage(item, M, { proof, icons = {} }) {
   const KICK_SIZES = [6.4, 6, 5.6]
   const kickNode = (text, size, tier) => ({ text, ...T(size, { color: THEME[tier].deep, pitch: 1.12 }) })
   const cards = Object.fromEntries(cardTiers.map((tier) => [tier, tiers[tier].map((s, i) => {
-    const sub = subjectByKey(settings, s.subject_key)
+    const sub = subjectByKey(settings, s.subject_key, report.year_group)
     // A fixed description (Movement) is the same on every report; the others are written each quarter.
     const fixed = fixedDescription(sub)
     const note = fixed || noteFor(s.subject_key)

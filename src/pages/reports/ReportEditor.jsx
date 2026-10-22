@@ -276,7 +276,7 @@ export default function ReportEditor() {
   // 'bi' = this student also gets a Vietnamese report (printed as its own page)
   const bi = report.lang === 'bi'
   const shownLang = bi ? previewLang : 'en'
-  const tiers = sectionsByTier(settings, sections)
+  const tiers = sectionsByTier(settings, sections, report.year_group)
   const comp = completion(report, sections, settings)
   const periods = settings.periods || []
   const isLastPeriod = periods.length > 0 && Number(report.period_index) >= Math.max(...periods.map((p) => Number(p.index)))
@@ -301,8 +301,8 @@ export default function ReportEditor() {
   const tierHint = (tier) => {
     if (tier.key === 'academic' && !reviewScores) return tier.hint.replace(', progress review score', '')
     if (tier.key !== 'vocational') return tier.hint
-    const named = (test) => tiers.vocational.map((s) => subjectByKey(settings, s.subject_key)).filter(test).map((sub) => sub.name)
-    const own = named((sub) => writingFor(settings, sub.key).comment)
+    const named = (test) => tiers.vocational.map((s) => subjectByKey(settings, s.subject_key, report.year_group)).filter(test).map((sub) => sub.name)
+    const own = named((sub) => writingFor(settings, sub.key, report.year_group).comment)
     const fixed = named((sub) => fixedDescription(sub))
     if (own.length && own.length === tiers.vocational.length) return TIERS.find((x) => x.key === 'specialist').hint
     let hint = tier.hint
@@ -459,13 +459,13 @@ export default function ReportEditor() {
 }
 
 function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, teachers, isHead, editable, onPatch, cohortAvg, note, onNote, signName, yearGroup, isLastPeriod, lastLabel, name, viAll, limits, minimums }) {
-  const sub = subjectByKey(settings, s.subject_key)
+  const sub = subjectByKey(settings, s.subject_key, yearGroup)
   // The teacher comes from the Teachers page; a typed name is only used while nobody is linked.
   const linkedTeacher = teacherNameFor(teachers, s.subject_key, yearGroup)
   const teacher = sectionTeacher(teachers, s, yearGroup)
   const scored = reviewScores && tier === 'academic' && sub.scored !== false
   // What this area needs: an individual comment, a course description, or both (core areas).
-  const writing = writingFor(settings, s.subject_key)
+  const writing = writingFor(settings, s.subject_key, yearGroup)
   // Or neither: a description fixed in Report settings (Movement) prints instead.
   const fixed = fixedDescription(sub)
 

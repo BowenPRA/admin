@@ -108,7 +108,7 @@ function ReportsList({ settings }) {
     const kinds = [{ comment: true, description: true }, { comment: true, description: false }, { comment: false, description: true }, { comment: false, description: false }]
     return kinds.map((writing) => ({
       writing,
-      names: (me?.subjects || []).filter((k) => { const w = writingFor(settings, k.split(':')[0]); return w.comment === writing.comment && w.description === writing.description })
+      names: (me?.subjects || []).filter((k) => { const w = writingFor(settings, ...k.split(':')); return w.comment === writing.comment && w.description === writing.description })
         .map((k) => { const [s, g] = k.split(':'); return `${subjectByKey(settings, s).name}${g ? ` (${g})` : ''}` }),
     })).filter((x) => x.names.length)
   }, [me, settings])
@@ -333,7 +333,7 @@ function ReportsList({ settings }) {
                           {!isHead && (
                             <td className="py-2 pr-3">
                               <div className="flex flex-wrap gap-1">
-                                {mine.map((s) => { const done = sectionDone(settings, s, r); return <span key={s.id} className={pill(done)}>{done && <Check size={12} />}{subjectByKey(settings, s.subject_key).name} <WritingTags settings={settings} subjectKey={s.subject_key} compact size={11} /></span> })}
+                                {mine.map((s) => { const done = sectionDone(settings, s, r); return <span key={s.id} className={pill(done)}>{done && <Check size={12} />}{subjectByKey(settings, s.subject_key).name} <WritingTags settings={settings} subjectKey={s.subject_key} yearGroup={r.year_group} compact size={11} /></span> })}
                                 {canHomeroom(r) && <span className={pill(homeroomDone(settings, r))}>{homeroomDone(settings, r) && <Check size={12} />}Homeroom</span>}
                                 {!mine.length && !canHomeroom(r) && <span className="text-xs text-slate-400">read-only</span>}
                               </div>

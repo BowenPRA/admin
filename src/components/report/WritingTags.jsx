@@ -15,13 +15,13 @@ export const WRITING_PARTS = [
 ]
 
 /**
- * The tags for one area: `subjectKey` (looked up in `settings`) or an explicit
- * `writing` ({ comment, description }). `compact` shows the icons only, with the
- * words as a tooltip; put a <WritingLegend /> near any compact use.
+ * The tags for one area: `subjectKey` (looked up in `settings`, as `yearGroup` has
+ * it) or an explicit `writing` ({ comment, description }). `compact` shows the icons
+ * only, with the words as a tooltip; put a <WritingLegend /> near any compact use.
  */
-export function WritingTags({ settings, subjectKey, writing, compact = false, size, className = '' }) {
+export function WritingTags({ settings, subjectKey, yearGroup, writing, compact = false, size, className = '' }) {
   const { t } = useT()
-  const w = writing || writingFor(settings, subjectKey)
+  const w = writing || writingFor(settings, subjectKey, yearGroup)
   const parts = WRITING_PARTS.filter((p) => w[p.key])
   if (!parts.length) {
     return compact ? null : (

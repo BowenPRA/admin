@@ -97,6 +97,8 @@ A vocational area can be ticked in Report settings to take an individual comment
 
 A vocational area can instead have a **Fixed course description** in Report settings. That text prints on every report with the area, every quarter, under "Topics covered:" like the other course descriptions, and teachers only pick a level. Movement is the only one (since 22 October 2026; trimmed that evening to about 250 characters, the length of the others). Leave the box empty for a description written each quarter.
 
+Such an area can still be a specialist area in some year groups: **Specialist area instead in** in Report settings, under the fixed description, ticks them. There the area takes a level and an individual comment on each student (up to 550 characters, like the other specialist areas) and prints with the specialist cards. Movement is ticked for Year 7 only: Mr. Caleb writes a comment on each Year 7 student, as before 22 October, while Mr. Chiến's Years 1 to 6 keep the fixed description. Comments typed before a change like this stay saved and print again once the year group is ticked.
+
 On the Teachers page, the Reports page and the editor, a violet speech-bubble icon means "comments to write" and a green page icon means "a course description to write". An academic area has both. An area with a fixed description shows a grey "Level only" tag.
 
 ### Master Minds, Movement and Social Studies

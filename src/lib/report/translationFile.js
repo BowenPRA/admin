@@ -45,11 +45,11 @@ function reportParts(report, sections, settings) {
   const limits = textLimits(settings, report)
   const add = (id, where, english, vietnamese, max) => { if (filled(english)) parts.push({ id, where, max_chars: max, english: english.trim(), vietnamese: vietnamese || '' }) }
   add(`report:${report.id}:homeroom_note`, 'Homeroom teacher comment', report.homeroom_note, report.homeroom_note_vi, limits.homeroom_note)
-  const tiers = sectionsByTier(settings, sections)
+  const tiers = sectionsByTier(settings, sections, report.year_group)
   for (const tier of TIER_KEYS) {
     for (const s of tiers[tier] || []) {
       const name = subjectByKey(settings, s.subject_key).name
-      if (writingFor(settings, s.subject_key).comment) add(`section:${s.id}:comment`, `${name}: individual teacher comment`, s.comment, s.comment_vi, limits[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
+      if (writingFor(settings, s.subject_key, report.year_group).comment) add(`section:${s.id}:comment`, `${name}: individual teacher comment`, s.comment, s.comment_vi, limits[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
     }
   }
   return parts
@@ -68,7 +68,7 @@ export function buildTranslationFile({ reports, sections, notes, students, setti
   const shared_topics = notes
     .filter((n) => groups.has(n.year_group) && filled(n.description))
     // Only areas with a course description on the page (core and vocational areas).
-    .filter((n) => writingFor(settings, n.subject_key).description)
+    .filter((n) => writingFor(settings, n.subject_key, n.year_group).description)
     .map((n) => ({ id: `note:${n.id}:description`, year_group: n.year_group, where: `${subjectByKey(settings, n.subject_key).name}: course description (topics covered this quarter), shared by every ${n.year_group} report`, max_chars: topicsLimit(settings, n.subject_key, n.year_group), english: n.description.trim(), vietnamese: n.description_vi || '' }))
     .filter(keep)
   const out = bi.map((r) => {
@@ -149,8 +149,8 @@ export function planTranslationImport(data, { reports, sections, notes, students
       if (field === 'homeroom_note') { english = row.homeroom_note; current = row.homeroom_note_vi; max = textLimits(settings, row).homeroom_note }
     } else if (kind === 'section' && (row = sectionById.get(rowId))) {
       report = reportById.get(row.report_id)
-      const tier = subjectByKey(settings, row.subject_key).kind
-      if (field === 'comment' && writingFor(settings, row.subject_key).comment) { english = row.comment; current = row.comment_vi; max = textLimits(settings, report)[tier === 'academic' ? 'academic_comment' : 'specialist_comment'] }
+      const tier = subjectByKey(settings, row.subject_key, report?.year_group).kind
+      if (field === 'comment' && writingFor(settings, row.subject_key, report?.year_group).comment) { english = row.comment; current = row.comment_vi; max = textLimits(settings, report)[tier === 'academic' ? 'academic_comment' : 'specialist_comment'] }
     } else if (kind === 'note' && field === 'description' && (row = noteById.get(rowId))) {
       english = row.description; current = row.description_vi; max = topicsLimit(settings, row.subject_key, row.year_group)
     }
