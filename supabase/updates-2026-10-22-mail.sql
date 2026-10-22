@@ -655,30 +655,84 @@ begin
   return q;
 end $$;
 
--- Sends a scheduled newsletter, exactly as it will go, to the person who asks, so
--- Seth or Bowen can read it in their own inbox before approving. Its subject starts
--- "[Test]". At most five an hour for each person.
-create or replace function adm_newsletter_test(p_job uuid) returns adm_mail_queue
+-- A test of a newsletter, to staff only, at any stage: the scheduled email exactly
+-- as it will go (p_job), or the issue as it is now (p_mail = { subject, html, text },
+-- made by The Current). A yellow box at the top says it is a test, from whom, and
+-- the note they wrote (p_note); the subject starts "[Test]". It goes to the sender
+-- unless p_to names other staff: at most six addresses, all @pra.edu.vn or
+-- @palmriveracademy.edu.vn. Ten tests an hour for each person.
+create or replace function adm_newsletter_send_test(p_issue uuid, p_job uuid default null, p_mail jsonb default null,
+  p_to text default null, p_note text default null)
+returns adm_mail_queue
 language plpgsql security definer set search_path = public as $$
 declare
   j adm_mail_queue;
   q adm_mail_queue;
   me text := adm_email();
+  rcpt text[];
+  a text;
+  subj text;
+  html text;
+  body text;
+  files jsonb := '[]'::jsonb;
+  note text := nullif(btrim(coalesce(p_note, '')), '');
+  box text;
+  i int;
+  k int;
 begin
   if not adm_newsletter_office() then
     raise exception 'Only the office can send a test.' using errcode = '42501';
   end if;
   if me !~ '@' then raise exception 'This login has no email address to send the test to.'; end if;
-  select * into j from adm_mail_queue where id = p_job and kind = 'newsletter';
-  if not found or j.html = '' then raise exception 'This schedule no longer exists. Reload the page.'; end if;
-  if (select count(*) from adm_mail_queue where kind = 'test' and requested_by = me and created_at > now() - interval '1 hour') >= 5 then
-    raise exception 'Five tests have gone to you in the last hour. Look in your inbox, or wait a little.';
+  rcpt := adm_mail_addrs(coalesce(nullif(btrim(coalesce(p_to, '')), ''), me));
+  if coalesce(array_length(rcpt, 1), 0) = 0 then raise exception 'Give at least one address to send the test to.'; end if;
+  if array_length(rcpt, 1) > 6 then raise exception 'A test goes to six addresses at most.'; end if;
+  foreach a in array rcpt loop
+    if a !~ '@(pra\.edu\.vn|palmriveracademy\.edu\.vn)$' then
+      raise exception 'Tests go to staff addresses only (@pra.edu.vn): % is not one.', a;
+    end if;
+  end loop;
+  if (select count(*) from adm_mail_queue where kind = 'test' and requested_by = me and created_at > now() - interval '1 hour') >= 10 then
+    raise exception 'You have sent ten tests in the last hour. Look in your inbox, or wait a little.';
   end if;
+
+  if p_job is not null then
+    select * into j from adm_mail_queue where id = p_job and kind = 'newsletter';
+    if not found or j.html = '' then raise exception 'This schedule no longer exists. Reload the page.'; end if;
+    p_issue := j.ref_id;
+    subj := j.subject; html := j.html; body := j.body; files := j.attachments;
+  else
+    if not exists (select 1 from adm_newsletters where id = p_issue) then raise exception 'This issue no longer exists.'; end if;
+    subj := p_mail ->> 'subject'; html := p_mail ->> 'html'; body := coalesce(p_mail ->> 'text', '');
+    if coalesce(subj, '') = '' or coalesce(html, '') = '' then raise exception 'The test email is empty.'; end if;
+  end if;
+
+  box := '<div style="max-width:600px;margin:12px auto;padding:12px 16px;background:#FFF6DE;border:1px solid #FFE4A0;border-radius:8px;'
+    || 'font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#7A5000"><b>Test</b> from '
+    || adm_mail_esc(adm_mail_who(me)) || '. Families have not received this.'
+    || case when note is not null then '<br><br>' || replace(adm_mail_esc(note), E'\n', '<br>') else '' end || '</div>';
+  -- Straight after <body ...>, or on top when there is none.
+  i := position('<body' in lower(html));
+  if i > 0 then
+    k := i + position('>' in substr(html, i)) - 1;
+    html := substr(html, 1, k) || box || substr(html, k + 1);
+  else
+    html := box || html;
+  end if;
+  body := 'TEST from ' || adm_mail_who(me) || '. Families have not received this.'
+    || coalesce(E'\n\n' || note, '') || E'\n\n------\n\n' || body;
+
   insert into adm_mail_queue (kind, ref_id, to_addr, subject, body, html, attachments, lang, requested_by)
-  values ('test', j.ref_id, me, '[Test] ' || j.subject, j.body, j.html, j.attachments, j.lang, me)
+  values ('test', p_issue, array_to_string(rcpt, ', '), '[Test] ' || subj, body, html, files, 'en', me)
   returning * into q;
   return q;
 end $$;
+
+-- The first version of the button (scheduled email, to the sender, no note).
+create or replace function adm_newsletter_test(p_job uuid) returns adm_mail_queue
+language sql security definer set search_path = public as $$
+  select * from adm_newsletter_send_test(null, p_job, null, null, null)
+$$;
 
 create or replace function adm_newsletter_unschedule(p_job uuid) returns adm_mail_queue
 language plpgsql security definer set search_path = public as $$
@@ -851,9 +905,11 @@ end $$;
 revoke all on function adm_mail_enrollment(uuid), adm_mail_web_message(uuid), adm_mail_notice(uuid, text, text),
   adm_mail_template(text), adm_mail_who(text), adm_mail_recent(text, text) from public, anon, authenticated;
 revoke all on function adm_newsletter_schedule(uuid, timestamptz, jsonb, jsonb, int, text), adm_newsletter_approve(uuid),
-  adm_newsletter_unschedule(uuid), adm_newsletter_test(uuid), adm_mail_retry(uuid), adm_mailer_status() from public, anon;
+  adm_newsletter_unschedule(uuid), adm_newsletter_test(uuid), adm_newsletter_send_test(uuid, uuid, jsonb, text, text),
+  adm_mail_retry(uuid), adm_mailer_status() from public, anon;
 grant execute on function adm_newsletter_schedule(uuid, timestamptz, jsonb, jsonb, int, text), adm_newsletter_approve(uuid),
-  adm_newsletter_unschedule(uuid), adm_newsletter_test(uuid), adm_mail_retry(uuid), adm_mailer_status() to authenticated;
+  adm_newsletter_unschedule(uuid), adm_newsletter_test(uuid), adm_newsletter_send_test(uuid, uuid, jsonb, text, text),
+  adm_mail_retry(uuid), adm_mailer_status() to authenticated;
 revoke all on function adm_mailer_ok(text), adm_mailer_due(text), adm_mailer_claim(text, uuid),
   adm_mailer_done(text, uuid, boolean, text, text), adm_mailer_build(text, boolean, text) from public;
 grant execute on function adm_mailer_ok(text), adm_mailer_due(text), adm_mailer_claim(text, uuid),

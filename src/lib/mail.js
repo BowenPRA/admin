@@ -252,18 +252,24 @@ export const unscheduleNewsletter = (id, me) => change('adm_newsletter_unschedul
   if (!['waiting', 'ready', 'failed'].includes(r.status)) throw new Error('This schedule cannot be cancelled now. Reload the page.')
   Object.assign(r, { status: 'cancelled', cancelled_by: me?.email, cancelled_at: nowIso() })
 })
-/** Sends the scheduled email, as it will go, to the person signed in ("[Test]" in front of its subject). */
-export async function sendTestNewsletter(id, me) {
+/**
+ * A test of a newsletter, to staff only ("[Test]" in front of the subject, a box on
+ * top with who sent it and `note`): the scheduled email exactly as it will go
+ * (`jobId`), or `mail` = { subject, html, text } made from the issue as it is now.
+ * `to` empty sends it to yourself.
+ */
+export async function sendNewsletterTest({ issueId, jobId = null, mail = null, to = '', note = '', me }) {
   if (!hasSupabase) {
     const d = local()
-    const j = d.queue.find((r) => r.id === id && r.kind === 'newsletter')
-    if (!j) throw new Error('This schedule no longer exists. Reload the page.')
-    const row = { ...j, id: genId(), kind: 'test', to_addr: me?.email || '', bcc_addr: '', subject: `[Test] ${j.subject}`, status: 'ready', send_at: nowIso(), requested_by: me?.email, created_at: nowIso(), extra: {} }
+    const j = jobId ? d.queue.find((r) => r.id === jobId && r.kind === 'newsletter') : null
+    if (jobId && !j) throw new Error('This schedule no longer exists. Reload the page.')
+    const src = j || { subject: mail?.subject, html: mail?.html, body: mail?.text, attachments: [] }
+    const row = { id: genId(), kind: 'test', ref_id: issueId, to_addr: to || me?.email || '', bcc_addr: '', subject: `[Test] ${src.subject}`, html: src.html, body: `${note ? `${note}\n\n` : ''}${src.body || ''}`, attachments: src.attachments || [], status: 'ready', send_at: nowIso(), requested_by: me?.email, created_at: nowIso(), tries: 0, extra: {} }
     d.queue.push(row)
     lsWrite(d)
     return slim(row)
   }
-  const { data, error } = await supabase.rpc('adm_newsletter_test', { p_job: id })
+  const { data, error } = await supabase.rpc('adm_newsletter_send_test', { p_issue: issueId, p_job: jobId, p_mail: mail, p_to: to || null, p_note: note || null })
   throwIf(error)
   return slim(data)
 }

@@ -1,6 +1,6 @@
 import { Component, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, Eye, Image as ImageIcon, Languages, Lightbulb, Mail, MoreHorizontal, Plus, Send, Trash2, Wand2, X, CheckCheck } from 'lucide-react'
+import { ChevronLeft, Eye, Image as ImageIcon, Languages, Lightbulb, Mail, MailCheck, MoreHorizontal, Plus, Send, Trash2, Wand2, X, CheckCheck } from 'lucide-react'
 import { useAuth } from '../../lib/AuthContext'
 import { useData } from '../../lib/DataContext'
 import { useToast } from '../../lib/toast'
@@ -22,6 +22,7 @@ import NeedToKnow from '../../components/newsletter/NeedToKnow'
 import Preview from '../../components/newsletter/Preview'
 import PhotoPicker from '../../components/newsletter/PhotoPicker'
 import PublishPanel from '../../components/newsletter/PublishPanel'
+import TestDialog from '../../components/newsletter/TestDialog'
 import NoPhotoList from '../../components/newsletter/NoPhotoList'
 import { StatusChips, ownsCorner } from '../../components/newsletter/status'
 import { JobChip, isLiveJob, fmtWhen } from '../../components/newsletter/ScheduleBits'
@@ -72,6 +73,7 @@ function IssueEditor({ id }) {
   const [onlyVi, setOnlyVi] = useState(() => params.get('vi') === '1')
   const [addAt, setAddAt] = useState(null)
   const [publishing, setPublishing] = useState(false)
+  const [testing, setTesting] = useState(false)
   // The issue's schedule in the outbox (supabase/updates-2026-10-22-mail.sql), if any.
   const [job, setJob] = useState(null)
   const loadJob = () => { if (isOffice) listNewsletterJobs([id]).then((m) => setJob(m[id] || null)).catch(() => setJob(null)) }
@@ -250,6 +252,7 @@ function IssueEditor({ id }) {
               {office && (
                 <div className="flex flex-wrap items-center gap-2">
                   {status === 'draft' && <button className="btn-secondary" onClick={() => setDoneOpen(true)}><CheckCheck size={16} />{L('English is done', 'Đã xong tiếng Anh')}</button>}
+                  <button className="btn-secondary" onClick={() => flushThen(() => setTesting(true))}><MailCheck size={16} />{L('Send a test…', 'Gửi thử…')}</button>
                   <button className="btn-primary" onClick={() => flushThen(() => setPublishing(true))}><Send size={16} />{publishLabel}</button>
                   <Menu label="" icon={MoreHorizontal} items={[
                     issue.status !== 'published' && { label: L('Delete this issue', 'Xoá số này'), icon: Trash2, onClick: delIssue },
@@ -352,6 +355,7 @@ function IssueEditor({ id }) {
           <Preview payload={payloads.pub} families={payloads.fam} L={L} onFull={openFull} />
         </Modal>
       )}
+      {testing && <TestDialog issue={issue} job={job} toast={toast} L={L} onClose={() => setTesting(false)} />}
       {publishing && <PublishPanel open onClose={() => { setPublishing(false); loadJob() }} issue={issue} parts={parts} onIssue={iss.replaceIssue} flush={iss.flush} refresh={iss.refresh} L={L} toast={toast} job={job} onJob={setJob} />}
       {doneOpen && <EnglishDoneModal onClose={() => setDoneOpen(false)} onDone={englishDone} needVi={c.needVi.length} L={L} />}
       {coverPick && <PhotoPicker open onClose={() => setCoverPick(false)} issueId={issue.id} max={1} by={me?.email || ''} title={L('Cover photo', 'Ảnh bìa')}

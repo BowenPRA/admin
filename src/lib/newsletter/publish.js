@@ -7,9 +7,9 @@ import { supabase, hasSupabase } from '../supabaseClient.js'
 import { createDraftUpload, gmailConfigured, getToken } from '../gmail.js'
 import { EDITIONS, SITE } from './constants.js'
 import { buildPayload, fingerprint, issueChecks, sortParts, statusOf } from './payload.js'
-import { scheduleNewsletter } from '../mail.js'
+import { scheduleNewsletter, sendNewsletterTest } from '../mail.js'
 import { getIssue, listParts, patchIssue, setIssueSetting, newsletterError } from './data.js'
-import { photoLink, preparePhotoLinks, publishPhotos, publishedPhotoLink, putPublic, removePublicFolder } from './photos.js'
+import { photoLink, preparePhotoLinks, publishPhotos, publishedPhotoLink, putPublic, removePublicFolder, lastingPhotoLinks } from './photos.js'
 
 // The public bucket takes files up to 15 MB; a PDF that size would also make the email too big for Gmail.
 const PDF_MAX = 14 * 1024 * 1024
@@ -159,6 +159,24 @@ export async function scheduleIssue(issue0, parts0, sendAt, { me, onStep = () =>
   const { subject, html, text } = newsletterEmail(fam)
   onStep('schedule')
   return scheduleNewsletter({ issue, sendAt: new Date(sendAt).toISOString(), mail: { subject, html, text, attachments }, pending, round, print, me })
+}
+
+/**
+ * Sends a test of an issue to staff, at any stage. With `jobId`, the scheduled
+ * email exactly as it will go (PDFs attached). Without it, the issue as it is in
+ * the database now: its photos through links that last a week, and no PDFs (they
+ * are made when the issue is scheduled or published). `to` empty sends it to
+ * yourself; `note` shows in a box at the top. Returns the outbox row.
+ */
+export async function sendTest(issue0, { jobId = null, to = '', note = '', me } = {}) {
+  if (jobId) return sendNewsletterTest({ issueId: issue0.id, jobId, to, note, me })
+  const [issue, parts] = await Promise.all([getIssue(issue0.id), listParts(issue0.id)])
+  if (!issue) throw new Error('This issue no longer exists.')
+  const links = await lastingPhotoLinks(issuePhotos(issue, parts))
+  const fam = buildPayload(issue, parts, { audience: 'families', photo: (p) => links.get(p.key) || photoLink(p) })
+  const { newsletterEmail } = await import('./email.js')
+  const { subject, html, text } = newsletterEmail(fam, { preview: true })
+  return sendNewsletterTest({ issueId: issue.id, mail: { subject, html, text }, to, note, me })
 }
 
 /** Takes an issue off the website: its page, its public photos and PDFs. The issue itself stays. */

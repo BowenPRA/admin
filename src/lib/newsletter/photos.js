@@ -108,6 +108,22 @@ export async function preparePhotoLinks(photos) {
   return changed
 }
 
+/**
+ * Links that last `seconds` (a week by default), for a test email someone opens
+ * days later. Returns a Map photo.key -> { src, small }.
+ */
+export async function lastingPhotoLinks(photos, seconds = 7 * 24 * 60 * 60) {
+  const out = new Map()
+  const keys = [...new Set((photos || []).map((p) => p?.key).filter(Boolean))]
+  const stored = hasSupabase ? keys.filter((k) => !/^(https?:|web:)/.test(k)) : []
+  for (const k of keys) if (!stored.includes(k)) { const l = photoLink({ key: k }); if (l) out.set(k, l) }
+  if (!stored.length) return out
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(stored, seconds)
+  if (error) throw newsletterError(error)
+  for (const row of data || []) if (row.signedUrl && !row.error) out.set(row.path, { src: row.signedUrl, small: row.signedUrl })
+  return out
+}
+
 /** Where the browser can show a photo from now: { src, small }, or null while its link is not ready. */
 export function photoLink(photo) {
   const key = photo?.key

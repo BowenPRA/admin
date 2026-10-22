@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { CalendarClock, CircleCheck, CircleX, Eye, LoaderCircle, Mail, MailCheck, RotateCcw, ShieldCheck, TriangleAlert, Undo2 } from 'lucide-react'
 import { EDITIONS } from '../../lib/newsletter/constants'
 import { fingerprint } from '../../lib/newsletter/payload'
-import { approveNewsletter, unscheduleNewsletter, retryMail, sendTestNewsletter, openMail, gmailLink, isApprover, MAIL_STATUS } from '../../lib/mail'
+import { approveNewsletter, unscheduleNewsletter, retryMail, openMail, gmailLink, isApprover, MAIL_STATUS } from '../../lib/mail'
+import TestDialog from './TestDialog'
 
 const LIVE = ['waiting', 'ready', 'sending']
 export const isLiveJob = (job) => !!job && LIVE.includes(job.status)
@@ -78,6 +79,7 @@ export function ScheduleForm({ issue, when, setWhen, me, L }) {
  */
 export function ScheduleCard({ job, issue, parts, me, L, toast, onJob, onAgain }) {
   const [busy, setBusy] = useState('')
+  const [testing, setTesting] = useState(false)
   if (!job || job.status === 'cancelled') return null
   const st = MAIL_STATUS[job.status] || MAIL_STATUS.ready
   const changed = isLiveJob(job) && job.print && job.print !== fingerprint(issue, parts)
@@ -86,14 +88,6 @@ export function ScheduleCard({ job, issue, parts, me, L, toast, onJob, onAgain }
     try { const row = await fn(); onJob({ ...job, ...row }); if (ok) toast(ok) } catch (e) { toast.error(e.message) } finally { setBusy('') }
   }
   const see = async () => { try { await openMail(job.id) } catch (e) { toast.error(e.message) } }
-  // The real email in your own inbox, attachments and all, before it goes to families.
-  const test = async () => {
-    setBusy('test')
-    try {
-      const row = await sendTestNewsletter(job.id, me)
-      toast(L(`A test is on its way to ${row.to_addr}. It arrives within five minutes, with "[Test]" in front of the subject.`, `Email gửi thử đang đến ${row.to_addr}, trong vòng năm phút, tiêu đề có "[Test]" ở đầu.`))
-    } catch (e) { toast.error(e.message) } finally { setBusy('') }
-  }
   const tone = { amber: 'border-amber-200 bg-amber-50/70', sky: 'border-sky-200 bg-sky-50/70', green: 'border-green-200 bg-green-50/60', red: 'border-red-200 bg-red-50/70', slate: 'border-slate-200 bg-slate-50' }[st.tone]
   const Icon = job.status === 'sent' ? CircleCheck : job.status === 'failed' ? CircleX : job.status === 'waiting' ? ShieldCheck : CalendarClock
   return (
@@ -128,9 +122,7 @@ export function ScheduleCard({ job, issue, parts, me, L, toast, onJob, onAgain }
         )}
         <button className="btn-secondary" onClick={see}><Eye size={16} />{L('See the email', 'Xem email')}</button>
         {['waiting', 'ready', 'failed'].includes(job.status) && (
-          <button className="btn-secondary" disabled={!!busy} onClick={test} title={L('The links to the website page work once the issue is on the website.', 'Đường link đến trang web chỉ mở được khi số báo đã lên web.')}>
-            {busy === 'test' ? <LoaderCircle size={16} className="animate-spin" /> : <MailCheck size={16} />}{L('Send a test to me', 'Gửi thử cho tôi')}
-          </button>
+          <button className="btn-secondary" disabled={!!busy} onClick={() => setTesting(true)}><MailCheck size={16} />{L('Send a test…', 'Gửi thử…')}</button>
         )}
         {job.status === 'sent' && job.message_id && <a className="btn-ghost" href={gmailLink(job.message_id)} target="_blank" rel="noreferrer"><Mail size={16} />{L('Open in admin@ Sent', 'Mở trong Thư đã gửi')}</a>}
         {job.status === 'failed' && (
@@ -143,6 +135,7 @@ export function ScheduleCard({ job, issue, parts, me, L, toast, onJob, onAgain }
           </button>
         )}
       </div>
+      {testing && <TestDialog issue={issue} job={job} toast={toast} L={L} onClose={() => setTesting(false)} />}
     </div>
   )
 }
