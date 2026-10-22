@@ -7,7 +7,7 @@ import { partialFrom } from '../../lib/studentRecords'
 import { useAuth } from '../../lib/AuthContext'
 import { db, genId } from '../../lib/db'
 import { loadReportBundle } from '../../lib/report/loaders'
-import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor } from '../../lib/report/utils'
+import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor, fixedDescription } from '../../lib/report/utils'
 import { TIERS } from '../../lib/report/defaults'
 import { reportTitle } from '../../lib/report/strings'
 import { Card, Field, TextInput, TextArea, NumberInput, Select, Spinner, LevelPicker, SaveState, ReportStatusChip } from '../../components/ui'
@@ -296,14 +296,19 @@ export default function ReportEditor() {
   // Headings and learner skills follow the report's template (Early Years has its own).
   const template = templateOf(settings, report)
   // Reports without review scores (Early Years, Years 1 to 3) leave that part out of the hint,
-  // and a vocational area with its own comment (Early Years Physical Development) is named.
+  // and a vocational area with its own comment (Early Years Physical Development) or a fixed
+  // description (Movement) is named.
   const tierHint = (tier) => {
     if (tier.key === 'academic' && !reviewScores) return tier.hint.replace(', progress review score', '')
-    const own = tier.key === 'vocational' ? tiers.vocational.filter((s) => writingFor(settings, s.subject_key).comment).map((s) => subjectByKey(settings, s.subject_key).name) : []
-    if (!own.length) return tier.hint
-    const all = own.length === tiers.vocational.length
-    return all ? TIERS.find((x) => x.key === 'specialist').hint
-      : `${tier.hint.replace(' No individual comment.', '')} ${own.join(' and ')} ${own.length > 1 ? 'have' : 'has'} an individual comment for each student instead.`
+    if (tier.key !== 'vocational') return tier.hint
+    const named = (test) => tiers.vocational.map((s) => subjectByKey(settings, s.subject_key)).filter(test).map((sub) => sub.name)
+    const own = named((sub) => writingFor(settings, sub.key).comment)
+    const fixed = named((sub) => fixedDescription(sub))
+    if (own.length && own.length === tiers.vocational.length) return TIERS.find((x) => x.key === 'specialist').hint
+    let hint = tier.hint
+    if (own.length) hint = `${hint.replace(' No individual comment.', '')} ${own.join(' and ')} ${own.length > 1 ? 'have' : 'has'} an individual comment for each student instead.`
+    if (fixed.length) hint += ` ${fixed.join(' and ')} ${fixed.length > 1 ? 'print descriptions' : 'prints a description'} set in Report settings, so ${fixed.length > 1 ? 'they need' : 'it needs'} only a level.`
+    return hint
   }
 
   return (
@@ -461,6 +466,8 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
   const scored = reviewScores && tier === 'academic' && sub.scored !== false
   // What this area needs: an individual comment, a course description, or both (core areas).
   const writing = writingFor(settings, s.subject_key)
+  // Or neither: a description fixed in Report settings (Movement) prints instead.
+  const fixed = fixedDescription(sub)
 
   if (!editable) {
     const lvl = levelInfo(settings, s.level)
@@ -479,6 +486,7 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
           {writing.description && ((note?.description || '').trim()
             ? <p className="mt-1 line-clamp-2 text-xs text-slate-600"><b className="font-semibold">Course description: </b>{note.description}</p>
             : <p className="mt-1 text-xs italic text-slate-400">No course description yet</p>)}
+          {fixed && <p className="mt-1 line-clamp-2 text-xs text-slate-600"><b className="font-semibold">Course description (the same on every report): </b>{fixed.description}</p>}
           {writing.comment && ((s.comment || '').trim()
             ? <p className="mt-1 line-clamp-2 text-xs text-slate-600">{writing.description && <b className="font-semibold">Comment: </b>}{s.comment}</p>
             : <p className="mt-1 text-xs italic text-slate-400">No comment yet</p>)}
@@ -548,6 +556,16 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
                 <p className="flex items-center gap-1 text-xs text-slate-500">
                   <Users size={13} /> Shared by every {yearGroup} report this quarter, so it only needs writing once.
                   {writing.comment ? " It prints above each student's comment." : ` It prints as the course description; there is no individual comment for ${sub.name}.`}
+                </p>
+              </div>
+            )}
+            {fixed && (
+              <div className="space-y-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
+                <div className="label !mb-0">Course description</div>
+                <p className="text-sm text-slate-700">{fixed.description}</p>
+                <p className="flex items-center gap-1 text-xs text-slate-500">
+                  <Users size={13} /> The same on every {sub.name} report, every quarter, so there is nothing to write: just pick the level.
+                  {isHead && <> The wording is in <Link to="/reports/settings" className="font-semibold text-pra-blue">Report settings</Link>.</>}
                 </p>
               </div>
             )}

@@ -109,7 +109,7 @@ export const DEFAULT_SCHEDULE = {
         { time: '9:35–10:25', days: week(c('English', DAVID)) },
         all('10:25–10:45', 'Snack / Break', 'break'),
         { time: '10:45–11:35', days: week(c('Science', BOWEN)) },
-        { time: '11:35–12:25', days: [c('History', KIU), c('Executive Function', KIU), c('History', KIU), c('Executive Function', KIU), c('Review: History / Executive Function', KIU)] },
+        { time: '11:35–12:25', days: [c('Social Studies', KIU), c('Executive Function', KIU), c('Social Studies', KIU), c('Executive Function', KIU), c('Review: Social Studies / Executive Function', KIU)] },
         all('12:25–13:15', 'Lunch', 'lunch'),
         { time: '13:15–14:05', days: [c('Art of Science', SETH), c('Movement', CALEB), c('Art of Science', SETH), c('Movement', CALEB), c('Art of Science', SETH)] },
         all('14:05–14:25', 'Snack / Break', 'break'),

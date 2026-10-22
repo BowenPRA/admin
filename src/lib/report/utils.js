@@ -52,18 +52,25 @@ export const TIER_KEYS = ['academic', 'specialist', 'vocational']
  * student, one course description for the year group, or both (core areas).
  * The tier (subject.kind) decides, except that a vocational area with
  * `comment: true` (Early Years Physical Development) takes a comment instead of
- * the description. Every screen reads writingFor() so they agree.
+ * the description, and one with a fixed description in Report settings
+ * (Movement) needs only a level. Every screen reads writingFor() so they agree.
  */
 export const WRITING = {
   academic: { comment: true, description: true },
   specialist: { comment: true, description: false },
   vocational: { comment: false, description: true },
+  levelOnly: { comment: false, description: false },
 }
 export function writingFor(settings, key) {
   const sub = subjectByKey(settings, key)
   if (sub.kind === 'vocational' && sub.comment) return WRITING.specialist
+  if (fixedDescription(sub)) return WRITING.levelOnly
   return WRITING[sub.kind] || WRITING.vocational
 }
+
+/** The area's fixed course description ({ description, description_vi }), printed on every report instead of one written each quarter, or null. */
+export const fixedDescription = (sub) =>
+  (sub?.kind === 'vocational' && !sub.comment && String(sub.description || '').trim() ? { description: sub.description, description_vi: sub.description_vi || '' } : null)
 
 /** A section's tier comes from the current settings, so re-tiering an area applies to existing reports. */
 export function tierOf(settings, section) {

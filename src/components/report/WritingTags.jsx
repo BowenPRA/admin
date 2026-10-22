@@ -7,7 +7,8 @@ import { useT } from '../../lib/i18n'
 // screen (Teachers, Reports, the editor and the Home task list):
 //   individual comments   a comment on each student   (core and specialist areas)
 //   course description    one description for the year group (core and vocational areas)
-// Core areas show both tags.
+// Core areas show both tags. An area whose description is fixed in Report
+// settings (Movement) needs neither, and shows "Level only" (no compact icon).
 export const WRITING_PARTS = [
   { key: 'comment', Icon: MessageSquareText, label: 'writingComments', tone: 'bg-violet-50 text-violet-800 ring-violet-200' },
   { key: 'description', Icon: FileText, label: 'writingDescription', tone: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
@@ -22,7 +23,11 @@ export function WritingTags({ settings, subjectKey, writing, compact = false, si
   const { t } = useT()
   const w = writing || writingFor(settings, subjectKey)
   const parts = WRITING_PARTS.filter((p) => w[p.key])
-  if (!parts.length) return null
+  if (!parts.length) {
+    return compact ? null : (
+      <span className={`inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 align-middle text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 ${className}`}>{t('writingLevelOnly')}</span>
+    )
+  }
   if (compact) {
     return (
       <span className={`inline-flex items-center gap-0.5 align-middle ${className}`} title={parts.map((p) => t(p.label)).join(' + ')}>

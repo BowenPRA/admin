@@ -14,8 +14,8 @@ import { scheduledHomeroom, templateForYearGroup, areasFor, writingFor } from '.
 import { Card, Field, TextInput, Select, Checkbox, Modal, Empty, Spinner, Chip, PageHeader, Avatar } from '../../components/ui'
 import { WritingTags, WritingLegend } from '../../components/report/WritingTags'
 
-// Inside a year-group pill: core areas (both) first, then comment areas, then description areas.
-const writingOrder = (settings, k) => { const w = writingFor(settings, k); return w.comment && w.description ? 0 : w.comment ? 1 : 2 }
+// Inside a year-group pill: core areas (both) first, then comment areas, then description areas, then level-only ones (Movement).
+const writingOrder = (settings, k) => { const w = writingFor(settings, k); return w.comment && w.description ? 0 : w.comment ? 1 : w.description ? 2 : 3 }
 
 const blank = () => ({ email: '', name: '', title: 'Mr.', role: 'teacher', subjects: [], homeroom_groups: [], active: true })
 const shortLevel = (g) => (g === 'Nursery' ? 'N' : g === 'Kindergarten' ? 'K' : g === 'Upper Secondary' ? 'US' : g === '*' ? 'All' : g.replace('Year ', 'Y'))
@@ -225,7 +225,8 @@ export default function Teachers() {
               <thead><tr className="border-b border-slate-100">
                 <th className="th pl-5">Year group</th>
                 <th className="th">Homeroom</th>
-                {subjects.map((s) => <th key={s.key} className="th whitespace-nowrap align-bottom">{s.name}<span className="block"><WritingTags settings={settings} subjectKey={s.key} compact /></span></th>)}
+                {/* Long names ("Intensive English in Life Skills: Technology") wrap rather than widen the grid. */}
+                {subjects.map((s) => <th key={s.key} className="th min-w-[5.5rem] max-w-[9rem] align-bottom">{s.name}<span className="block"><WritingTags settings={settings} subjectKey={s.key} compact /></span></th>)}
               </tr></thead>
               <tbody>
                 {coverage.map((row) => (

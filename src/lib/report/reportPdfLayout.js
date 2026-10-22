@@ -27,8 +27,13 @@
 // vocational band, beside Expressive Arts & Design's description (cards 3:2):
 // Nursery and Kindergarten at every limit 8pt in both languages, nothing cut,
 // and 8.25pt with boxes 85% full; Year 1 (7.75pt) and Year 7 (8pt) unchanged.
+// Measured 22 October 2026, when Movement moved from the specialist cards to
+// the vocational ones with its fixed description (about 370 characters; four
+// vocational cards in Years 2 to 7): every year group from Nursery to Year 8,
+// at every limit and at 85%, in both languages, came out at exactly the
+// comment size it had before, nothing cut, Movement's text at the usual 7.2pt.
 
-import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor } from './utils'
+import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor, fixedDescription } from './utils'
 import { reportStrings, reportTitle, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
 import { partialFrom } from '../studentRecords'
 
@@ -573,40 +578,66 @@ function buildPage(item, M, { proof, icons = {} }) {
   // band. The teacher's name joins that line when it fits on every card of the
   // tier ('one'), else each card gives it a line of its own ('two'), so the
   // cards of a tier look alike and their text boxes line up. In narrow cards
-  // (four in a tier, as Year 1's specialists) the area name would be cut
-  // beside the pill, so the pill moves down to the teacher's line ('stacked').
+  // (four in a tier, as the vocational areas of Years 2 to 7 since Movement
+  // joined them) the area name would be cut beside the pill, so the pill moves
+  // down to the teacher's line ('stacked'), or below it when a teacher's name
+  // would be cut beside the pill ('stacked3': "Mr. Caleb & Ms. Thắm V").
   const CARD_HEAD = 3.5
   const CARD_PAD = 4
   const HEAD_ONE = CARD_HEAD + PILL_H + 4 // text top when the teacher shares the title line
   const TEACHER_Y = CARD_HEAD + PILL_H + 0.5 // the teacher's own line, when needed
   const HEAD_TWO = TEACHER_Y + F.teacher * LINE + 1
   const STACK_PILL_Y = CARD_HEAD + PILL_H // the pill's top when it shares the teacher's line
+  const STACK3_PILL_Y = HEAD_TWO + 0.5 // the pill's top on a line of its own, under the teacher
   const TITLE_STYLE = { bold: true, color: C.navy }
+  // A long name with a colon ("Intensive English in Life Skills: Technology", since 22
+  // October 2026) prints its first part as a small line above the class name, on two
+  // lines if need be, a little smaller. Every card of the tier leaves the same room for
+  // it, so the class names line up.
+  const KICK_SIZES = [6.4, 6, 5.6]
+  const kickNode = (text, size, tier) => ({ text, ...T(size, { color: THEME[tier].deep, pitch: 1.12 }) })
   const cards = Object.fromEntries(cardTiers.map((tier) => [tier, tiers[tier].map((s, i) => {
     const sub = subjectByKey(settings, s.subject_key)
-    const note = noteFor(s.subject_key)
+    // A fixed description (Movement) is the same on every report; the others are written each quarter.
+    const fixed = fixedDescription(sub)
+    const note = fixed || noteFor(s.subject_key)
     const desc = !commentCard(s)
     const cw = cardWs[tier][i]
     const teacher = teacherOf(s)
-    const titleW = M.width({ text: nameIn(sub), ...T(F.cardTitle, { bold: true, pitch: 1 }) })
+    const colon = nameIn(sub).indexOf(': ')
+    const head = colon > 0 ? nameIn(sub).slice(colon + 2) : nameIn(sub)
+    let kick = null
+    if (colon > 0) {
+      for (const size of KICK_SIZES) {
+        const node = kickNode(nameIn(sub).slice(0, colon), size, tier)
+        kick = { node, h: M.height(node, cw - 35) }
+        if (kick.h <= size * 1.12 * 2 + 0.5) break
+      }
+    }
+    const titleW = M.width({ text: head, ...T(F.cardTitle, { bold: true, pitch: 1 }) })
     const teacherW = teacher ? M.width({ text: teacher, ...T(F.teacher, { pitch: 1 }) }) : 0
     const pillBox = pillFit(s.level, cw * 0.55)
     const roomForTeacher = cw - 27 - 8 - pillBox.w - 5 - titleW - 6
     const teacherBeside = !teacher || teacherW <= roomForTeacher
     // Beside the pill the name may be set a little smaller (as putLine does), but not cut.
-    const titleBeside = oneLine(nameIn(sub), F.cardTitle, cw - 27 - 8 - pillBox.w - 5, TITLE_STYLE).node.text === nameIn(sub)
+    const titleBeside = oneLine(head, F.cardTitle, cw - 27 - 8 - pillBox.w - 5, TITLE_STYLE).node.text === head
+    // Likewise the teacher beside the pill, when the pill moves down to the teacher's line.
+    const teacherBesidePill = !teacher || oneLine(teacher, F.teacher, cw - 35 - pillBox.w - 5, { color: C.muted }).node.text === teacher
     // A comment is set at the shared body size; a course description in the smaller topics style.
     return {
-      ...(desc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, teacher, titleW, teacherBeside, titleBeside, pillH: pillBox.h,
+      ...(desc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, head, kick, teacher, titleW, teacherBeside, titleBeside, teacherBesidePill, pillH: pillBox.h,
       name: `${sub.name} ${desc ? 'course description' : 'comment'}`, w: cw - 16,
-      label: desc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
+      label: fixed ? t.aboutClass : desc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
       ...(desc ? picked(note?.description, note?.description_vi) : picked(s.comment, s.comment_vi)),
     }
   })]))
   const tierLayout = Object.fromEntries(cardTiers.map((k) => [k,
-    !cards[k].every((c) => c.titleBeside) ? 'stacked' : cards[k].every((c) => c.teacherBeside) ? 'one' : 'two']))
-  const cardTop = Object.fromEntries(cardTiers.map((k) => [k,
-    tierLayout[k] === 'stacked' ? STACK_PILL_Y + Math.max(...cards[k].map((c) => c.pillH)) + 2.5 : tierLayout[k] === 'one' ? HEAD_ONE : HEAD_TWO]))
+    !cards[k].every((c) => c.titleBeside) ? (cards[k].every((c) => c.teacherBesidePill) ? 'stacked' : 'stacked3')
+      : cards[k].every((c) => c.teacherBeside) ? 'one' : 'two']))
+  const pillTop = { stacked: STACK_PILL_Y, stacked3: STACK3_PILL_Y }
+  const kickH = Object.fromEntries(cardTiers.map((k) => [k, Math.max(0, ...cards[k].map((c) => c.kick?.h || 0))]))
+  const cardTop = Object.fromEntries(cardTiers.map((k) => [k, kickH[k] +
+    (tierLayout[k] in pillTop ? pillTop[tierLayout[k]] + Math.max(...cards[k].map((c) => c.pillH)) + 2.5 : tierLayout[k] === 'one' ? HEAD_ONE : HEAD_TWO)]))
   // A card's text height at comment size `s` (vocational cards keep their own size).
   const cardText = (c, s) => M.height(boxNode(c, c.body ? s : c.base), c.w)
 
@@ -846,14 +877,17 @@ function buildPage(item, M, { proof, icons = {} }) {
       const cx = X + sum(ws.slice(0, i))
       const cy = y + BAR
       if (i > 0) dotted(cx, cy + 6, cx, y + h - 6, theme.edge)
-      const p = pill(c.s.level, cx + cw - 8, cy + (layout === 'stacked' ? STACK_PILL_Y : CARD_HEAD), cw * 0.55, 'right')
-      const mid = cy + CARD_HEAD + PILL_H / 2
+      // The small first line of a long name, then the header (badge, name, teacher, pill) below it.
+      if (c.kick) put(cx + 27, cy + CARD_HEAD, cw - 35, c.kick.node)
+      const hy = cy + kickH[tier]
+      const p = pill(c.s.level, cx + cw - 8, hy + (pillTop[layout] ?? CARD_HEAD), cw * 0.55, 'right')
+      const mid = hy + CARD_HEAD + PILL_H / 2
       badge(c.sub.icon, cx + 8 + 7.5, mid, 15, theme.tint, theme.accent)
-      const titleMax = cw - 27 - 8 - (layout === 'stacked' ? 0 : p.w + 5)
-      const tw = putLine(cx + 27, midTop(mid, F.cardTitle, true), titleMax, nameIn(c.sub), F.cardTitle, TITLE_STYLE)
+      const titleMax = cw - 27 - 8 - (layout in pillTop ? 0 : p.w + 5)
+      const tw = putLine(cx + 27, midTop(mid, F.cardTitle, true), titleMax, c.head, F.cardTitle, TITLE_STYLE)
       if (c.teacher && layout === 'one') putLine(cx + 27 + tw + 6, midTop(mid, F.teacher), titleMax - tw - 6, c.teacher, F.teacher, { color: C.muted })
-      else if (c.teacher && layout === 'stacked') putLine(cx + 27, midTop(cy + STACK_PILL_Y + PILL_H / 2, F.teacher), cw - 35 - p.w - 5, c.teacher, F.teacher, { color: C.muted })
-      else if (c.teacher) putLine(cx + 27, cy + TEACHER_Y, cw - 35, c.teacher, F.teacher, { color: C.muted })
+      else if (c.teacher && layout === 'stacked') putLine(cx + 27, midTop(hy + STACK_PILL_Y + PILL_H / 2, F.teacher), cw - 35 - p.w - 5, c.teacher, F.teacher, { color: C.muted })
+      else if (c.teacher) putLine(cx + 27, hy + TEACHER_Y, cw - 35, c.teacher, F.teacher, { color: C.muted })
       return { ...c, base: c.body ? body : c.base, x: cx + 8, y: cy + top, h: y + h - CARD_PAD - (cy + top) }
     })
     placeBoxes(boxes)

@@ -74,8 +74,8 @@ A template is the set of learning areas one stage's reports contain. The templat
 | Template | Year groups | Academic | Specialist | Vocational | Review scores |
 |---|---|---|---|---|---|
 | Early Years | Nursery, Kindergarten | Communication & Language, Intensive English in Math topics, Understanding the World | Applied English, Cooking (longer comments) | Physical Development (an individual comment), Expressive Arts & Design | None |
-| Primary | Year 1 to Year 6 | Intensive English in Math topics, Intensive English in Science topics, English Literacy | Art & Crafts, Cooking, Movement, Master Minds (Year 1 only) | Technology, Wellbeing (Years 2 to 6), Everyday Experts (Years 2 to 6), Presentation & Play (Year 1 only) | Years 4 to 6 only |
-| Lower Secondary | Year 7 to Year 9 | Intensive English in Math topics, Intensive English in Science topics, English Literacy | Art of Science, History, Movement (Year 7 only) | Executive Function, Technology, Wellbeing | Every year group |
+| Primary | Year 1 to Year 6 | Intensive English in Math topics, Intensive English in Science topics, English Literacy | Art & Crafts, Cooking, Master Minds (Year 1 only) | Technology, Wellbeing (Years 2 to 6), Everyday Experts (Years 2 to 6), Presentation & Play (Year 1 only), Movement (a fixed description) | Years 4 to 6 only |
+| Lower Secondary | Year 7 to Year 9 | Intensive English in Math topics, Intensive English in Science topics, English Literacy | Art of Science, Social Studies | Executive Function, Technology, Wellbeing, Movement (Year 7 only, a fixed description) | Every year group |
 
 - Early Years prints its own headings: "Areas of Learning" over the academic areas and "Physical & Creative Development" over the vocational ones. It has its own learner skills: Learning & Independence, and Personal, Social & Emotional, six skills each.
 - Since 19 October 2026, Early Years has Cooking beside Applied English under Specialist Learning, and Physical Development has an individual comment for each child instead of a class description. Physical Development still prints in the green "Physical & Creative Development" band, in a wider card beside Expressive Arts & Design, which keeps its class description. With every box full the page prints at 8pt, the same as Years 1 to 7. Before that, Applied English was one full-width card.
@@ -83,6 +83,7 @@ A template is the set of learning areas one stage's reports contain. The templat
 - Years 1 to 3 have no review scores, so their learner skills print at full width.
 - Since 20 October 2026 the academic areas print with last year's names: "Intensive English in Math topics", "Intensive English in Science topics" and "English Literacy" (see [Rules and wording](#/handbook/rules)). In the narrow scores table Mathematics and Science print as "Math topics" and "Science topics". The names and the scores-table labels (**Name in the scores table**) are set in Reports → Settings.
 - A long name wraps onto two lines, a little smaller, in the name column and in the scores table instead of being cut; every academic row then shows its icon at the same, smaller size. With every box full the page still prints at the same size as before.
+- Since 22 October 2026 the Primary and Lower Secondary vocational areas print with last year's "Life Skills" names: "Intensive English in Life Skills: Technology" and so on (Executive Function, Wellbeing, Everyday Experts, Presentation & Play; see [Rules and wording](#/handbook/rules)). Movement keeps its name. On the card, the part before the colon prints as a small green line above the class name (two lines in Vietnamese). Nothing is cut; with every box full, some Vietnamese pages set comments at 8pt instead of 8.25pt. A name in Report settings with no colon prints on one line as before.
 
 ### The three tiers
 
@@ -94,13 +95,22 @@ A template is the set of learning areas one stage's reports contain. The templat
 
 A vocational area can be ticked in Report settings to take an individual comment instead of the course description. It still prints with the other vocational areas. Early Years Physical Development is the only one.
 
-On the Teachers page, the Reports page and the editor, a violet speech-bubble icon means "comments to write" and a green page icon means "a course description to write". An academic area has both.
+A vocational area can instead have a **Fixed course description** in Report settings. That text prints on every report with the area, every quarter, under "About the class:", and teachers only pick a level. Movement is the only one (since 22 October 2026). Leave the box empty for a description written each quarter.
 
-### Master Minds and Movement
+On the Teachers page, the Reports page and the editor, a violet speech-bubble icon means "comments to write" and a green page icon means "a course description to write". An academic area has both. An area with a fixed description shows a grey "Level only" tag.
 
-- **Master Minds** is a specialist area for Year 1 only, added on 2 October 2026 (To-Do #43). Year 1 reports have four specialist cards and still fit on one page. Its Vietnamese name, "Tư duy & Giải đố", has not been read by Vietnamese staff (not checked since 15 October 2026).
-- **Movement** in Years 1 to 6 is taught by Mr. Chiến, who has no login on purpose. His row on the Teachers page has a stand-in instead of an email address. Reports print his name, and Seth writes his comments.
+### Master Minds, Movement and Social Studies
+
+- **Master Minds** is a specialist area for Year 1 only, added on 2 October 2026 (To-Do #43). Its Vietnamese name, "Tư duy & Giải đố", has not been read by Vietnamese staff (not checked since 15 October 2026).
+- **Movement** has had no individual comments since 22 October 2026 (Bowen's request). It prints in the green Vocational Learning band with a level and this fixed description, from Reports → Settings:
+
+  > Movement and Exercise gives students opportunities to develop physical coordination, agility, dexterity, and body awareness through warm-ups, stretching, movement activities, and collaborative games. Students explore movement, practice adapting to changing situations, and engage in activities that encourage quick thinking, problem-solving, and teamwork.
+
+  The Vietnamese version ("Giờ Vận động giúp học viên ...") was written by Claude and has not been read by Vietnamese staff (not checked since 22 October 2026). Years 2 to 7 now have four vocational cards. Where a teacher's name would be cut beside the level in those narrow cards ("Mr. Caleb & Ms. Thắm V" on Technology), the level moves to a line of its own. With every box full each page prints at the same size as before.
+- **Movement** in Years 1 to 6 is taught by Mr. Chiến, who has no login on purpose. His row on the Teachers page has a stand-in instead of an email address. Reports print his name, and Seth gives his levels.
 - **Movement** in Year 7 is Mr. Caleb's.
+- **Social Studies** (Year 7, Ms. Kiu) was called History until 22 October 2026. Its key on the Teachers page and in saved reports is still `history`, so existing links and reports carry on. Its Vietnamese name, "Khoa học xã hội", has not been read by Vietnamese staff (not checked since 22 October 2026).
+- Reports are drawn from the current settings, so a Quarter 1 report printed again now shows Movement's description in place of its Quarter 1 comment, and "Social Studies" in place of "History".
 - When an area is added to a template after a quarter's reports exist, the year group's card on the Reports page shows a button **Add … to N reports**. The head presses it once for each year group.
 
 ### Partial-day students

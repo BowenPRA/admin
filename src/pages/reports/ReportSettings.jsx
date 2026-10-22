@@ -94,7 +94,7 @@ function SettingsForm({ initial }) {
         </div>
       </Card>
 
-      <Card title="Learning areas" subtitle="The tier decides what teachers write and how it prints: academic (level, review score, individual comment and course description), specialist (level and individual comment) or vocational (level and a course description shared by the year group, or an individual comment where ticked). The key gives teachers their permissions, so avoid renaming keys once reports exist.">
+      <Card title="Learning areas" subtitle="The tier decides what teachers write and how it prints: academic (level, review score, individual comment and course description), specialist (level and individual comment) or vocational (level and a course description shared by the year group, an individual comment where ticked, or a level only where the area has a fixed description). The key gives teachers their permissions, so avoid renaming keys once reports exist.">
         <div className="space-y-3">
           {s.subjects.map((sub, i) => (
             <div key={i} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_130px_120px_auto]">
@@ -126,6 +126,16 @@ function SettingsForm({ initial }) {
                 </div>
               )}
               {sub.kind === 'vocational' && <div className="sm:col-span-6"><Checkbox checked={!!sub.comment} onChange={(v) => set(`subjects.${i}.comment`, v)} label="Individual comment for each student instead of the course description (still prints with the vocational areas)" /></div>}
+              {sub.kind === 'vocational' && !sub.comment && (
+                <div className="grid gap-2 sm:col-span-6 sm:grid-cols-2">
+                  <Field label="Fixed course description" hint="Optional. Prints on every report with this area, every quarter, so teachers only pick a level and nobody writes a description. Leave blank for one written each quarter. About 370 characters fits (Movement's).">
+                    <TextArea rows={4} value={sub.description || ''} onChange={(v) => set(`subjects.${i}.description`, v)} />
+                  </Field>
+                  <Field label="Fixed course description (Vietnamese)" hint="Printed on Vietnamese reports.">
+                    <TextArea rows={4} value={sub.description_vi || ''} onChange={(v) => set(`subjects.${i}.description_vi`, v)} />
+                  </Field>
+                </div>
+              )}
             </div>
           ))}
           <button className="btn-secondary text-xs" onClick={() => add('subjects', { key: `subject_${s.subjects.length + 1}`, kind: 'specialist', name: 'New area', name_vi: '', icon: 'star', scored: false })}><Plus size={14} /> Add learning area</button>

@@ -703,6 +703,7 @@ const STRINGS = {
   writingDescription: ['Course description', 'Mô tả khóa học'],
   writingLegendBoth: ['Core areas need both.', 'Các môn cốt lõi cần cả hai.'],
   writingLevels: ['levels', 'mức độ'],
+  writingLevelOnly: ['Level only', 'Chỉ đánh giá mức độ'],
   writingToWrite: ['to write', 'cần viết'],
 
   // Proof of payment, student list and folder export (2026-09-21)

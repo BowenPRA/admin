@@ -59,7 +59,7 @@ export const TEACHER_SCHEDULE = [
   { email: 'tham.n@pra.edu.vn', name: 'Tham N', title: 'Ms.', role: 'teacher', subjects: earlyYears('Nursery'), homeroom_groups: ['Nursery'] },
   { email: 'tham.v@pra.edu.vn', name: 'Thắm V', title: 'Ms.', role: 'teacher', subjects: [...years('technology', Y2_5), ...years('art_craft', Y2_5)], homeroom_groups: [] },
   // Movement & Exercise in Years 1 to 6 (Year 7 Movement is Mr. Caleb's). Part time, no login:
-  // Mr. Seth writes his comments as head teacher.
+  // Mr. Seth gives his levels as head teacher (Movement has had no comments since 22 October 2026).
   { email: noLoginId('Chiến'), name: 'Chiến', title: 'Mr.', role: 'teacher', subjects: years('movement', PRIMARY), homeroom_groups: [] },
 ]
 

@@ -265,7 +265,7 @@ From the website's own plan and notes, as of 16 October 2026. [The website chapt
 Do not "fix" these.
 
 - **On Target is stored as 3 and Confident as 5.** The five levels are saved as ids, not as an order: Emerging 1, Practicing 2, On Target 3, Moving Beyond 4, Confident 5. When the scale was renamed on 22 September 2026 each saved value kept its place on the scale. Every saved report uses these numbers; the screen and the PDF show the levels in the right order.
-- **Mr. Chiến's teacher row has no login.** Its email column holds `no-login:chien`, which can never match a sign-in. It exists so his name prints on Movement for Years 1 to 6; the head writes his parts of the reports.
+- **Mr. Chiến's teacher row has no login.** Its email column holds `no-login:chien`, which can never match a sign-in. It exists so his name prints on Movement for Years 1 to 6; the head gives his levels on the reports.
 - **Pending students are billable but not on the register.** New and returning students start as pending. The invoice builder includes them; attendance, reports and counts leave them out until someone sets them to active by hand.
 - **The triage login is not a person.** triage@pra.edu.vn is a login in The Current with the role "triage", used by the triage scripts. It may read, add and update Leads and To-Do tasks, never delete, and cannot read students. Claude's own notes on To-Do tasks show as "Inbox triage", whether a cloud run or a session wrote them. Do not remove the login.
 - **The handbook is in English only.** The page title and buttons follow the EN/VI switch; the chapters do not.

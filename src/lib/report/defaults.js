@@ -45,6 +45,9 @@ export const LEVELS = [
 // A vocational area with `comment: true` takes an individual comment for each
 // student instead of the course description, and still prints in the
 // vocational band (Early Years Physical Development, since 18 October 2026).
+// A vocational area with its own `description` (and `description_vi`) prints
+// that fixed text on every report, every quarter, so teachers give a level
+// only (Movement, since 22 October 2026).
 // WRITING and writingFor() in utils.js hold the same split as data, for the
 // screens.
 export const TIERS = [
@@ -62,6 +65,25 @@ const EARLY_YEARS = ['Nursery', 'Kindergarten']
 const PRIMARY_YEARS = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6']
 const YEARS_2_TO_6 = PRIMARY_YEARS.slice(1)
 const LOWER_SECONDARY_YEARS = ['Year 7', 'Year 8', 'Year 9']
+
+// Movement's description, from Bowen (22 October 2026). It is longer than a
+// course description teachers write (TEXT_LIMITS.vocational_topics).
+const MOVEMENT_DESCRIPTION = 'Movement and Exercise gives students opportunities to develop physical coordination, agility, dexterity, and body awareness through warm-ups, stretching, movement activities, and collaborative games. Students explore movement, practice adapting to changing situations, and engage in activities that encourage quick thinking, problem-solving, and teamwork.'
+const MOVEMENT_DESCRIPTION_VI = 'Giờ Vận động giúp học viên phát triển khả năng phối hợp, sự nhanh nhẹn, khéo léo và cảm nhận về cơ thể qua các bài khởi động, giãn cơ, hoạt động vận động và trò chơi đồng đội. Học viên khám phá nhiều cách vận động, tập thích ứng khi tình huống thay đổi và tham gia các hoạt động rèn khả năng suy nghĩ nhanh, giải quyết vấn đề và làm việc nhóm.'
+
+// The vocational class names before 22 October 2026, and the "Life Skills" names
+// built from them (last year's pattern, as "Intensive English in Life Skills: Technology").
+const LIFE_SKILLS_CLASSES = {
+  executive_function: ['Executive Function', 'Kỹ năng điều hành'],
+  technology: ['Technology', 'Công nghệ'],
+  wellbeing: ['Wellbeing', 'Sức khỏe tinh thần'],
+  everyday_experts: ['Everyday Experts', 'Chuyên gia thường ngày'],
+  presentation_play: ['Presentation & Play', 'Thuyết trình & Vui chơi'],
+}
+const lifeSkills = (key) => ({
+  name: `Intensive English in Life Skills: ${LIFE_SKILLS_CLASSES[key][0]}`,
+  name_vi: `Tiếng Anh giao tiếp trong hoạt động hằng ngày: Chủ đề ${LIFE_SKILLS_CLASSES[key][1]}`,
+})
 
 // Early Years areas follow the Early Years Foundation Stage, as last year's
 // Nursery and Kindergarten reports did: Communication & Language, Mathematics
@@ -82,16 +104,23 @@ export const SUBJECTS = [
   { key: 'understanding_world', kind: 'academic', name: 'Understanding the World', name_vi: 'Hiểu biết về thế giới', icon: 'sprout', scored: false, yearGroups: EARLY_YEARS },
   { key: 'applied_english', kind: 'specialist', name: 'Applied English', name_vi: 'Tiếng Anh ứng dụng', icon: 'languages', scored: false, yearGroups: EARLY_YEARS },
   { key: 'art_of_science', kind: 'specialist', name: 'Art of Science', name_vi: 'Nghệ thuật Khoa học', icon: 'palette', scored: false },
-  { key: 'history', kind: 'specialist', name: 'History', name_vi: 'Lịch sử', icon: 'landmark', scored: false },
+  // The key stays `history` (saved reports and the Teachers page use it); the class has been Social Studies since 22 October 2026.
+  { key: 'history', kind: 'specialist', name: 'Social Studies', name_vi: 'Khoa học xã hội', icon: 'landmark', scored: false },
   { key: 'art_craft', kind: 'specialist', name: 'Art & Crafts', name_vi: 'Mỹ thuật & Thủ công', icon: 'brush', scored: false, yearGroups: PRIMARY_YEARS },
   { key: 'cooking', kind: 'specialist', name: 'Cooking', name_vi: 'Nấu ăn', icon: 'chef', scored: false, yearGroups: [...EARLY_YEARS, ...PRIMARY_YEARS] },
-  { key: 'movement', kind: 'specialist', name: 'Movement', name_vi: 'Vận động', icon: 'movement', scored: false, yearGroups: [...PRIMARY_YEARS, 'Year 7'] },
   { key: 'master_minds', kind: 'specialist', name: 'Master Minds', name_vi: 'Tư duy & Giải đố', icon: 'puzzle', scored: false, yearGroups: ['Year 1'] },
-  { key: 'executive_function', kind: 'vocational', name: 'Executive Function', name_vi: 'Kỹ năng điều hành', icon: 'brain', scored: false },
-  { key: 'technology', kind: 'vocational', name: 'Technology', name_vi: 'Công nghệ', icon: 'monitor', scored: false },
-  { key: 'wellbeing', kind: 'vocational', name: 'Wellbeing', name_vi: 'Sức khỏe tinh thần', icon: 'heart', scored: false, yearGroups: [...YEARS_2_TO_6, ...LOWER_SECONDARY_YEARS] },
-  { key: 'everyday_experts', kind: 'vocational', name: 'Everyday Experts', name_vi: 'Chuyên gia thường ngày', icon: 'lightbulb', scored: false, yearGroups: YEARS_2_TO_6 },
-  { key: 'presentation_play', kind: 'vocational', name: 'Presentation & Play', name_vi: 'Thuyết trình & Vui chơi', icon: 'drama', scored: false, yearGroups: ['Year 1'] },
+  // The Primary and Lower Secondary vocational areas carry last year's "Life Skills" names,
+  // which present them as English classes like the academic areas (Bowen, 22 October 2026;
+  // Movement keeps its name). Reports print the part before the colon as a small line
+  // above the class name.
+  { key: 'executive_function', kind: 'vocational', ...lifeSkills('executive_function'), icon: 'brain', scored: false },
+  { key: 'technology', kind: 'vocational', ...lifeSkills('technology'), icon: 'monitor', scored: false },
+  { key: 'wellbeing', kind: 'vocational', ...lifeSkills('wellbeing'), icon: 'heart', scored: false, yearGroups: [...YEARS_2_TO_6, ...LOWER_SECONDARY_YEARS] },
+  { key: 'everyday_experts', kind: 'vocational', ...lifeSkills('everyday_experts'), icon: 'lightbulb', scored: false, yearGroups: YEARS_2_TO_6 },
+  { key: 'presentation_play', kind: 'vocational', ...lifeSkills('presentation_play'), icon: 'drama', scored: false, yearGroups: ['Year 1'] },
+  // Movement was a specialist area with a comment on each student until 22 October 2026.
+  { key: 'movement', kind: 'vocational', name: 'Movement', name_vi: 'Vận động', icon: 'movement', scored: false, yearGroups: [...PRIMARY_YEARS, 'Year 7'],
+    description: MOVEMENT_DESCRIPTION, description_vi: MOVEMENT_DESCRIPTION_VI },
   { key: 'physical', kind: 'vocational', comment: true, name: 'Physical Development', name_vi: 'Phát triển thể chất', icon: 'footprints', scored: false, yearGroups: EARLY_YEARS },
   { key: 'expressive_arts', kind: 'vocational', name: 'Expressive Arts & Design', name_vi: 'Nghệ thuật & Sáng tạo', icon: 'music', scored: false, yearGroups: EARLY_YEARS },
 ]
@@ -209,7 +238,7 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
-const SETTINGS_VERSION = 9
+const SETTINGS_VERSION = 11
 
 export const DEFAULT_REPORT_SETTINGS = {
   version: SETTINGS_VERSION,
@@ -254,7 +283,13 @@ export const DEFAULT_REPORT_SETTINGS = {
  * course description, Cooking opens to Nursery and Kindergarten and joins the
  * Early Years template after Applied English, and that template's vocational
  * subtitle, if still "What the {yearGroup} class explored together this
- * quarter", now names both kinds of card.
+ * quarter", now names both kinds of card. Before version 10 Movement moves
+ * from the specialist tier (a comment) to the vocational one, after the other
+ * vocational areas, with its fixed description (unless it already has one), and
+ * History, if still so named, becomes Social Studies. Before version 11 the
+ * Primary and Lower Secondary vocational areas still under their old names
+ * take the "Life Skills" names (Technology becomes "Intensive English in Life
+ * Skills: Technology").
  * Saving in Report settings then stores the upgraded version.
  */
 export function normalizeReportSettings(stored) {
@@ -356,6 +391,33 @@ export function normalizeReportSettings(stored) {
       if (titles.vocationalNote === 'What the {yearGroup} class explored together this quarter') titles.vocationalNote = TEMPLATES.early_years.titles.vocationalNote
       if (titles.vocationalNote_vi === 'Những gì lớp {yearGroup} đã cùng khám phá trong quý này') titles.vocationalNote_vi = TEMPLATES.early_years.titles.vocationalNote_vi
       templates[key] = { ...t, areas, titles }
+    }
+  }
+  if ((Number(v.version) || 1) < 10 && v.subjects) {
+    // Movement prints its fixed description instead of a comment on each student.
+    const at = subjects.findIndex((sub) => sub.key === 'movement')
+    if (at >= 0 && subjects[at].kind === 'specialist') {
+      const fresh = SUBJECTS.find((sub) => sub.key === 'movement')
+      const [movement] = subjects.splice(at, 1)
+      movement.kind = 'vocational'
+      if (!String(movement.description || '').trim()) Object.assign(movement, { description: fresh.description, description_vi: fresh.description_vi })
+      // After the Primary and Lower Secondary vocational areas, before Early Years Physical Development.
+      const keys = subjects.map((sub) => sub.key)
+      const ey = keys.findIndex((k) => ['physical', 'expressive_arts'].includes(k))
+      const last = subjects.map((sub) => sub.kind).lastIndexOf('vocational')
+      subjects.splice(ey >= 0 ? ey : last + 1, 0, movement)
+    }
+    const history = subjects.find((sub) => sub.key === 'history')
+    if (history?.name === 'History') history.name = 'Social Studies'
+    if (history?.name_vi === 'Lịch sử') history.name_vi = 'Khoa học xã hội'
+  }
+  if ((Number(v.version) || 1) < 11 && v.subjects) {
+    // The vocational classes take last year's English-led names; a name someone changed stays.
+    for (const sub of subjects) {
+      const old = LIFE_SKILLS_CLASSES[sub.key]
+      if (!old) continue
+      if (sub.name === old[0]) sub.name = lifeSkills(sub.key).name
+      if (sub.name_vi === old[1]) sub.name_vi = lifeSkills(sub.key).name_vi
     }
   }
   let levels = s.levels

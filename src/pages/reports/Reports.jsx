@@ -102,9 +102,10 @@ function ReportsList({ settings }) {
   }, [reports, group, scoped, myYearGroups])
 
   // The learning areas this teacher writes, grouped by what each needs:
-  // [{ writing, names: ['English (Year 7)', …] }] for both, comments only, descriptions only.
+  // [{ writing, names: ['English (Year 7)', …] }] for both, comments only, descriptions only,
+  // and levels only (an area with a fixed description, as Movement).
   const myWriting = useMemo(() => {
-    const kinds = [{ comment: true, description: true }, { comment: true, description: false }, { comment: false, description: true }]
+    const kinds = [{ comment: true, description: true }, { comment: true, description: false }, { comment: false, description: true }, { comment: false, description: false }]
     return kinds.map((writing) => ({
       writing,
       names: (me?.subjects || []).filter((k) => { const w = writingFor(settings, k.split(':')[0]); return w.comment === writing.comment && w.description === writing.description })

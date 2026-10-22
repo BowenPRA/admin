@@ -48,7 +48,7 @@ Every login carries a role. The role decides which pages and buttons the app sho
 - "Office accounts" in this handbook means Super Admin, Head Teacher and Admin together.
 - For progress reports, "the head" is Super Admin, Head Teacher, or anyone whose Teachers row has **Head teacher (can edit every report)** ticked.
 - A teacher's rights come from their row on the Teachers page: the learning areas ticked for each year group (for example English in Year 7) and the homeroom year groups. Attendance follows the same year groups.
-- Mr. Chiến (Movement, Years 1 to 6) has no login on purpose. His Teachers row says "No login"; progress reports print his name and Mr. Seth writes his comments.
+- Mr. Chiến (Movement, Years 1 to 6) has no login on purpose. His Teachers row says "No login"; progress reports print his name and Mr. Seth gives his levels (Movement has a fixed description and no comments since 22 October 2026).
 
 > **Rule:** the database enforces the same rights as the screen. Hiding a button is not the only protection: if an account without the right tries something, the database refuses it and the app shows the error. This is why giving someone a role is done with care, and why the public key built into the page does no harm.
 

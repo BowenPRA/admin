@@ -9,6 +9,7 @@ const STRINGS = {
     homeroomComment: 'Homeroom Teacher Comment',
     notYet: 'Not yet',
     topicsCovered: 'Topics covered:',
+    aboutClass: 'About the class:', // a fixed description (Movement), the same every quarter
     comment: 'Comment:',
     scores: 'Progress Review Scores',
     learningArea: 'Learning area',
@@ -31,6 +32,7 @@ const STRINGS = {
     homeroomComment: 'Nhận xét của giáo viên chủ nhiệm',
     notYet: 'Chưa đánh giá',
     topicsCovered: 'Nội dung đã học:',
+    aboutClass: 'Giới thiệu môn học:',
     comment: 'Nhận xét:',
     scores: 'Điểm đánh giá tiến bộ',
     learningArea: 'Lĩnh vực',
