@@ -22,7 +22,7 @@ This chapter follows a child from the first enquiry to a complete student record
 | Walk-in, WhatsApp / Zalo, Facebook, Other | Added by hand with **Add family** |
 
 - A website message from a new email address makes a new lead with stage New. One from an address already on Leads is attached to that family, and the family comes back out of the archive if it was there. The lead itself is left as the office wrote it.
-- No email arrives in admin@ for a website message. Messages wait in the **From the website** panel at the top of Leads until someone marks them done, and the triage lists them in its digests.
+- Each website message sends two emails: a thank-you to the family and an alert to Yvonne and admin@ (see [The emails after a form](#/handbook/students?s=the-emails-after-a-form)). The message still waits in the **From the website** panel at the top of Leads until someone marks it done, and the triage lists it in its digests.
 - The triage signs in with its own account (see [The Current, tab by tab](#/handbook/the-current)). It adds and updates families, never moves a stage backwards and cannot delete.
 
 ### Stages
@@ -73,8 +73,29 @@ Five steps: the student; parents and emergency contacts; education and health; p
 - The row then shows **Pending student added**, **Already a student** or no student. **To check** stays until someone presses **Mark checked**; **To check only** shows those forms.
 - The student's new-student checklist is shown inside the form window too.
 - A form that came in without a student gets one with **Add pending student**.
+- The family gets a thank-you email and the office an alert, both within about five minutes (next section).
 
 > **Careful:** there is no button to merge two records. If a form made a second record for a child who already had one, copy any missing details into the right record and delete the extra one (it has no attendance yet). Do not then press **Add pending student** on the form, or the duplicate comes back. Ask Claude if the form needs linking to the right child.
+
+### The emails after a form
+
+Built on 22 October 2026 for Yvonne (To-Do #75). It works once the database file `updates-2026-10-22-mail.sql` has run and the mailer is installed in admin@ (see [Behind the scenes](#/handbook/behind?s=the-mailer-in-admin)).
+
+When a family sends the enrollment form or the contact / book-a-tour form, The Current writes two emails and the mailer sends them from admin@ within about five minutes:
+
+| Email | To | What it says |
+|---|---|---|
+| Thank-you | Every parent address on the form | The form or message has arrived, and the office will be in touch. It is in the language the family used first, then the other one. For a tour or call it repeats the day they asked for and says the office will confirm it |
+| Alert | Yvonne and admin@ | Who sent it, how to reach them, what they asked for, and a link to it in The Current. Health answers and documents stay in The Current |
+
+- **The wording.** **Enrollments** → **Emails** (or **Emails** on the Leads panel). One tab for each form, English and Vietnamese, with a preview filled in with a made-up family. Words in braces such as `{child}` are filled in for each family; the window lists them. A blank line starts a new paragraph. **Save**, and every form from then on uses it.
+- **Switching off.** Untick the box at the top of a form's tab to stop its thank-yous. The office alert still goes. The alerts are switched off, or sent elsewhere, on the **Office alerts** tab.
+- **Did it go?** Each form and each website message shows a line for its two emails: sent (with a link to it in admin@'s Sent), waiting, or not sent and why. **Emails** → **Outbox** lists the latest emails of every kind and says when the mailer last checked in.
+- **Send again.** An email that failed, or was not sent, has **Send again** in the Outbox.
+- **One a day.** An address gets at most one thank-you in 24 hours, so nobody can type a stranger's address into the contact form and flood them. Siblings' enrollment forms sent the same day each get their own. The office alert goes every time, and says when a thank-you was held back.
+- **Late forms.** A thank-you or an alert more than two days late (the mailer was stopped) is marked "not sent" rather than arriving days after the form.
+- The Vietnamese wording was written by Claude and has not been read by Vietnamese staff yet. The emails promise no response time; add one in the wording if the office wants to.
+- Forms imported from Jotform never send anything.
 
 ### The private part
 

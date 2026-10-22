@@ -109,6 +109,9 @@ The Current keeps its data at **Supabase**, a database service on the internet. 
 | adm_enrollment_private | The private part of each form: ID numbers, documents, signature |
 | adm_todos | The To-Do tab's tasks |
 | adm_newsletters, adm_newsletter_parts, adm_newsletter_views | The Newsletter tab, live since 16 October 2026: issues, their parts, page-open counts |
+| adm_mail_queue | The outbox: every email The Current sends (form thank-yous and alerts, scheduled newsletters, notes to Seth and Bowen), with how it went |
+| adm_mail_templates | The thank-you wording and who gets the alerts, edited under **Enrollments** → **Emails** |
+| adm_mailer_key | One row: the mailer's key. Nobody can read it except in the SQL Editor |
 
 ### The storage buckets
 
@@ -130,6 +133,7 @@ Files are kept in "buckets". The app opens a private file through a link that la
 - **Teachers** may read students, and write only their own report parts and the registers of their year groups.
 - **The triage account** may read, add and change leads and tasks, and read website messages. It may never delete anything.
 - **The website** reads no table. It may only call the two database functions that save a contact message and an enrollment form, and read published newsletters.
+- **The mailer in admin@** has no account. With its key it may ask what is due and say how sending went, and nothing else. Nobody writes to the outbox directly: the forms add to it by themselves, and scheduling, approving and cancelling go through their own functions. Only Head and Super Admin accounts (Seth and Bowen) may approve a newsletter.
 - A delete the database refuses is reported by the app, never silently ignored.
 
 ### The two keys
@@ -212,6 +216,14 @@ The `.env` file never travels with the code, so it is the step most likely to be
 
 > **Ask Claude:** "I am on a new laptop. Check that the admin folder has a complete .env file, rebuild it from the last good deploy if it does not, and run a build to prove it before anything is deployed."
 
+The triage runs in the cloud, but a laptop move has broken it once: after the move of 18 October 2026 the link between Claude and GitHub came undone and no triage ran for two days. On the new laptop, also:
+
+1. Copy the triage login file `.the-current-triage.json` into `C:/Users/sbowe/pra-triage` and the Admin Email folder. Never make a new password for it instead (the cloud runs use the same one).
+2. Sign in to github.com as BowenPRA, open https://claude.ai/code and, if it offers **Connect GitHub**, click it and choose BowenPRA.
+3. **Run now** on the "PRA triage environment check" routine and see that it finishes.
+
+The accounts behind the triage are listed in [The inbox and the triage](#/handbook/inbox?s=what-the-runs-depend-on).
+
 ## Backups
 
 > **Careful:** whether the database is backed up has not been checked (not checked since 15 October 2026). Bowen's notes record Supabase's free plan. On the free plan there are no backups, the project pauses after a week with no use, and storage is 1 GB. Paying for a plan with backups is a decision in [Known problems and open items](#/handbook/open).
@@ -254,7 +266,16 @@ Claude checks changes to The Current on a copy that runs on the laptop, before a
 
 - `supabase/functions/facebook-post` is, today, the one program of PRA's own that runs on a server: it posts to the Facebook Page for the Photos tab. It is deployed in Supabase → **Edge Functions**. Its secrets, the Page's ID and key, are in **Edge Functions** → **Secrets**, never in the code.
 - Bowen set it up; there is no other written owner. The setup steps are in `supabase/functions/facebook-post/README.md`. See [Photos and Facebook](#/handbook/photos).
-- A second function, `newsletter-build`, is written to rebuild the website when a newsletter is published. It needs a GitHub key in its secrets and is not set up yet (16 October 2026). Until it is, the website picks up a newly published issue at its nightly build at 02:30 or at the next push.
+- A second function, `newsletter-build`, is written to rebuild the website when a newsletter is published, or when a scheduled one goes up. It needs a GitHub key in its secrets and is deployed with **Verify JWT** off, because it checks its callers itself (an office login, or the mailer's key). Set up on 22 October 2026: the key is the fine-grained GitHub token "The Current: rebuild website" (BowenPRA account, Actions read and write on BowenPRA/website only), saved as the `GH_TOKEN` secret. When it expires, GitHub emails Bowen; make a new one the same way (`supabase/functions/newsletter-build/README.md`) and replace the secret. Until then, published and scheduled issues wait for the nightly build at 02:30.
+
+### The mailer in admin@
+
+- A Google Apps Script named **The Current mailer**, in the admin@palmriveracademy.edu.vn account at https://script.google.com. Every five minutes it asks the database what is due, sends it with Gmail from admin@, and reports back. It uses no Claude, no laptop and no GitHub. Built on 22 October 2026; the database file is `supabase/updates-2026-10-22-mail.sql`.
+- The code is `scripts/mailer/the-current-mailer.gs`; the copy that runs is the one pasted into Apps Script. Installing, pausing (`PAUSED`), sending as admin@pra.edu.vn (`FROM`) and making a new key are in `scripts/mailer/README.md`.
+- Its three settings are **Script Properties** in the project: the database address, the public key, and the mailer's own key (`MAILER_KEY`, printed by the SQL file). The mailer's key is private.
+- **Is it running?** **Enrollments** → **Emails** → **Outbox** says when it last checked in. Office accounts also see a line on Home when emails are waiting and it has not checked in for 20 minutes.
+- Nothing is ever sent twice by itself. If a run took an email and never reported, the email shows "Sending did not finish": look in admin@'s Sent before **Send again**.
+- The Google Cloud project above is a separate thing: The Current uses it only to save drafts. Sending is the mailer's.
 
 ### The triage's login
 

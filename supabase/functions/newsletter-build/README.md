@@ -2,10 +2,14 @@
 
 When the Newsletter tab's **Publish** finishes, The Current asks this function
 to start the website's build on GitHub (the same build a push starts). About two
-minutes later the issue is on pra.edu.vn. **Take off the website** does the same.
+minutes later the issue is on pra.edu.vn. **Take off the website** does the same,
+and so does the mailer script in admin@ when a scheduled newsletter goes on the
+website ten minutes before its email.
 
 Without it, nothing breaks: the website still builds itself every night at 02:30
-and picks up whatever was published that day.
+and picks up whatever was published that day. But a scheduled newsletter's
+email then links to a page that is not there until that night, so set this up
+before the first scheduled issue.
 
 It takes about ten minutes to set up, once.
 
@@ -29,8 +33,10 @@ Keep it private. Do not paste it into chat, email, or any file in these projects
 1. **Edge Functions → Secrets:** add `GH_TOKEN` with the key.
 2. **Edge Functions → Deploy a new function → Via Editor.** The name must be
    exactly `newsletter-build`. Paste `index.ts` from this folder and deploy.
-   Leave **Verify JWT** on: only people signed in to The Current can call it,
-   and the function also checks that the account is an office account.
+   Turn **Verify JWT** off. The function checks every caller itself: an office
+   account signed in to The Current, or the mailer script in admin@ with its key
+   (`scripts/mailer`), which starts a build when a scheduled newsletter goes on
+   the website. The script has no sign-in, so Supabase's own check would stop it.
 
 ## 3. Check
 

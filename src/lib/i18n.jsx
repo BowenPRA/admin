@@ -1032,6 +1032,9 @@ const STRINGS = {
   ldDueShort: ['{n} to follow up', '{n} cần liên hệ lại'],
   // Messages from the form on pra.edu.vn
   ldWebTitle: ['From the website', 'Từ trang web'],
+  mailButton: ['Emails', 'Email'],
+  nlApproveHome: ['Newsletter to approve: {n}', 'Bản tin cần duyệt: {n}'],
+  mailStuckHome: ['{n} emails waiting: the admin@ mailer is not running', '{n} email đang chờ: trình gửi thư admin@ không chạy'],
   ldWebSub: ['Sent from the form on pra.edu.vn. Reply to the family by email or phone, then mark the message done.', 'Gửi từ form trên pra.edu.vn. Hãy trả lời gia đình qua email hoặc điện thoại, rồi đánh dấu đã xử lý.'],
   ldWebWaiting: ['{n} waiting', '{n} đang chờ'],
   ldWebNone: ['Nothing waiting.', 'Không có tin nhắn nào đang chờ.'],

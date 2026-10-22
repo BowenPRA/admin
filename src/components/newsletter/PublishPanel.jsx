@@ -1,20 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, CircleX, Copy, ExternalLink, FileText, Globe, LoaderCircle, Mail, RefreshCw, Send, TriangleAlert, Undo2 } from 'lucide-react'
+import { CalendarClock, CircleCheck, CircleX, Copy, ExternalLink, FileText, Globe, LoaderCircle, Mail, RefreshCw, Send, TriangleAlert, Undo2 } from 'lucide-react'
+import { useAuth } from '../../lib/AuthContext'
 import { gmailConfigured } from '../../lib/gmail'
 import { EDITIONS, SOURCES } from '../../lib/newsletter/constants'
 import { issueChecks, statusOf, anchorId } from '../../lib/newsletter/payload'
-import { publishIssue, unpublishIssue, saveEmailDraft, readyGmail, pageIsLive, startBuild, previewPayloads, publishedFamilies } from '../../lib/newsletter/publish'
+import { publishIssue, unpublishIssue, saveEmailDraft, readyGmail, pageIsLive, startBuild, previewPayloads, publishedFamilies, scheduleIssue } from '../../lib/newsletter/publish'
+import { isApprover } from '../../lib/mail'
+import { ScheduleCard, ScheduleForm, isLiveJob, defaultSendTime, fmtWhen } from './ScheduleBits'
 import { getIssue, listParts, listViews, sumViews } from '../../lib/newsletter/data'
 import { Modal } from '../ui'
 
 const STEPS = ['photos', 'pdf', 'save', 'build', 'email']
+const SCHEDULE_STEPS = ['photos', 'pdf', 'email', 'schedule']
 
 /**
- * Publish, and everything after it: checks first; then the steps as they run;
- * then the links, the email draft, the chat message, whether the page is live,
- * and how often it has been read. Also "Take off the website".
+ * Publish or schedule, and everything after it: checks first; then the steps as
+ * they run; then the links, the email draft, the chat message, whether the page is
+ * live, and how often it has been read. Also "Take off the website". A schedule
+ * (`job`, from the outbox) shows on top, with Approve for Seth and Bowen.
  */
-export default function PublishPanel({ open, onClose, issue, parts, onIssue, flush, refresh = () => {}, L, toast }) {
+export default function PublishPanel({ open, onClose, issue, parts, onIssue, flush, refresh = () => {}, L, toast, job = null, onJob = () => {} }) {
+  const { me } = useAuth()
   const c = issueChecks(issue, parts)
   const status = statusOf(issue, parts)
   const published = issue.status === 'published'
@@ -23,6 +29,8 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
   const [live, setLive] = useState(null) // null | 'waiting' | 'live' | 'slow'
   const [views, setViews] = useState(null)
   const [busy, setBusy] = useState('')
+  const [scheduling, setScheduling] = useState(false)
+  const [when, setWhen] = useState(() => defaultSendTime(issue))
   const timer = useRef(null)
   const ed = EDITIONS[issue.edition]
 
@@ -40,12 +48,17 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
   }
 
   const blocking = (c.needVi.length && !englishOnly) || c.unchecked.length
+  // While a schedule is live, publishing by hand is put away: the schedule puts the page up itself.
+  const canPublish = (!published || status === 'changed') && !isLiveJob(job)
+  const canSchedule = !isLiveJob(job) && job?.status !== 'sent' && (canPublish || published)
+  // Scheduling only the email of an issue already on the website checks nothing again.
+  const scheduleBlocked = status !== 'published' && blocking
   const doPublish = async () => {
     // The Gmail pop-up must open straight from the click, before the long steps.
     let gmail = false
     try { gmail = await readyGmail() } catch (e) { toast.error(`Gmail: ${e.message}. The issue is published; save the email afterwards.`) }
     const done = new Set()
-    setRun({ step: 'photos', detail: null, done, error: '' })
+    setRun({ steps: STEPS, step: 'photos', detail: null, done, error: '' })
     try {
       await flush()
       const result = await publishIssue(issue, parts, { onStep: (step, detail) => { setRun((r) => { const d = new Set(r.done); STEPS.slice(0, STEPS.indexOf(step)).forEach((s) => d.add(s)); return { ...r, step, detail, done: d } }) } })
@@ -61,6 +74,19 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
     } catch (e) {
       setRun((r) => ({ ...r, error: e.message || String(e) }))
       refresh()
+    }
+  }
+
+  const doSchedule = async () => {
+    setRun({ steps: SCHEDULE_STEPS, step: 'photos', detail: null, done: new Set(), error: '' })
+    try {
+      await flush()
+      const onStep = (step, detail) => setRun((r) => { const d = new Set(r.done); SCHEDULE_STEPS.slice(0, SCHEDULE_STEPS.indexOf(step)).forEach((s) => d.add(s)); return { ...r, step, detail, done: d } })
+      const row = await scheduleIssue(issue, parts, new Date(when).toISOString(), { me, onStep })
+      onJob(row)
+      setRun((r) => ({ ...r, step: '', done: new Set(SCHEDULE_STEPS), result: { scheduled: row } }))
+    } catch (e) {
+      setRun((r) => ({ ...r, error: e.message || String(e) }))
     }
   }
 
@@ -102,6 +128,12 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
     build: L('Asking the website to rebuild (about two minutes)', 'Yêu cầu trang web cập nhật (khoảng hai phút)'),
     email: L('Saving the email in admin@ Gmail, groups in Bcc, PDFs attached', 'Lưu email trong Gmail admin@, nhóm ở Bcc, kèm PDF'),
   }
+  const scheduleLabel = {
+    photos: L('Copying the photos for the website', 'Sao chép ảnh cho trang web'),
+    pdf: L('Making the PDFs in English and Vietnamese', 'Làm PDF tiếng Anh và tiếng Việt'),
+    email: L('Making the email', 'Soạn email'),
+    schedule: isApprover(me) ? L('Putting it in the outbox, approved', 'Đưa vào hộp thư đi, đã duyệt') : L('Putting it in the outbox and asking Seth and Bowen to approve it', 'Đưa vào hộp thư đi và nhờ thầy Seth, thầy Bowen duyệt'),
+  }
   const pub = issue.published
   const url = pub?.url || { en: `https://pra.edu.vn/newsletter/${issue.slug}/`, vi: `https://pra.edu.vn/vi/newsletter/${issue.slug}/` }
 
@@ -115,25 +147,33 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
   const running = run && !run.result && !run.error
   return (
     <Modal open={open} onClose={running ? () => {} : onClose} wide
-      title={published && !run ? L('Published', 'Đã đăng') : L(`Publish ${ed.short}, ${issue.quarter ? `Quarter ${issue.quarter} · Week ${issue.week}` : ''}`, `Đăng ${ed.short}, Quý ${issue.quarter} · Tuần ${issue.week}`)}
+      title={isLiveJob(job) && !run ? L('Scheduled', 'Đã hẹn giờ') : scheduling || run?.steps === SCHEDULE_STEPS ? L(`Schedule ${ed.short}, ${issue.quarter ? `Quarter ${issue.quarter} · Week ${issue.week}` : ''}`, `Hẹn giờ ${ed.short}, Quý ${issue.quarter} · Tuần ${issue.week}`) : published && !run ? L('Published', 'Đã đăng') : L(`Publish ${ed.short}, ${issue.quarter ? `Quarter ${issue.quarter} · Week ${issue.week}` : ''}`, `Đăng ${ed.short}, Quý ${issue.quarter} · Tuần ${issue.week}`)}
       subtitle={ed.readers ? L(ed.readers.en, ed.readers.vi) : null}
-      footer={!run ? (
+      footer={!run ? (scheduling ? (
+        <>
+          <button className="btn-secondary mr-auto" onClick={() => setScheduling(false)}>{L('Back', 'Quay lại')}</button>
+          <button className="btn-primary" disabled={!!scheduleBlocked || !when} onClick={doSchedule}><CalendarClock size={16} />{L(`Schedule for ${fmtWhen(when, L)}`, `Hẹn gửi ${fmtWhen(when, L)}`)}</button>
+        </>
+      ) : (
         <>
           {published && <button className="btn-danger mr-auto" disabled={!!busy} onClick={doUnpublish}><Undo2 size={16} />{L('Take off the website', 'Gỡ khỏi trang web')}</button>}
           <button className="btn-secondary" onClick={onClose}>{L('Close', 'Đóng')}</button>
-          {(!published || status === 'changed') && <button className="btn-primary" disabled={!!blocking} onClick={doPublish}><Send size={16} />{published ? L('Publish the changes', 'Đăng phần đã sửa') : L('Publish', 'Đăng')}</button>}
+          {canPublish && <button className={canSchedule ? 'btn-secondary' : 'btn-primary'} disabled={!!blocking} onClick={doPublish}><Send size={16} />{published ? L('Publish the changes now', 'Đăng phần đã sửa ngay') : L('Publish now', 'Đăng ngay')}</button>}
+          {canSchedule && <button className="btn-primary" onClick={() => setScheduling(true)}><CalendarClock size={16} />{canPublish ? L('Schedule…', 'Hẹn giờ…') : L('Schedule the email…', 'Hẹn giờ gửi email…')}</button>}
         </>
-      ) : run.result || run.error ? <button className="btn-primary" onClick={onClose}>{L('Done', 'Xong')}</button> : null}>
+      )) : run.result || run.error ? <button className="btn-primary" onClick={onClose}>{L('Done', 'Xong')}</button> : null}>
       {!run && (
         <div className="space-y-5">
-          {published && (
+          {!scheduling && <ScheduleCard job={job} issue={issue} parts={parts} me={me} L={L} toast={toast} onJob={onJob} onAgain={() => setScheduling(true)} />}
+          {scheduling && <ScheduleForm issue={issue} when={when} setWhen={setWhen} me={me} L={L} />}
+          {published && !scheduling && (
             <div className="space-y-3 rounded-xl border border-green-200 bg-green-50/60 p-4 text-sm">
               <div className="flex flex-wrap items-center gap-2 text-green-800"><Globe size={16} /><b>{L('On the website since', 'Có trên trang web từ')} {new Date(issue.published_at).toLocaleString()}</b>{status === 'changed' && <span className="chip bg-amber-100 text-amber-800">{L('Changed since: publish the changes', 'Đã sửa sau khi đăng: hãy đăng lại')}</span>}</div>
               <Links url={url} pdf={pub?.pdf} L={L} />
               <Readers views={views} parts={parts} L={L} />
             </div>
           )}
-          {(!published || status === 'changed') && (
+          {(canPublish || (scheduling && status !== 'published')) && (
             <ul className="space-y-3">
               <Check ok={!c.needVi.length} warn={c.needVi.length && englishOnly} title={L('Vietnamese', 'Tiếng Việt')}>
                 {!c.needVi.length ? L('Every part has its Vietnamese.', 'Mọi phần đều có tiếng Việt.') : L(`${c.needVi.length} part${c.needVi.length > 1 ? 's' : ''} still need${c.needVi.length > 1 ? '' : 's'} Vietnamese.`, `Còn ${c.needVi.length} phần chưa có tiếng Việt.`)}
@@ -150,14 +190,14 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
               </Check>
             </ul>
           )}
-          {(!published || status === 'changed') && (
+          {canPublish && !scheduling && (
             <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[13px] text-slate-700">
               <div className="flex gap-2"><Globe size={15} className="mt-0.5 flex-none text-slate-500" /><span>{L('Website:', 'Trang web:')} <code className="code break-all">{url.en}</code> {L('and the Vietnamese page', 'và trang tiếng Việt')}</span></div>
               <div className="flex gap-2"><FileText size={15} className="mt-0.5 flex-none text-slate-500" /><span>{L('Two PDFs (English and Vietnamese), on the page and attached to the email.', 'Hai file PDF (tiếng Anh và tiếng Việt), trên trang web và đính kèm email.')}{parts.some((p) => p.public === false) && ` ${L('Families-only parts are in the email text only: not on the page, not in the PDFs.', 'Phần chỉ gửi gia đình chỉ có trong nội dung email: không có trên trang web và trong PDF.')}`}</span></div>
               <div className="flex gap-2"><Mail size={15} className="mt-0.5 flex-none text-slate-500" /><span>{gmailConfigured ? L(`Email draft in admin@ Gmail: Bcc ${ed.groups.join(', ')}. The office sends it, or schedules it for Friday 16:30.`, `Thư nháp trong Gmail admin@: Bcc ${ed.groups.join(', ')}. Văn phòng gửi hoặc hẹn giờ gửi lúc 16:30 thứ Sáu.`) : L('Gmail is not connected in this copy of The Current, so the email is not saved as a draft.', 'Bản The Current này chưa kết nối Gmail nên không lưu thư nháp được.')}</span></div>
             </div>
           )}
-          {published && (
+          {published && !scheduling && (
             <div className="flex flex-wrap gap-2">
               <button className="btn-secondary" onClick={doChat}><Copy size={16} />{L('Copy for chat groups', 'Sao chép cho nhóm chat')}</button>
               <button className="btn-secondary" disabled={!!busy} onClick={doEmail}>{busy === 'email' ? <LoaderCircle size={16} className="animate-spin" /> : <Mail size={16} />}{issue.email?.saved_at ? L('Save the email again', 'Lưu lại email') : L('Save the email in Gmail', 'Lưu email vào Gmail')}</button>
@@ -171,18 +211,27 @@ export default function PublishPanel({ open, onClose, issue, parts, onIssue, flu
       {run && (
         <div className="space-y-4">
           <ul className="space-y-2.5">
-            {STEPS.filter((s) => s !== 'email' || gmailConfigured).map((s) => {
+            {(run.steps || STEPS).filter((s) => run.steps === SCHEDULE_STEPS || s !== 'email' || gmailConfigured).map((s) => {
               const isDone = run.done.has(s), now = run.step === s && !run.error
               return (
                 <li key={s} className="flex items-center gap-3 text-sm">
                   {isDone ? <CircleCheck size={20} className="text-green-600" /> : now ? <LoaderCircle size={20} className="animate-spin text-pra-blue" /> : <span className="h-5 w-5 rounded-full border-2 border-slate-200" />}
-                  <span className={isDone || now ? 'text-slate-800' : 'text-slate-400'}>{stepLabel[s]}{now && run.detail?.total ? ` (${run.detail.done}/${run.detail.total})` : ''}</span>
+                  <span className={isDone || now ? 'text-slate-800' : 'text-slate-400'}>{(run.steps === SCHEDULE_STEPS ? scheduleLabel : stepLabel)[s]}{now && run.detail?.total ? ` (${run.detail.done}/${run.detail.total})` : ''}</span>
                 </li>
               )
             })}
           </ul>
-          {run.error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{run.error} {L('Nothing families can see has changed unless the step "Saving the published issue" was ticked. You can publish again.', 'Gia đình chưa thấy thay đổi gì nếu bước "Lưu số đã đăng" chưa được đánh dấu. Có thể đăng lại.')}</div>}
-          {run.result && (
+          {run.error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{run.error} {run.steps === SCHEDULE_STEPS ? L('Nothing is scheduled and nothing went to families. You can try again.', 'Chưa hẹn giờ gì và chưa gửi gì cho gia đình. Có thể thử lại.') : L('Nothing families can see has changed unless the step "Saving the published issue" was ticked. You can publish again.', 'Gia đình chưa thấy thay đổi gì nếu bước "Lưu số đã đăng" chưa được đánh dấu. Có thể đăng lại.')}</div>}
+          {run.result?.scheduled && (
+            <div className="space-y-2 rounded-xl border border-sky-200 bg-sky-50/60 p-4 text-sm text-slate-700">
+              <b className="flex items-center gap-2 text-sky-900"><CalendarClock size={16} />{L(`Scheduled for ${fmtWhen(run.result.scheduled.send_at, L)}.`, `Đã hẹn gửi ${fmtWhen(run.result.scheduled.send_at, L)}.`)}</b>
+              <p>{run.result.scheduled.status === 'ready'
+                ? L('It is approved. The page goes on pra.edu.vn ten minutes before, then the email goes to the groups from admin@.', 'Đã duyệt. Trang lên pra.edu.vn mười phút trước, sau đó email được gửi từ admin@ đến các nhóm.')
+                : L('Seth and Bowen have been emailed to approve it. Nothing goes to families until one of them does.', 'Đã gửi email nhờ thầy Seth và thầy Bowen duyệt. Chưa có gì được gửi cho gia đình cho đến khi một trong hai thầy duyệt.')}</p>
+              <p className="text-xs text-slate-500">{L('Changes made to the issue from now on are not in it. To include them, schedule it again.', 'Những chỉnh sửa từ bây giờ sẽ không có trong email đã hẹn. Muốn gửi kèm, hãy hẹn giờ lại.')}</p>
+            </div>
+          )}
+          {run.result && !run.result.scheduled && (
             <div className="space-y-3 rounded-xl border border-green-200 bg-green-50/60 p-4 text-sm">
               <b className="block text-green-800">{L('Published.', 'Đã đăng.')}</b>
               <Links url={run.result.pub.url} pdf={run.result.pub.pdf} L={L} />

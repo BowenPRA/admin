@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PlusCircle, Users, CalendarCheck, CalendarDays, CalendarX, ClipboardList, ClipboardCheck, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane, Shapes } from 'lucide-react'
+import { PlusCircle, Users, CalendarCheck, CalendarDays, CalendarX, ClipboardList, ClipboardCheck, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane, Shapes, ShieldCheck, MailWarning } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
@@ -13,6 +13,7 @@ import { finishingThisQuarter } from '../lib/studentDates'
 import { withOpenSteps } from '../lib/onboarding'
 import { summarize } from '../lib/leads'
 import { summarizeTodos } from '../lib/todos'
+import { listNewsletterJobs, mailerStatus, withAge, isApprover, MAILER_LATE_MINUTES } from '../lib/mail'
 import { tripOn, statusOn, travelingOn, tripLine, TRAVEL } from '../lib/travel'
 import { useOffDays, sessionsToday, sameEmail, activityName, timeText, currentTerm } from '../lib/eca'
 import { teacherDay, todayIndex, isNow, subjectTone } from '../lib/schedule'
@@ -383,6 +384,8 @@ function OfficeHome() {
   const [webWaiting, setWebWaiting] = useState(0)
   const [forms, setForms] = useState(null)
   const [todos, setTodos] = useState(null)
+  const [toApprove, setToApprove] = useState(0)
+  const [mailer, setMailer] = useState(null)
   const today = useTodayAttendance(data.students, data.travel)
   const reports = useReportWork()
   const lessons = useTodayLessons()
@@ -399,6 +402,13 @@ function OfficeHome() {
 
   // And for the To-Do tab (updates-2026-10-01-todos.sql).
   useEffect(() => { db.todos.list().then((ts) => setTodos(summarizeTodos(ts, me?.email || ''))).catch(() => setTodos(null)) }, [me?.email])
+  // And for the emails The Current sends (updates-2026-10-22-mail.sql): newsletters for Seth and Bowen to approve,
+  // and emails stuck because the mailer script in admin@ is not running.
+  useEffect(() => {
+    if (isApprover(me)) listNewsletterJobs().then((m) => setToApprove(Object.values(m).filter((j) => j.status === 'waiting').length)).catch(() => setToApprove(0))
+    mailerStatus().then((st) => setMailer(withAge(st))).catch(() => setMailer(null))
+  }, [me])
+  const mailStuck = mailer && !mailer.offline && mailer.ready > 0 && (mailer.mins === null || mailer.mins > MAILER_LATE_MINUTES)
 
   if (!invoices || data.loading) return <Spinner />
 
@@ -432,6 +442,8 @@ function OfficeHome() {
           finishing > 0 && { icon: CalendarX, to: '/students?ending=1', text: t('endingHome', { n: finishing }) },
           newSteps > 0 && { icon: ClipboardCheck, to: '/students?steps=1', text: t(newSteps === 1 ? 'stepsHomeOne' : 'stepsHome', { n: newSteps }) },
           formsToCheck > 0 && { icon: FileSignature, to: '/enrollments', text: t('enHomeShort', { n: formsToCheck }) },
+          toApprove > 0 && { icon: ShieldCheck, to: '/newsletter', text: t('nlApproveHome', { n: toApprove }) },
+          mailStuck && { icon: MailWarning, to: '/enrollments', text: t('mailStuckHome', { n: mailer.ready }) },
           todos && (todos.mine || todos.late || todos.check) > 0 && { icon: ListTodo, to: '/todo', text: `${t('todoNav')}: ${[todos.mine && t('tdHomeMine', { n: todos.mine }), todos.late && t('tdHomeLate', { n: todos.late }), todos.check && t('tdHomeCheck', { n: todos.check })].filter(Boolean).join(' · ')}` },
         ]} />
 

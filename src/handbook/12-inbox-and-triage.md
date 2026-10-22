@@ -5,7 +5,7 @@ The office's email goes to one shared inbox, admin@palmriveracademy.edu.vn. Each
 - **The address.** admin@palmriveracademy.edu.vn is the office inbox: parents, applicants, suppliers, government offices and the domain registrar all write to it. Mail to admin@palmriveracademy.com arrives here too. Mail to admin@pra.edu.vn does not: that is a separate, unused account (see [Google Workspace and domains](#/handbook/google)).
 - **Who works in it.** The office staff read it and send from it: fee announcements, replies to parents, tour bookings. Yvonne, Hien and Seth each get their own share of it by email from the triage, so most days they never need to search it. The admin reads it for anything technical and for anything the triage could not place.
 - **What else the account is.** The same Google account is the Workspace super admin, the sign-in for the account tool GAM, the email the database account is registered under, and the account Claude's Gmail connector works through. Never change its password without asking Claude first what depends on it.
-- **What does not come here.** The website sends no email. Its contact and book-a-tour form saves into [Leads](#/leads) and its enrollment form into [Enrollments](#/enrollments) (see [The website](#/handbook/website)). The old Wix site still sends "Contact Us got a new submission" emails from admin@ to admin@; the family's address is inside the message, and a reply on that thread does not reach them.
+- **What The Current sends from here.** The website's contact and book-a-tour form saves into [Leads](#/leads) and its enrollment form into [Enrollments](#/enrollments) (see [The website](#/handbook/website)). Since 22 October 2026 a script in this account, The Current's mailer, sends from admin@: a thank-you to the family after each form (it is in Sent), an alert to Yvonne and admin@ ("New enrollment form: …", "Website: … from …"; it lands in this inbox), scheduled newsletters (in Sent, kept out of the inbox), and short notes to Seth and Bowen about newsletters to approve. The alerts are for information: the form is already in The Current and the family has had its thank-you. See [Behind the scenes](#/handbook/behind?s=the-mailer-in-admin). The old Wix site still sends "Contact Us got a new submission" emails from admin@ to admin@; the family's address is inside the message, and a reply on that thread does not reach them.
 - **Walk-in families** often never email. They appear only in Sent, when Yvonne writes to them, so every run looks through Sent as well as the inbox.
 
 ## What the triage is
@@ -121,7 +121,7 @@ The triage writes to The Current through two small scripts in the repository, si
 
 Since 30 September 2026 every family that has asked about joining is on [Leads](#/leads) (the old "Inquiries Tracker" spreadsheet is retired). A lead reaches it in one of four ways:
 
-1. The website's contact form saves the family straight into Leads, with no email. The triage reads these messages and, because there is no thread to forward, emails Yvonne (Seth in copy) the family's details, what they asked for, the day they asked for, the message with a translation if needed, and a suggested first reply. The office marks the message done on the Leads tab; the triage cannot.
+1. The website's contact form saves the family straight into Leads. Yvonne gets The Current's alert within minutes; the triage also reads these messages and, because there is no thread to forward, emails Yvonne (Seth in copy) the family's details, what they asked for, the day they asked for, the message with a translation if needed, and a suggested first reply. The office marks the message done on the Leads tab; the triage cannot.
 2. A "Contact Us" email from the old Wix site.
 3. A direct email from a parent.
 4. A walk-in family found in Sent.
@@ -180,7 +180,22 @@ A routine is a Claude agent that runs on a schedule in Anthropic's cloud, with n
 
 - The routines are listed at https://claude.ai/code/routines, and every run, with its full transcript, can be read at https://claude.ai/code. All five have been on since 2 October 2026 (the early check since 5 October 2026). `PLAN.md` in the repository still shows them as switched off; that part is out of date.
 - They belong to the Claude account they were made in, Bowen's today, and run on that account's allowance. Moving them to another Claude account has not been tried; plan it with Claude before the handover.
-- A leftover one-off routine called "PRA triage environment check" may still be listed; it can be deleted.
+- A one-off routine called "PRA triage environment check" is kept as a quick test. **Run now** on it copies the repository, signs in to The Current and saves a short result to GitHub (`routine/last-environment-check.md`). If it finishes, the routines can reach everything they need. It was used this way on 21 October 2026.
+
+### What the runs depend on
+
+The routines need four accounts to be linked, and nothing warns anyone when a link comes undone except the triage watch (below). After the laptop move of 18 October 2026 the GitHub link came undone: every run from Tuesday 20 October 06:00 to Wednesday 21 October 16:30 failed before it started, and nobody got a digest.
+
+| What | Where it is set | When it changes or comes undone |
+|---|---|---|
+| **The Claude account** that holds the routines (Bowen's own account today) | The five routines, the "PRA triage" environment, the GitHub link and the Gmail connector all belong to it, and the runs use its allowance | A different Claude account means setting all of it up again (see the steps below) |
+| **The GitHub account BowenPRA**, which owns BowenPRA/triage | Linked once at https://claude.ai/code with **Connect GitHub**, while the browser is signed in to github.com as BowenPRA. Bowen's personal GitHub account (sbowen209) cannot see the triage repository, so linking that one does not help | Every run fails at the start and sends nothing. Sign in to github.com as BowenPRA, open https://claude.ai/code, click **Connect GitHub** and choose BowenPRA, then **Run now** on the environment check and run the morning update by hand |
+| **The Gmail connector**, signed in as admin@palmriveracademy.edu.vn | In the Claude account's connectors | A run stops and says so. Reconnect Gmail at claude.ai, signed in as admin@ |
+| **The triage login**, triage@pra.edu.vn | In the "PRA triage" environment for the cloud runs; on the laptop in `.the-current-triage.json`, in `C:/Users/sbowe/pra-triage` and in the Admin Email folder (never on GitHub) | The cloud runs and the laptop use the same password. Never make a new password to get round a missing file on the laptop: copy the file from the old laptop or the password manager. If the password does change, it goes into the environment the same day |
+
+> **Careful:** moving the routines to another Claude account is planned. When PRA's paid plan on Bowen's account ends, PRA may take its own plan under admin@. On that day, in the new account: connect GitHub as BowenPRA (or whoever then owns the repository), connect Gmail as admin@, create the "PRA triage" environment with the triage login and the same network settings, re-create the five routines with the same times, models and prompts (`routine/` in the repository) and Gmail as their only connector, run the environment check, then switch the new routines on and the old ones off on the same day, so that nothing is sent twice.
+
+> **Ask Claude:** "We are moving the triage routines to the Claude account I am signed in to now. Read 'What the runs depend on' in the handbook, list each step, and do the ones you can with me here."
 
 ### What it costs
 
@@ -214,6 +229,14 @@ To run the morning update by hand:
 
 Claude must use the skill in the repository, not the older "inbox-triage-daily" skill the account may still offer (see "When the triage goes wrong").
 
+### The triage watch
+
+A small Google Apps Script in the admin@ account checks each weekday, between 08:30 and 09:00, that the morning update has sent its report or a digest. If it has not, the script emails Bowen and Seth once that day: "Triage alert, Thu 22 Oct: no morning update by 08:41", with what to check. It does not use Claude, GitHub or the laptop, so it still works when they are what failed. It looks only at the morning update; a missed sorting run or day recap does not raise an alert.
+
+How to install it, pause it over a holiday (the `QUIET_UNTIL` setting) and remove it is in `watch/README.md` in the triage repository, next to the script itself. The copy that runs is the one pasted into Apps Script, so a change to the file has to be pasted there again. If the subjects of the morning emails change, the script has to change with them, or it raises an alert every morning.
+
+> **Careful:** the watch was written on 22 October 2026 and is not installed until someone pastes it into Apps Script as admin@ (about ten minutes, steps in the README).
+
 Other failures, from `PLAN.md`:
 
 | What happened | What the run does | What you do |
@@ -221,7 +244,7 @@ Other failures, from `PLAN.md`:
 | The Current's database cannot be reached | Finishes the Gmail steps; lists "Leads not saved" | Enter the changes by hand from the report |
 | The log cannot be saved to `main` | Saves it to a `claude/triage-<date>` branch | Nothing; the next run merges it |
 | Gmail needs reconnecting | Stops and says so | Reconnect Gmail at claude.ai, signed in as admin@ |
-| GitHub is disconnected | Runs are skipped for up to 72 hours, then the routine switches itself off | Reconnect GitHub at claude.ai/code, then switch the routines back on |
+| GitHub is disconnected | Every run fails before it starts and sends nothing, not even a warning (20 to 21 October 2026) | The triage watch emails by 09:00. Reconnect GitHub as in "What the runs depend on", check the routines are still switched on, and run the morning update by hand |
 | The password of triage@pra.edu.vn was changed | Every script call prints NOT SAVED | Put the new value in the "PRA triage" environment the same day (a task for a session with Claude) |
 
 ## Changing a label by email
@@ -305,7 +328,7 @@ Use it once a month, or when Drafts holds more than about 50 drafts. The group "
 
 | What you see | Likely cause | What to do |
 |---|---|---|
-| No digest at 08:00, no new drafts | The run was refused (allowance used up) or Gmail needs reconnecting | Look at today's runs at https://claude.ai/code; run the morning update by hand (above) |
+| No digest at 08:00, no new drafts | The run was refused (allowance used up), Gmail needs reconnecting, or the GitHub link came undone | Look at today's runs at https://claude.ai/code; check the links in "What the runs depend on"; run the morning update by hand (above) |
 | Two copies of a forward, or two sets of digests | The old Cowork scheduled task or the old account skills are still running beside the routines, or two runs overlapped | Stop the Cowork task and switch off the old skills (below); only one run at a time |
 | The log was not saved | The save to GitHub was refused | Nothing: the log is on a `claude/triage-<date>` branch and the next run merges it. If GitHub was disconnected, reconnect it |
 | "Leads not saved" or "To-Do not saved" | The Current could not be reached, or the triage login was refused | Enter the changes by hand from the report; ask Claude to find the cause |

@@ -24,6 +24,8 @@ import PhotoPicker from '../../components/newsletter/PhotoPicker'
 import PublishPanel from '../../components/newsletter/PublishPanel'
 import NoPhotoList from '../../components/newsletter/NoPhotoList'
 import { StatusChips, ownsCorner } from '../../components/newsletter/status'
+import { JobChip, isLiveJob, fmtWhen } from '../../components/newsletter/ScheduleBits'
+import { listNewsletterJobs } from '../../lib/mail'
 import { NlIcon } from '../../components/newsletter/icons'
 import { Outline, SaveLine, NextStep, cornerCount } from '../../components/newsletter/EditorBits'
 
@@ -70,6 +72,10 @@ function IssueEditor({ id }) {
   const [onlyVi, setOnlyVi] = useState(() => params.get('vi') === '1')
   const [addAt, setAddAt] = useState(null)
   const [publishing, setPublishing] = useState(false)
+  // The issue's schedule in the outbox (supabase/updates-2026-10-22-mail.sql), if any.
+  const [job, setJob] = useState(null)
+  const loadJob = () => { if (isOffice) listNewsletterJobs([id]).then((m) => setJob(m[id] || null)).catch(() => setJob(null)) }
+  useEffect(loadJob, [id, isOffice])
   const [doneOpen, setDoneOpen] = useState(false)
   const [coverPick, setCoverPick] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -223,7 +229,9 @@ function IssueEditor({ id }) {
   })
   const cover = issue.settings?.cover
   const inbox = payloads?.fam?.preheader?.en || ''
-  const publishLabel = issue.status === 'published' ? (status === 'changed' ? L('Publish the changes…', 'Đăng phần đã sửa…') : L('Published…', 'Đã đăng…')) : L('Publish…', 'Đăng…')
+  const publishLabel = job?.status === 'waiting' ? L('Waiting for approval…', 'Chờ duyệt…')
+    : isLiveJob(job) ? L(`Goes ${fmtWhen(job.send_at, L)}…`, `Gửi ${fmtWhen(job.send_at, L)}…`)
+      : issue.status === 'published' ? (status === 'changed' ? L('Publish the changes…', 'Đăng phần đã sửa…') : L('Published…', 'Đã đăng…')) : L('Publish or schedule…', 'Đăng hoặc hẹn giờ…')
 
   return (
     <div className="space-y-4">
@@ -234,10 +242,10 @@ function IssueEditor({ id }) {
           {/* The issue */}
           <section className="card overflow-hidden">
             <div className="flex flex-wrap items-start gap-4 p-4" style={{ background: `linear-gradient(90deg, ${TONES[ed.tone].pale}, #fff)` }}>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-64">
                 <div className="text-xs font-bold uppercase tracking-wider" style={{ color: TONES.green.ink }}>{issueLabel(issue, lang === 'vi' ? 'vi' : 'en')} · {longDay(issue.issue_date, lang === 'vi' ? 'vi' : 'en')}</div>
                 <h1 className="text-xl font-black tracking-tight text-slate-800 sm:text-2xl">{L(ed.name.en, ed.name.vi)}</h1>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2"><StatusChips issue={issue} parts={parts} L={L} /><SaveLine save={iss.save} unsaved={iss.unsaved} onRetry={iss.retry} L={L} /></div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2"><StatusChips issue={issue} parts={parts} L={L} /><JobChip job={job} L={L} /><SaveLine save={iss.save} unsaved={iss.unsaved} onRetry={iss.retry} L={L} /></div>
               </div>
               {office && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -344,7 +352,7 @@ function IssueEditor({ id }) {
           <Preview payload={payloads.pub} families={payloads.fam} L={L} onFull={openFull} />
         </Modal>
       )}
-      {publishing && <PublishPanel open onClose={() => setPublishing(false)} issue={issue} parts={parts} onIssue={iss.replaceIssue} flush={iss.flush} refresh={iss.refresh} L={L} toast={toast} />}
+      {publishing && <PublishPanel open onClose={() => { setPublishing(false); loadJob() }} issue={issue} parts={parts} onIssue={iss.replaceIssue} flush={iss.flush} refresh={iss.refresh} L={L} toast={toast} job={job} onJob={setJob} />}
       {doneOpen && <EnglishDoneModal onClose={() => setDoneOpen(false)} onDone={englishDone} needVi={c.needVi.length} L={L} />}
       {coverPick && <PhotoPicker open onClose={() => setCoverPick(false)} issueId={issue.id} max={1} by={me?.email || ''} title={L('Cover photo', 'Ảnh bìa')}
         issuePhotos={parts.flatMap((p) => p.data?.photos || [])} canSeeAlbums={office} onAdd={([p]) => iss.setSetting('cover', p)} />}

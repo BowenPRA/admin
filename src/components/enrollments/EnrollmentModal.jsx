@@ -8,6 +8,7 @@ import {
   showValue, birthdayLine, yesNo, isYes, placeOf,
 } from '../../lib/enrollment'
 import { Chip, Modal } from '../ui'
+import MailLine from '../mail/MailLine'
 import { onChecklist } from '../../lib/onboarding'
 import NewStudentChecklist from '../students/NewStudentChecklist'
 
@@ -164,6 +165,7 @@ export default function EnrollmentModal({ value: e, student, isSuper, onClose, o
           : <button type="button" className="btn-primary" disabled={busy} onClick={() => run(() => onCheck(e, true))}><Check size={16} /> {t('enMarkChecked')}</button>}
       </>}>
       <div className="space-y-5">
+        {e.source !== 'import' && <MailLine refId={e.id} L={(en, vi) => (lang === 'vi' && vi ? vi : en)} />}
         {/* The form's student on the new-student checklist; with no student yet, the one step is to add them. */}
         {checklist && (place === 'none' || (student && onChecklist(student))) && (
           <NewStudentChecklist student={place === 'none' ? {} : student} ctx={checklist.ctx} me={checklist.me} t={t} lang={lang}

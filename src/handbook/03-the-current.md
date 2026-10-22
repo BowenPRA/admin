@@ -147,8 +147,13 @@ Under **Teaching**.
 Under **Outreach** for office accounts, under **Teaching** for teachers.
 
 - **What it is for:** writing the two weekly newsletters, The Palm River Post (to all parents and all staff) and the Early Years newsletter (to Early Years parents and all staff), which go out from admin@ on Fridays at 16:30.
-- **Main things you do:** **New issue** for a Friday; write the sections in English, then the Vietnamese; preview it as the website page, the email and the PDF; publish. Publishing puts the issue on pra.edu.vn, makes its PDFs and saves the email in admin@'s Gmail Drafts. A person sends the email.
-- The page was added on 16 October 2026 and follows the layout of Seth's Google Doc "Weekly Newsletters 2026-27". Some parts (class corners, dates, reminders) are hidden for now. The website does not yet rebuild the moment an issue is published; a published issue appears at the website's nightly build or with the next push.
+- **Main things you do:** **New issue** for a Friday; write the sections in English, then the Vietnamese; preview it as the website page, the email and the PDF; then **Publish or schedule…**.
+  - **Schedule…** picks a day and time (it starts at the issue's Friday, 16:30). Seth or Bowen approves it; when one of them schedules it, that is the approval. Ten minutes before the time the page goes on pra.edu.vn, and at the time the mailer in admin@ emails it to the edition's parent group and allstaff@, with both PDFs. While it waits, the issue shows **Waiting for approval** or **Goes Fri …, 16:30**.
+  - **Publish now** works as before: the page goes up at once and the email is saved in admin@'s Gmail Drafts for a person to send.
+  - **Send a test to me** (on a scheduled issue) sends the exact email, PDFs and all, to the person signed in, with "[Test]" in front of the subject. It arrives within five minutes. Read it on your phone before approving. Its link to the website page works once the issue is on the website. At most five tests an hour each.
+  - Changes made after scheduling are not in the email. The window says so and offers **Schedule again**.
+- Seth and Bowen see a line at the top of the Newsletter page, and on their Home page, when an issue is waiting for them. Each also gets a short email asking them to approve it.
+- The page was added on 16 October 2026 and follows the layout of Seth's Google Doc "Weekly Newsletters 2026-27". Some parts (class corners, dates, reminders) are hidden for now. Since 22 October 2026 publishing starts a website build, and the issue's page is up about two minutes later.
 - **Who sees it:** office accounts write and publish. Teachers see the page under Teaching; while the class corners are hidden it tells them the office writes the newsletter and there is nothing for them to do.
 - There is no chapter for it yet. The website side is in [The website](#/handbook/website).
 
@@ -166,7 +171,7 @@ Under **Office**.
 Under **Office**.
 
 - **What it is for:** every family who has asked about joining, one row per family, from first contact to enrolled or lost. It replaced the Inquiries Tracker spreadsheet on 30 September 2026.
-- **Main things you do:** read the "From the website" panel at the top and mark messages done; change a family's stage; set the next step, who has it and a follow-up date; **Make the student records** when a family agrees; **Archive** families that have gone quiet; **Print summary**; **Add family**.
+- **Main things you do:** read the "From the website" panel at the top and mark messages done (each message shows whether its thank-you and the office alert went; **Emails** on the panel opens the wording and the outbox); change a family's stage; set the next step, who has it and a follow-up date; **Make the student records** when a family agrees; **Archive** families that have gone quiet; **Print summary**; **Add family**.
 - The daily inbox triage adds and updates rows through its own account.
 - **Who sees it:** office accounts.
 - Deeper: [Students, families and enrollment](#/handbook/students?s=leads).
@@ -177,6 +182,7 @@ Under **Office**.
 
 - **What it is for:** the enrollment forms parents send from https://pra.edu.vn/admissions/enroll/. Each form arrives by itself and adds the child as a pending student, or links to an existing one.
 - **Main things you do:** open a form and read every answer, including the documents and ID details; **Mark checked**; **Add pending student** for a form that came in without one. **To check only** shows the forms nobody has checked.
+- Each form shows at the top whether the family's thank-you and the alert to the office went. **Emails** (top right) holds the wording of the thank-you emails, who gets the alerts, and the outbox: every email The Current has sent or is waiting to send.
 - **Who sees it:** office accounts. Only the Super Admin can delete a form.
 - Deeper: [Students, families and enrollment](#/handbook/students?s=enrollment-forms).
 

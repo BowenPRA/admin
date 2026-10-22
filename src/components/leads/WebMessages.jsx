@@ -1,10 +1,13 @@
-import { useState } from 'react'
-import { Check, Globe, Undo2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, Globe, Mail, Undo2 } from 'lucide-react'
+import { listMail } from '../../lib/mail'
+import MailLine from '../mail/MailLine'
+import MailSettings from '../mail/MailSettings'
 import { wantOf, askedFor, fmtMoment, fmtDay, personName, leadForMessage, byWaiting } from '../../lib/leads'
 import { Chip } from '../ui'
 
 /** One message as the family sent it. `actions` are the buttons beside it, if any. */
-export function WebMessage({ m, t, lang, actions, family }) {
+export function WebMessage({ m, t, lang, actions, family, mails = null }) {
   const want = wantOf(m.want)
   const asked = askedFor(m, lang)
   // A parent who writes again is often on the list under another name ("Tran family").
@@ -30,6 +33,7 @@ export function WebMessage({ m, t, lang, actions, family }) {
           {m.phone && <a href={`tel:${String(m.phone).replace(/\s+/g, '')}`} className="text-pra-blue hover:underline" onClick={(e) => e.stopPropagation()}>{m.phone}</a>}
         </div>
         {m.done_at && <div className="text-xs text-slate-400">{t('ldWebDoneBy', { name: personName(m.done_by, lang) || '?', date: fmtDay(m.done_at, lang) })}</div>}
+        {mails && <MailLine mails={mails} L={(en, vi) => (lang === 'vi' && vi ? vi : en)} />}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
     </div>
@@ -43,6 +47,19 @@ export function WebMessage({ m, t, lang, actions, family }) {
  */
 export default function WebMessages({ messages, leads, busyId, onOpen, onDone, t, lang }) {
   const [showDone, setShowDone] = useState(false)
+  const [mailOpen, setMailOpen] = useState(false)
+  // The thank-yous and alerts sent about these messages (supabase/updates-2026-10-22-mail.sql); none before that SQL is run.
+  const [mails, setMails] = useState({})
+  useEffect(() => {
+    let on = true
+    listMail({ kinds: ['web_family', 'web_office'], limit: 500 }).then((rows) => {
+      if (!on) return
+      const by = {}
+      for (const r of rows) (by[r.ref_id] ||= []).push(r)
+      setMails(by)
+    }).catch(() => {})
+    return () => { on = false }
+  }, [messages.length])
   const sorted = [...messages].sort(byWaiting)
   const waiting = sorted.filter((m) => !m.done_at)
   const done = sorted.filter((m) => m.done_at)
@@ -58,19 +75,23 @@ export default function WebMessages({ messages, leads, busyId, onOpen, onDone, t
           </h2>
           <p className="text-xs text-slate-500">{t('ldWebSub')}</p>
         </div>
-        {done.length > 0 && (
-          <button type="button" className="btn-ghost text-xs" aria-expanded={showDone} onClick={() => setShowDone((v) => !v)}>
-            {showDone ? t('ldWebHideDone') : t('ldWebShowDone', { n: done.length })}
-          </button>
-        )}
+        <div className="flex flex-wrap gap-1">
+          <button type="button" className="btn-ghost text-xs" onClick={() => setMailOpen(true)}><Mail size={14} /> {t('mailButton')}</button>
+          {done.length > 0 && (
+            <button type="button" className="btn-ghost text-xs" aria-expanded={showDone} onClick={() => setShowDone((v) => !v)}>
+              {showDone ? t('ldWebHideDone') : t('ldWebShowDone', { n: done.length })}
+            </button>
+          )}
+        </div>
       </div>
+      {mailOpen && <MailSettings onClose={() => setMailOpen(false)} start="web_family" />}
       {shown.length === 0
         ? <p className="border-t border-slate-100 px-4 py-3 text-sm text-slate-400">{t('ldWebNone')}</p>
         : (
           <ul>
             {shown.map((m) => { const lead = leadForMessage(m, leads); return (
               <li key={m.id} className="border-t border-slate-100 p-4">
-                <WebMessage m={m} t={t} lang={lang} family={lead?.family} actions={<>
+                <WebMessage m={m} t={t} lang={lang} family={lead?.family} mails={mails[m.id] || null} actions={<>
                   <button type="button" className="btn-secondary" onClick={() => onOpen(m)}>{t(lead ? 'ldWebOpen' : 'ldWebAdd')}</button>
                   {m.done_at
                     ? <button type="button" className="btn-ghost" disabled={busyId === m.id} onClick={() => onDone(m, false)}><Undo2 size={16} /> {t('ldWebUndo')}</button>

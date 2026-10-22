@@ -10,14 +10,20 @@
 //   GH_WORKFLOW  optional, default deploy.yml
 // Setup: supabase/functions/newsletter-build/README.md
 //
-// POST { action: 'build' }   starts a build (office accounts only)
+// POST { action: 'build' }   starts a build (office accounts, or the admin@ mailer)
 // POST { action: 'status' }  the latest build: { status, conclusion, url, started }
+//
+// Who may call it: someone signed in to The Current with an office account, or
+// the mailer script in admin@ (scripts/mailer) with its key in the x-mailer-key
+// header: it starts a build when a scheduled newsletter goes on the website.
+// The function checks this itself, so it is deployed with Verify JWT off (the
+// mailer has no sign-in to send).
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-mailer-key',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
@@ -46,11 +52,21 @@ async function github(path: string, init: RequestInit = {}) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   try {
-    const auth = req.headers.get('Authorization') || ''
-    const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } })
-    const { data: office, error } = await db.rpc('adm_newsletter_office')
-    if (error) return reply({ error: `The newsletter is not set up in the database yet (${error.message}).` }, 503)
-    if (office !== true) return reply({ error: 'Only office accounts can rebuild the website.' }, 403)
+    // The public key the caller sent (as the facebook-post function does), else the project's own.
+    const apiKey = req.headers.get('apikey') || Deno.env.get('SUPABASE_ANON_KEY') || ''
+    const mailerKey = req.headers.get('x-mailer-key') || ''
+    if (mailerKey) {
+      const db = createClient(Deno.env.get('SUPABASE_URL')!, apiKey, { auth: { persistSession: false } })
+      const { data: okKey, error } = await db.rpc('adm_mailer_ok', { p_key: mailerKey })
+      if (error) return reply({ error: `The mailer is not set up in the database yet (${error.message}).` }, 503)
+      if (okKey !== true) return reply({ error: 'This mailer key is not the one in the database.' }, 403)
+    } else {
+      const auth = req.headers.get('Authorization') || ''
+      const db = createClient(Deno.env.get('SUPABASE_URL')!, apiKey, { global: { headers: { Authorization: auth } }, auth: { persistSession: false } })
+      const { data: office, error } = await db.rpc('adm_newsletter_office')
+      if (error) return reply({ error: `The newsletter is not set up in the database yet (${error.message}).` }, 503)
+      if (office !== true) return reply({ error: 'Only office accounts can rebuild the website.' }, 403)
+    }
 
     const { action } = await req.json().catch(() => ({ action: 'build' }))
     if (action === 'status') {

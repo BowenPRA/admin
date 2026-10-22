@@ -118,6 +118,7 @@ A database change is an SQL file that a person runs in Supabase (**SQL Editor** 
 | 2 October 2026 | Master Minds on Year 1 and Mr. Chiến for Movement (or three clicks on the live site instead) | Unconfirmed |
 | 8 October 2026 | Bowen's Year 7 Quarter 1 Science and Maths comments, two files | Unconfirmed; five students' comments and one Maths score still to write |
 | 16 October 2026 | The first Quarter 2 newsletters, English and Vietnamese, two files | Handed over on 16 October |
+| 22 October 2026 | Emails after website forms and scheduled newsletters (the outbox) | Handed over on 22 October, with the mailer to install in admin@ (`scripts/mailer/README.md`) |
 
 Also waiting: one Kindergarten student's legal first name, to be typed on the record by the office (21 September 2026; the name is in Claude's notes), and a yes or no on an extra update in the enrollment placing function that would touch enrolled students (item 10 of the 2 October review).
 
@@ -136,6 +137,7 @@ C:\Users\sbowe\Desktop\Admin Email\year7-q1-reports.sql
 C:\Users\sbowe\Desktop\Admin Email\year7-q1-reports-2.sql
 C:\Users\sbowe\Desktop\Admin Email\q2-week-1-newsletters.sql
 C:\Users\sbowe\Desktop\Admin Email\q2-week-1-vietnamese.sql
+C:\Users\sbowe\admin\supabase\updates-2026-10-22-mail.sql
 ```
 
 ### How to tell whether a file has run
@@ -153,7 +155,6 @@ As of 16 October 2026, checked with git and against the live site that day:
 - **The Current:** one commit, the newsletter editor's rename of The Palm Press to Student Blog (`2ab6f3a`), is committed but not pushed; it went live with the handbook's deploy on 16 October 2026. The handbook (this chapter included), the Handbook page and its checker are deployed but not committed yet.
 - **The website, the triage and the redirect:** nothing waiting on the laptop; each matches GitHub.
 - **The Year 7 Maths assessment paper** of 6 October 2026 is committed (`73e4794`); whether the live Assessments tab shows it was not checked.
-- **The newsletter build function** and its GitHub key are not set up. Until they are, a newly published issue appears on the website at the nightly build or with the next push.
 
 > **Rule:** `npm run deploy` publishes everything in the admin folder, committed or not. Before a deploy, check what is in the folder. If another session's unfinished work is there, wait for it, or deploy a clean copy.
 
@@ -178,7 +179,7 @@ A commit that is not pushed exists only on the laptop. Push once the work is che
 | Since | Decision | Notes |
 |---|---|---|
 | 16 October 2026 | Nga cannot own a lead | She is an office account in the script but not in `OFFICE_ACCOUNTS`. Whether that is intended is not known |
-| 16 October 2026 | Newsletter build function | Needs a GitHub key so the website rebuilds when an issue is published |
+| 22 October 2026 | The thank-you emails' wording | Written by Claude in plain English and Vietnamese, unread by Yvonne and by Vietnamese staff; no response time promised. Edit under **Enrollments** → **Emails** |
 | 7 October 2026 | A documents section on the student window | Passports and uploads reachable from the student's own record |
 | 1 October 2026 | Practice packets in the Assessments library | Keep them beside the assessment papers, or take them out |
 
@@ -248,6 +249,7 @@ From the website's own plan and notes, as of 16 October 2026. [The website chapt
 
 | Date | What happens | What to do before it |
 |---|---|---|
+| When GitHub emails | The GitHub key for website builds ("The Current: rebuild website", made 22 October 2026) expires | Make a new one and replace the `GH_TOKEN` secret (see [Behind the scenes](#/handbook/behind?s=the-facebook-function)) |
 | 30 October 2026 | Supabase stops giving new tables to the app's roles by itself | Nothing for you: every new SQL file grants its tables (the rule is in `supabase/README.md`) |
 | 26 November 2026 | The Thanksgiving card on the website's home page goes out of date | Prune it after the day |
 | 5 January 2027 | Google changes who may post to a group that limits posters | Make admin@ a Manager of the three parent lists and check allstaff@ (steps on To-Do #27; not checked since 15 October 2026) |

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CalendarDays, Check, ChevronRight, CircleDot, Eye, Globe, Newspaper, PencilLine, Plus, Users } from 'lucide-react'
+import { CalendarDays, Check, ChevronRight, CircleDot, Eye, Globe, Newspaper, PencilLine, Plus, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '../../lib/AuthContext'
 import { useData } from '../../lib/DataContext'
 import { useToast } from '../../lib/toast'
@@ -15,6 +15,8 @@ import { Empty, Modal, PageHeader, Segmented, Spinner } from '../../components/u
 import { useL } from '../../components/newsletter/bits'
 import { StatusChips, ownsCorner } from '../../components/newsletter/status'
 import { cornerCount } from '../../components/newsletter/EditorBits'
+import { JobChip, fmtWhen } from '../../components/newsletter/ScheduleBits'
+import { listNewsletterJobs, isApprover } from '../../lib/mail'
 
 export default function Newsletters() {
   const { isOffice } = useAuth()
@@ -23,6 +25,7 @@ export default function Newsletters() {
 
 function OfficeList() {
   const { L, lang } = useL()
+  const { me } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
   const { calendar, schedule, teachers } = useData()
@@ -39,9 +42,10 @@ function OfficeList() {
         const today = todayHoiAn()
         // Parts only for issues still being worked on, and the latest ones (the list's chips need them).
         const want = issues.filter((i) => i.status !== 'published' || i.issue_date >= today || issues.indexOf(i) < 6).map((i) => i.id)
-        const [parts, views] = await Promise.all([listParts(want), listViews(issues.filter((i) => i.status === 'published').map((i) => i.slug))])
-        if (on) setState({ issues, parts, views, error: '' })
-      } catch (e) { if (on) setState({ issues: [], parts: [], views: [], error: e.message || String(e) }) }
+        // Schedules come from the outbox; before its SQL is run there are none.
+        const [parts, views, jobs] = await Promise.all([listParts(want), listViews(issues.filter((i) => i.status === 'published').map((i) => i.slug)), listNewsletterJobs().catch(() => ({}))])
+        if (on) setState({ issues, parts, views, jobs, error: '' })
+      } catch (e) { if (on) setState({ issues: [], parts: [], views: [], jobs: {}, error: e.message || String(e) }) }
     })()
     return () => { on = false }
   }, [])
@@ -58,6 +62,7 @@ function OfficeList() {
   const upcoming = state.issues.filter((i) => i.issue_date >= today).sort((a, b) => a.issue_date.localeCompare(b.issue_date))
   const nextFriday = upcoming[0]?.issue_date
   const thisWeek = nextFriday ? upcoming.filter((i) => i.issue_date === nextFriday) : []
+  const toApprove = isApprover(me) ? state.issues.filter((i) => state.jobs?.[i.id]?.status === 'waiting') : []
   // The coming Friday: each newsletter not started for it yet gets a card that starts it in one click.
   const friday = fridayOf(today)
   const notStarted = Object.values(EDITIONS).filter((ed) => !state.issues.some((i) => i.edition === ed.id && String(i.issue_date).slice(0, 10) === friday))
@@ -80,14 +85,22 @@ function OfficeList() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={L('Newsletter', 'Bản tin')} subtitle={L('The Palm River Post and the Early Years newsletter. Publish puts an issue on pra.edu.vn, makes its PDFs and saves the email in admin@ Drafts.', 'The Palm River Post và bản tin Early Years. Khi đăng, số báo lên pra.edu.vn, có PDF và email được lưu trong Thư nháp admin@.')}>
+      <PageHeader title={L('Newsletter', 'Bản tin')} subtitle={L('The Palm River Post and the Early Years newsletter. Schedule sends an issue to families at a set time, once Seth or Bowen approves it. Publish puts it on pra.edu.vn now and saves the email in admin@ Drafts.', 'The Palm River Post và bản tin Early Years. Hẹn giờ: số báo được gửi cho gia đình đúng giờ đã chọn, sau khi thầy Seth hoặc thầy Bowen duyệt. Đăng: số báo lên pra.edu.vn ngay và email được lưu trong Thư nháp admin@.')}>
         <button className="btn-primary" disabled={!!state.error} onClick={() => setCreating(true)}><Plus size={16} />{L('New issue', 'Số mới')}</button>
       </PageHeader>
       {state.error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{state.error}</div>}
+      {toApprove.map((i) => (
+        <Link key={i.id} to={`/newsletter/${i.id}`} className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100/70">
+          <ShieldCheck size={18} className="flex-none" />
+          <b>{L(`${EDITIONS[i.edition].short}, ${issueLabel(i, 'en')}: waiting for your approval`, `${EDITIONS[i.edition].short}, ${issueLabel(i, 'vi')}: chờ bạn duyệt`)}</b>
+          <span>{L(`It is set to go ${fmtWhen(state.jobs[i.id].send_at, L)}. Open it, read the email, then Approve.`, `Hẹn gửi ${fmtWhen(state.jobs[i.id].send_at, L)}. Mở số báo, xem email, rồi bấm Duyệt.`)}</span>
+          <ChevronRight size={16} className="ml-auto flex-none" />
+        </Link>
+      ))}
 
       {!state.error && (thisWeek.length > 0 || notStarted.length > 0) && (
         <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {thisWeek.map((i) => <WeekCard key={i.id} issue={i} parts={partsOf.get(i.id) || []} L={L} lang={lang} />)}
+          {thisWeek.map((i) => <WeekCard key={i.id} issue={i} parts={partsOf.get(i.id) || []} job={state.jobs?.[i.id]} L={L} lang={lang} />)}
           {notStarted.map((ed) => (
             <div key={ed.id} className="card flex flex-col gap-3 border-dashed p-4">
               <div className="flex items-center gap-2">
@@ -124,7 +137,7 @@ function OfficeList() {
                         <b className="block text-slate-800">{issueLabel(i, lang)}</b>
                         <span className="text-xs text-slate-500">{longDay(i.issue_date, lang)}{i.settings?.subject ? ` · ${i.settings.subject}` : ''}</span>
                       </span>
-                      <span className="flex-none">{ps ? <StatusChips issue={i} parts={ps} L={L} /> : i.status === 'published' ? <span className="chip bg-green-100 text-green-800"><Globe size={12} className="mr-1" />{L('Published', 'Đã đăng')}</span> : null}</span>
+                      <span className="inline-flex flex-none flex-wrap gap-1">{ps ? <StatusChips issue={i} parts={ps} L={L} /> : i.status === 'published' ? <span className="chip bg-green-100 text-green-800"><Globe size={12} className="mr-1" />{L('Published', 'Đã đăng')}</span> : null}<JobChip job={state.jobs?.[i.id]} L={L} /></span>
                       <span className="w-28 flex-none text-right text-xs text-slate-500">{v ? <span className="inline-flex items-center gap-1" title={L('Page openings counted by the website', 'Số lượt mở trang')}><Eye size={13} />{v.total}</span> : ''}</span>
                       <ChevronRight size={16} className="hidden flex-none text-slate-300 sm:block" />
                     </Link>
@@ -142,7 +155,7 @@ function OfficeList() {
 }
 
 /** This Friday's issue: what is left to do, in order. */
-function WeekCard({ issue, parts, L, lang }) {
+function WeekCard({ issue, parts, job, L, lang }) {
   const ed = EDITIONS[issue.edition]
   const st = statusOf(issue, parts)
   const c = issueChecks(issue, parts)
@@ -151,15 +164,22 @@ function WeekCard({ issue, parts, L, lang }) {
     !HIDDEN_PARTS.includes('class') && { done: corners.total === 0 || corners.done === corners.total, text: L(`Class corners: ${corners.done} of ${corners.total}`, `Góc lớp: ${corners.done}/${corners.total}`), sub: corners.missing.length ? corners.missing.join(', ') : '' },
     { done: issue.status !== 'draft', text: L('English done', 'Xong tiếng Anh'), sub: c.noOpening ? L('no opening yet', 'chưa có mở đầu') : '' },
     { done: issue.status !== 'draft' && !c.needVi.length, text: L(c.needVi.length ? `Vietnamese: ${c.needVi.length} part${c.needVi.length > 1 ? 's' : ''} left` : 'Vietnamese', c.needVi.length ? `Tiếng Việt: còn ${c.needVi.length} phần` : 'Tiếng Việt') },
-    { done: issue.status === 'published', text: L('Published', 'Đã đăng'), sub: st === 'changed' ? L('changed since', 'đã sửa sau đó') : '' },
-    { done: !!issue.email?.saved_at, text: L('Email draft saved: send at 16:30', 'Đã lưu thư nháp: gửi lúc 16:30') },
+    job && job.status !== 'cancelled'
+      ? { done: ['ready', 'sending', 'sent'].includes(job.status),
+        text: job.status === 'waiting' ? L('Scheduled: waiting for Seth or Bowen to approve', 'Đã hẹn giờ: chờ thầy Seth hoặc thầy Bowen duyệt')
+          : job.status === 'sent' ? L(`Emailed to families ${fmtWhen(job.sent_at, L)}`, `Đã gửi cho gia đình ${fmtWhen(job.sent_at, L)}`)
+            : job.status === 'failed' ? L('The scheduled email was not sent', 'Email đã hẹn chưa gửi được')
+              : L(`Approved: goes ${fmtWhen(job.send_at, L)}`, `Đã duyệt: gửi ${fmtWhen(job.send_at, L)}`),
+        sub: st === 'changed' ? L('changed since', 'đã sửa sau đó') : '' }
+      : { done: issue.status === 'published', text: L('Published or scheduled', 'Đã đăng hoặc hẹn giờ'), sub: st === 'changed' ? L('changed since', 'đã sửa sau đó') : '' },
+    !job && { done: !!issue.email?.saved_at, text: L('Email draft saved: send at 16:30', 'Đã lưu thư nháp: gửi lúc 16:30') },
   ].filter(Boolean)
   return (
     <Link to={`/newsletter/${issue.id}`} className="card block p-4 hover:border-pra-sky">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="grid h-9 w-9 place-items-center rounded-lg text-white" style={{ background: TONES[ed.tone].main }}><Newspaper size={18} /></span>
-        <div className="min-w-0 flex-1"><b className="block text-slate-800">{L(ed.name.en, ed.name.vi)}</b><span className="text-xs text-slate-500">{issueLabel(issue, lang)} · {enDay(issue.issue_date)}</span></div>
-        <StatusChips issue={issue} parts={parts} L={L} />
+        <div className="min-w-0 flex-1 basis-48"><b className="block text-slate-800">{L(ed.name.en, ed.name.vi)}</b><span className="text-xs text-slate-500">{issueLabel(issue, lang)} · {enDay(issue.issue_date)}</span></div>
+        <StatusChips issue={issue} parts={parts} L={L} /><JobChip job={job} L={L} />
       </div>
       <ol className="space-y-1">
         {steps.map((s, k) => (

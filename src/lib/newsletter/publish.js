@@ -1,11 +1,13 @@
 // Publish: puts an issue on pra.edu.vn, makes its PDFs and saves its email as a
-// Gmail draft in admin@ (the office sends it). Also: take an issue off the
-// website, and start a website build. Every step can be run again.
+// Gmail draft in admin@ (the office sends it). Schedule: the same, kept in the
+// outbox until its time, then sent by the mailer script in admin@. Also: take an
+// issue off the website, and start a website build. Every step can be run again.
 
 import { supabase, hasSupabase } from '../supabaseClient.js'
 import { createDraftUpload, gmailConfigured, getToken } from '../gmail.js'
 import { EDITIONS, SITE } from './constants.js'
-import { buildPayload, fingerprint, issueChecks, sortParts } from './payload.js'
+import { buildPayload, fingerprint, issueChecks, sortParts, statusOf } from './payload.js'
+import { scheduleNewsletter } from '../mail.js'
 import { getIssue, listParts, patchIssue, setIssueSetting, newsletterError } from './data.js'
 import { photoLink, preparePhotoLinks, publishPhotos, publishedPhotoLink, putPublic, removePublicFolder } from './photos.js'
 
@@ -65,17 +67,14 @@ export async function pageIsLive(slug, lang = 'en', mark = '') {
 }
 
 /**
- * Publishes an issue. Steps (onStep(name, detail)): 'photos', 'pdf', 'save', 'build'.
- * Everything is made from the issue as it is in the database at that moment (read
- * again here), so a teacher's last sentence saved a few seconds ago is in it.
+ * Makes everything a publish needs without publishing: the photos and the two PDFs
+ * in the issue's public folder, and the two payloads. `issue` and `parts` are fresh
+ * from the database. Steps (onStep(name, detail)): 'photos', 'pdf'.
  * The PDFs leave out families-only parts: the website links to them, and they are
  * the ones attached to the email (whose text still has the families-only parts).
  * Earlier rounds' photos and PDFs stay where they are, so emails already sent keep their pictures.
- * Returns { issue, parts, pub, fam, pdfs: { en: { blob, name, url }, vi }, build }.
  */
-export async function publishIssue(issue0, parts0, { onStep = () => {} } = {}) {
-  const [issue, parts] = await Promise.all([getIssue(issue0.id), listParts(issue0.id)])
-  if (!issue) throw new Error('This issue no longer exists.')
+async function prepareIssue(issue, parts, { onStep = () => {}, publishedAt = null } = {}) {
   const unchecked = issueChecks(issue, parts).unchecked.length
   if (unchecked) throw new Error(`${unchecked} photo${unchecked > 1 ? 's were' : ' was'} added a moment ago and ${unchecked > 1 ? 'are' : 'is'} not checked against the no-photo list yet. The editor shows ${unchecked > 1 ? 'them' : 'it'} now: check, then publish again.`)
   const round = (issue.publish_count || 0) + 1
@@ -99,18 +98,67 @@ export async function publishIssue(issue0, parts0, { onStep = () => {} } = {}) {
     pdfs[lang] = { blob, name, url: await putPublic(`${issue.slug}/r${round}-${name}`, blob, 'application/pdf') }
   }
   const pdf = { en: pdfs.en.url, vi: pdfs.vi.url }
+  const at = issue.published_at || publishedAt || new Date().toISOString()
+  const pub = buildPayload(issue, parts, { audience: 'public', photo, pdf, publishedAt: at })
+  const fam = { ...fam0, pdf, published_at: at }
+  return { pub, fam, pdfs, round, print: fingerprint(issue, parts) }
+}
+
+/**
+ * Publishes an issue. Steps (onStep(name, detail)): 'photos', 'pdf', 'save', 'build'.
+ * Everything is made from the issue as it is in the database at that moment (read
+ * again here), so a teacher's last sentence saved a few seconds ago is in it.
+ * Returns { issue, parts, pub, fam, pdfs: { en: { blob, name, url }, vi }, build }.
+ */
+export async function publishIssue(issue0, parts0, { onStep = () => {} } = {}) {
+  const [issue, parts] = await Promise.all([getIssue(issue0.id), listParts(issue0.id)])
+  if (!issue) throw new Error('This issue no longer exists.')
+  const { pub, fam, pdfs, round, print } = await prepareIssue(issue, parts, { onStep })
 
   onStep('save')
-  const at = new Date().toISOString()
-  const pub = buildPayload(issue, parts, { audience: 'public', photo, pdf, publishedAt: issue.published_at || at })
-  const fam = { ...fam0, pdf, published_at: issue.published_at || at }
-  await setIssueSetting(issue.id, 'published_print', fingerprint(issue, parts))
+  await setIssueSetting(issue.id, 'published_print', print)
   const saved = await patchIssue(issue.id, { status: 'published', published: pub, publish_count: round })
 
   onStep('build')
   let build
   try { build = await startBuild() } catch (e) { build = { error: e.message } }
   return { issue: saved, parts, pub, fam, pdfs, build }
+}
+
+// Gmail takes 25 MB in all; the email's own text and photos links need a little of it.
+const ATTACH_MAX = 22 * 1024 * 1024
+
+/**
+ * Schedules an issue to go out at `sendAt` (supabase/updates-2026-10-22-mail.sql):
+ * prepares it as Publish does (photos, PDFs, the page) and makes the email, then
+ * puts both in the outbox. The page goes on the website ten minutes before the
+ * email, which the mailer script in admin@ sends to the edition's groups once Seth
+ * or Bowen has approved it (their own scheduling counts). An issue already on the
+ * website and unchanged only has its email scheduled.
+ * Steps (onStep(name, detail)): 'photos', 'pdf', 'email', 'schedule'. Returns the outbox row.
+ */
+export async function scheduleIssue(issue0, parts0, sendAt, { me, onStep = () => {} } = {}) {
+  const [issue, parts] = await Promise.all([getIssue(issue0.id), listParts(issue0.id)])
+  if (!issue) throw new Error('This issue no longer exists.')
+  const { newsletterEmail } = await import('./email.js')
+  const { newsletterPdfName } = await import('./pdf.js')
+  let fam, pending = null, round = null, print, attachments
+  if (statusOf(issue, parts) === 'published') {
+    fam = publishedFamilies(issue, parts)
+    print = issue.settings?.published_print || fingerprint(issue, parts)
+    attachments = ['en', 'vi'].filter((l) => fam.pdf?.[l]).map((l) => ({ url: fam.pdf[l], name: newsletterPdfName(fam, l) }))
+  } else {
+    const prep = await prepareIssue(issue, parts, { onStep, publishedAt: new Date(sendAt).toISOString() })
+    const size = prep.pdfs.en.blob.size + prep.pdfs.vi.blob.size
+    if (size > ATTACH_MAX) throw new Error(`The two PDFs come to ${(size / 1048576).toFixed(0)} MB, too big for one email. Use fewer photos in this issue, then schedule again.`)
+    ;({ fam, round, print } = prep)
+    pending = prep.pub
+    attachments = ['en', 'vi'].map((l) => ({ url: prep.pdfs[l].url, name: prep.pdfs[l].name }))
+  }
+  onStep('email')
+  const { subject, html, text } = newsletterEmail(fam)
+  onStep('schedule')
+  return scheduleNewsletter({ issue, sendAt: new Date(sendAt).toISOString(), mail: { subject, html, text, attachments }, pending, round, print, me })
 }
 
 /** Takes an issue off the website: its page, its public photos and PDFs. The issue itself stays. */

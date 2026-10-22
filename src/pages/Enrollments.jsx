@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Mail } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/AuthContext'
@@ -10,6 +11,7 @@ import { placeOf, byReceived, birthdayLine, flagsOf, enrollmentError } from '../
 import { useOnboardingSources } from '../lib/useOnboardingSources'
 import { Card, Checkbox, Chip, Empty, PageHeader, SearchInput, Spinner } from '../components/ui'
 import EnrollmentModal from '../components/enrollments/EnrollmentModal'
+import MailSettings from '../components/mail/MailSettings'
 
 const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
 
@@ -31,6 +33,7 @@ export default function Enrollments() {
   const [state, setState] = useState(null)
   const [q, setQ] = useState('')
   const [toCheck, setToCheck] = useState(false)
+  const [mailOpen, setMailOpen] = useState(false)
   // A link from a student's checklist opens their form: /enrollments?form=<id>.
   const [openId, setOpenId] = useState(() => params.get('form'))
 
@@ -80,7 +83,9 @@ export default function Enrollments() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={t('enrollNav')} subtitle={t('enSubtitle')} />
+      <PageHeader title={t('enrollNav')} subtitle={t('enSubtitle')}>
+        <button type="button" className="btn-secondary" onClick={() => setMailOpen(true)}><Mail size={16} /> {t('mailButton')}</button>
+      </PageHeader>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
@@ -145,6 +150,7 @@ export default function Enrollments() {
         )}
       </Card>
 
+      {mailOpen && <MailSettings onClose={() => setMailOpen(false)} start="enroll_family" />}
       {open && (
         <EnrollmentModal value={open} student={studentById[open.student_id]} isSuper={isSuper} onClose={closeForm}
           onCheck={check} onMakeStudent={makeStudent} onDelete={remove} checklist={checklist} t={t} lang={lang} />
