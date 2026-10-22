@@ -4,7 +4,7 @@ A progress report is the one-page document each family receives for each child a
 
 - One report per enrolled student per quarter, made and written in The Current on **Teaching** → **Reports**. Its printed title is "Learning Progress Report" ("Báo cáo Tiến bộ Học tập" on the Vietnamese page).
 - It is always one A4 page. A report set to "English and Vietnamese" also prints a separate Vietnamese page. The two languages are never on the same page.
-- From top to bottom: the header with the student's photo (cropped to a circle), the legal first name with the nickname in quotes, the year group and the quarter; the key to the five levels; the learning areas, grouped by tier; the learner skills ("How I learn"); the homeroom comment; the review scores, where the year group has them; the closing message; the two signature lines; the legal line at the foot.
+- From top to bottom: the header with the student's photo (cropped to a circle), the full name with the nickname in quotes under it, the year group and the quarter; the key to the five levels; the learning areas, grouped by tier; the learner skills ("How I learn"); the homeroom comment; the review scores, where the year group has them; the closing message; the two signature lines; the legal line at the foot.
 - The PDF a teacher sees in the editor's preview is the same file the family receives.
 - Only Enrolled students get a report. Pending and Past students are not offered when reports are made.
 
@@ -95,7 +95,7 @@ A template is the set of learning areas one stage's reports contain. The templat
 
 A vocational area can be ticked in Report settings to take an individual comment instead of the course description. It still prints with the other vocational areas. Early Years Physical Development is the only one.
 
-A vocational area can instead have a **Fixed course description** in Report settings. That text prints on every report with the area, every quarter, under "About the class:", and teachers only pick a level. Movement is the only one (since 22 October 2026). Leave the box empty for a description written each quarter.
+A vocational area can instead have a **Fixed course description** in Report settings. That text prints on every report with the area, every quarter, under "Topics covered:" like the other course descriptions, and teachers only pick a level. Movement is the only one (since 22 October 2026; trimmed that evening to about 250 characters, the length of the others). Leave the box empty for a description written each quarter.
 
 On the Teachers page, the Reports page and the editor, a violet speech-bubble icon means "comments to write" and a green page icon means "a course description to write". An academic area has both. An area with a fixed description shows a grey "Level only" tag.
 
@@ -194,7 +194,8 @@ There is no Upper Secondary template, so Upper Secondary students get no report 
 
 ### Names
 
-- Use the student's legal first name, never the nickname, with the Vietnamese accents where the name has them. The printed header shows the nickname in quotes after the legal name.
+- Use the student's legal first name, never the nickname, with the Vietnamese accents where the name has them. The printed header shows the full name and, under it, the nickname in quotes. The nickname is left out when it is already part of the name (Anaya Bisht, "Anaya"), accents and capitals aside. A full name too long for one line breaks before the first name ("Bùi Nguyễn" / "Nhã Vy"), or else where the two lines come out most even.
+- As a report prints, small slips are tidied without changing what is saved: double spaces, a space before a comma or full stop, and a missing full stop at the end of a comment or course description.
 - For a Vietnamese name, the first name is the last two words of the full name: the full name starts with the family name, and the middle and given names together are the first name.
 - The legal first name is on the student record: **Students** → the student → **Personal** → legal first name used on reports. If it is blank, The Current works it out from the full name. Check that guess for every name that is not in the usual Vietnamese form before reports are made.
 

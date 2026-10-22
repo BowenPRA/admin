@@ -128,7 +128,7 @@ function SettingsForm({ initial }) {
               {sub.kind === 'vocational' && <div className="sm:col-span-6"><Checkbox checked={!!sub.comment} onChange={(v) => set(`subjects.${i}.comment`, v)} label="Individual comment for each student instead of the course description (still prints with the vocational areas)" /></div>}
               {sub.kind === 'vocational' && !sub.comment && (
                 <div className="grid gap-2 sm:col-span-6 sm:grid-cols-2">
-                  <Field label="Fixed course description" hint="Optional. Prints on every report with this area, every quarter, so teachers only pick a level and nobody writes a description. Leave blank for one written each quarter. About 370 characters fits (Movement's).">
+                  <Field label="Fixed course description" hint="Optional. Prints on every report with this area, every quarter, so teachers only pick a level and nobody writes a description. Leave blank for one written each quarter. About 250 characters matches the other course descriptions (Movement's); up to about 370 fits.">
                     <TextArea rows={4} value={sub.description || ''} onChange={(v) => set(`subjects.${i}.description`, v)} />
                   </Field>
                   <Field label="Fixed course description (Vietnamese)" hint="Printed on Vietnamese reports.">

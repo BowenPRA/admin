@@ -34,6 +34,17 @@ export function guessFirstName(fullName, nickname) {
   return words[0]
 }
 
+/**
+ * True when the nickname adds nothing to the names printed beside it: it is
+ * already one of their words, accents and case aside ("Anaya" in "Anaya
+ * Bisht", "Helios" in "Lamberti Helios Serge"). Reports then leave it out.
+ */
+export function nicknameInName(nickname, ...names) {
+  const words = (s) => ` ${foldName(s).replace(/[^a-z0-9]+/g, ' ').trim()} `
+  const nick = words(nickname).trim()
+  return !!nick && names.some((n) => words(n).includes(` ${nick} `))
+}
+
 /** { name, guessed } — the stored legal first name, or the guess from the full name. */
 export function legalFirstName(student) {
   const stored = String(student?.first_name || '').trim()

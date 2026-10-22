@@ -32,10 +32,18 @@
 // vocational cards in Years 2 to 7): every year group from Nursery to Year 8,
 // at every limit and at 85%, in both languages, came out at exactly the
 // comment size it had before, nothing cut, Movement's text at the usual 7.2pt.
+// Checked again that evening with the eight real Year 1 Q1 reports, after the
+// student's name block changed (nickname left out when it is part of the name,
+// long names broken before the first name) and text boxes were tidied: every
+// page had the same line count as the downloaded copy, nothing cut. Movement's
+// description was then cut to 246 characters (under "Topics covered:" like the
+// others) and Mr. Chiến named on its card: Year 1 at every limit rose from 7.75pt
+// to 8pt (Vietnamese from 7.5pt), Years 3, 6 and 7 unchanged, nothing cut.
 
 import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor, fixedDescription } from './utils'
 import { reportStrings, reportTitle, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
 import { partialFrom } from '../studentRecords'
+import { foldName, nicknameInName } from '../names'
 
 // One family of deep, saturated colours, all at a similar depth so no part
 // shouts louder than another: brand blue and green, with teal, orange and
@@ -109,6 +117,16 @@ const T = (size, o = {}) => ({
   ...(o.spacing && { characterSpacing: o.spacing }),
   ...(o.align && { alignment: o.align }),
 })
+/**
+ * Small typing slips tidied as a comment or description is set, so every box
+ * ends alike: one space between words, none before a comma or full stop, and a
+ * full stop at the end when the text stops on a letter or number.
+ */
+const tidy = (text) => {
+  const s = String(text || '').replace(/[^\S\n]{2,}/g, ' ').replace(/[^\S\n]+([,.;:!?])/g, '$1').trim()
+  return /[\p{L}\p{N}]$/u.test(s) ? `${s}.` : s
+}
+
 /** Top of a single line whose letters are centred on `cy` (capitals, or mixed text). */
 const midTop = (cy, size, caps = false) => cy - (ASC - (caps ? CAP : (CAP + XH) / 2) / 2) * size
 
@@ -387,7 +405,7 @@ function buildPage(item, M, { proof, icons = {} }) {
   const TOPICS = { base: F.topics, min: F.topicsMin, style: { pitch: 1.22, color: C.topics }, label: t.topicsCovered }
   const picked = (en, v) => {
     const p = pick(en, v)
-    return { content: (p.text || '').trim(), missing: p.missing }
+    return { content: tidy(p.text), missing: p.missing }
   }
 
   // ---------- small pieces ----------
@@ -627,7 +645,7 @@ function buildPage(item, M, { proof, icons = {} }) {
     return {
       ...(desc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, head, kick, teacher, titleW, teacherBeside, titleBeside, teacherBesidePill, pillH: pillBox.h,
       name: `${sub.name} ${desc ? 'course description' : 'comment'}`, w: cw - 16,
-      label: fixed ? t.aboutClass : desc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
+      label: desc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
       ...(desc ? picked(note?.description, note?.description_vi) : picked(s.comment, s.comment_vi)),
     }
   })]))
@@ -692,21 +710,36 @@ function buildPage(item, M, { proof, icons = {} }) {
     put(X, midTop(photoY + photoD / 2, 14, true), photoD, { text: initials, ...T(14, { bold: true, color: C.initials, align: 'center', pitch: 1 }) })
   }
   const infoX = X + photoD + 8
-  const nameSizes = [F.name, 10, 9.5, 9]
-  const nameNode = (s) => ({ text: student?.full_name || report.student_name || '', ...T(s, { bold: true, color: C.navy, pitch: 1.12 }) })
-  const nameFit = nameSizes.map((s) => M.height(nameNode(s), infoW))
-  const nameI = Math.max(0, nameFit.findIndex((h, i) => h <= nameSizes[i] * 1.12 * 2 + 0.5))
+  // The full name on one line where it fits (set a touch smaller if need be). A longer
+  // one breaks before the first name ("Bùi Nguyễn / Nhã Vy"), or else where the two
+  // lines come out most even, so no word is left on a line of its own.
+  const fullName = student?.full_name || report.student_name || ''
+  const nameStyle = (s) => T(s, { bold: true, color: C.navy, pitch: 1.12 })
+  const fullW = (text, s) => M.width({ text, ...nameStyle(s) })
+  const nameBreak = (s) => {
+    const words = fullName.split(/\s+/).filter(Boolean)
+    const splits = words.slice(1).map((_, i) => [words.slice(0, i + 1).join(' '), words.slice(i + 1).join(' ')])
+      .filter((p) => p.every((l) => fullW(l, s) <= infoW))
+    const longer = (p) => Math.max(fullW(p[0], s), fullW(p[1], s))
+    const best = splits.find((p) => foldName(p[1]) === foldName(nick)) || splits.sort((a, b) => longer(a) - longer(b))[0]
+    return best && best.join('\n')
+  }
+  const nameText = [F.name, 10, 9.75].map((s) => fullW(fullName, s) <= infoW && { s, text: fullName }).find(Boolean)
+    || [F.name, 10, 9.5, 9].map((s) => nameBreak(s) && { s, text: nameBreak(s) }).find(Boolean)
+    || { s: 9, text: fullName }
+  const nameNode = { text: nameText.text, ...nameStyle(nameText.s) }
+  const fullH = M.height(nameNode, infoW)
   const infoPitch = F.info * 1.24
   const infoLines = [
-    student?.nickname && { text: `"${student.nickname}"`, style: { color: C.muted } },
+    student?.nickname && !nicknameInName(student.nickname, fullName, nick) && { text: `"${student.nickname}"`, style: { color: C.muted } },
     { text: yearGroup, style: { bold: true } },
     homeroomTeacher && { text: [`${t.homeroom}: `, { text: homeroomTeacher, bold: true }], style: {} },
     // A partial-day student joins after the morning (academic) lessons, which is why the page has none.
     partialFrom(student) && { text: [`${t.partialDay} `, { text: partialFrom(student), bold: true }], style: { color: C.muted } },
   ].filter(Boolean)
-  let infoY = y + (hrH - (nameFit[nameI] + 2 + infoLines.length * infoPitch)) / 2
-  put(infoX, infoY, infoW, nameNode(nameSizes[nameI]))
-  infoY += nameFit[nameI] + 2
+  let infoY = y + (hrH - (fullH + 2 + infoLines.length * infoPitch)) / 2
+  put(infoX, infoY, infoW, nameNode)
+  infoY += fullH + 2
   infoLines.forEach((l) => { put(infoX, infoY, infoW, oneLine(l.text, F.info, infoW, l.style).node); infoY += infoPitch })
 
   rect(hrX, y, hrW, hrH, { r: 9, fill: C.homeroomFill, stroke: C.homeroomLine })

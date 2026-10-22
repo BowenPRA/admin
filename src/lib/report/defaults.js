@@ -66,10 +66,13 @@ const PRIMARY_YEARS = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6
 const YEARS_2_TO_6 = PRIMARY_YEARS.slice(1)
 const LOWER_SECONDARY_YEARS = ['Year 7', 'Year 8', 'Year 9']
 
-// Movement's description, from Bowen (22 October 2026). It is longer than a
-// course description teachers write (TEXT_LIMITS.vocational_topics).
-const MOVEMENT_DESCRIPTION = 'Movement and Exercise gives students opportunities to develop physical coordination, agility, dexterity, and body awareness through warm-ups, stretching, movement activities, and collaborative games. Students explore movement, practice adapting to changing situations, and engage in activities that encourage quick thinking, problem-solving, and teamwork.'
-const MOVEMENT_DESCRIPTION_VI = 'Giờ Vận động giúp học viên phát triển khả năng phối hợp, sự nhanh nhẹn, khéo léo và cảm nhận về cơ thể qua các bài khởi động, giãn cơ, hoạt động vận động và trò chơi đồng đội. Học viên khám phá nhiều cách vận động, tập thích ứng khi tình huống thay đổi và tham gia các hoạt động rèn khả năng suy nghĩ nhanh, giải quyết vấn đề và làm việc nhóm.'
+// Movement's description, from Bowen (22 October 2026), trimmed that evening to
+// the length and "Developing ..." style of the other course descriptions.
+const MOVEMENT_DESCRIPTION = 'Developing physical coordination, agility, dexterity, and body awareness through warm-ups, stretching, movement activities, and collaborative games. Students practice adapting to changing situations, quick thinking, problem-solving, and teamwork.'
+const MOVEMENT_DESCRIPTION_VI = 'Phát triển khả năng phối hợp, sự nhanh nhẹn, khéo léo và cảm nhận về cơ thể qua các bài khởi động, giãn cơ, hoạt động vận động và trò chơi đồng đội. Học viên tập thích ứng khi tình huống thay đổi, rèn khả năng suy nghĩ nhanh, giải quyết vấn đề và làm việc nhóm.'
+// The first wording, replaced in saved settings that still hold it (version 12).
+const MOVEMENT_DESCRIPTION_OLD = 'Movement and Exercise gives students opportunities to develop physical coordination, agility, dexterity, and body awareness through warm-ups, stretching, movement activities, and collaborative games. Students explore movement, practice adapting to changing situations, and engage in activities that encourage quick thinking, problem-solving, and teamwork.'
+const MOVEMENT_DESCRIPTION_VI_OLD = 'Giờ Vận động giúp học viên phát triển khả năng phối hợp, sự nhanh nhẹn, khéo léo và cảm nhận về cơ thể qua các bài khởi động, giãn cơ, hoạt động vận động và trò chơi đồng đội. Học viên khám phá nhiều cách vận động, tập thích ứng khi tình huống thay đổi và tham gia các hoạt động rèn khả năng suy nghĩ nhanh, giải quyết vấn đề và làm việc nhóm.'
 
 // The vocational class names before 22 October 2026, and the "Life Skills" names
 // built from them (last year's pattern, as "Intensive English in Life Skills: Technology").
@@ -238,7 +241,7 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
-const SETTINGS_VERSION = 11
+const SETTINGS_VERSION = 12
 
 export const DEFAULT_REPORT_SETTINGS = {
   version: SETTINGS_VERSION,
@@ -419,6 +422,12 @@ export function normalizeReportSettings(stored) {
       if (sub.name === old[0]) sub.name = lifeSkills(sub.key).name
       if (sub.name_vi === old[1]) sub.name_vi = lifeSkills(sub.key).name_vi
     }
+  }
+  if ((Number(v.version) || 1) < 12 && v.subjects) {
+    // Movement's shorter description; a description someone changed stays.
+    const movement = subjects.find((sub) => sub.key === 'movement')
+    if (movement?.description === MOVEMENT_DESCRIPTION_OLD) movement.description = MOVEMENT_DESCRIPTION
+    if (movement?.description_vi === MOVEMENT_DESCRIPTION_VI_OLD) movement.description_vi = MOVEMENT_DESCRIPTION_VI
   }
   let levels = s.levels
   if ((Number(v.version) || 1) < 7 && ['EPCM', 'EPCAM'].includes((v.levels || []).map((l) => l.code).join(''))) levels = LEVELS.map((l) => ({ ...l }))
