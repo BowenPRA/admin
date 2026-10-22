@@ -188,6 +188,15 @@ Under **Office**.
 - **Who sees it:** office accounts. Only the Super Admin can delete a form.
 - Deeper: [Students, families and enrollment](#/handbook/students?s=enrollment-forms).
 
+### Emails
+
+Under **Office**. Added on 22 October 2026.
+
+- **What it is for:** everything The Current emails by itself from admin@. That is the thank-you to each family who sends a form on pra.edu.vn, the alert to Yvonne and admin@, scheduled newsletters and their tests, and the notes to Seth and Bowen.
+- **Main things you do:** read the **Outbox**, newest first. The filters are To families, Office alerts, Newsletters and Not sent; you can search an address or subject. Each email has **Open** (the form, the Leads page or the issue it is about), **See** (the email itself) and **Gmail** (the copy in admin@'s Sent). An email that did not go has **Send again**. The line at the top says whether the mailer in admin@ is running; it checks in every five minutes. The other tabs hold the wording of the two thank-yous, with a preview, and who gets the office alerts: change, then **Save the wording**.
+- **Who sees it:** office accounts.
+- Deeper: [Students, families and enrollment](#/handbook/students?s=the-emails-after-a-form), and [Behind the scenes](#/handbook/behind?s=the-mailer-in-admin) for the mailer.
+
 ### Photos
 
 Under **Outreach**.

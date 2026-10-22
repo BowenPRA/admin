@@ -179,7 +179,7 @@ A commit that is not pushed exists only on the laptop. Push once the work is che
 | Since | Decision | Notes |
 |---|---|---|
 | 16 October 2026 | Nga cannot own a lead | She is an office account in the script but not in `OFFICE_ACCOUNTS`. Whether that is intended is not known |
-| 22 October 2026 | The thank-you emails' wording | Written by Claude in plain English and Vietnamese, unread by Yvonne and by Vietnamese staff; no response time promised. Edit under **Enrollments** → **Emails** |
+| 22 October 2026 | The thank-you emails' wording | Written by Claude in plain English and Vietnamese, unread by Yvonne and by Vietnamese staff; no response time promised. Edit under **Office** → **Emails** |
 | 7 October 2026 | A documents section on the student window | Passports and uploads reachable from the student's own record |
 | 1 October 2026 | Practice packets in the Assessments library | Keep them beside the assessment papers, or take them out |
 

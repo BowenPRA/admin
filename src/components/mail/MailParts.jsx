@@ -1,73 +1,14 @@
-import { useEffect, useState } from 'react'
-import { CircleAlert, CircleCheck, Eye, Inbox, LoaderCircle, Mail, RotateCcw, Save } from 'lucide-react'
-import { useAuth } from '../../lib/AuthContext'
-import { useToast } from '../../lib/toast'
-import { listTemplates, saveTemplate, listMail, mailerStatus, withAge, retryMail, openMail, gmailLink, renderFamily, sampleVars, SPOTS, DEFAULT_TEMPLATES, MAIL_KINDS, MAIL_STATUS, MAILER_LATE_MINUTES } from '../../lib/mail'
-import { useL } from '../newsletter/bits'
-import { Chip, Modal, Segmented, Spinner } from '../ui'
+import { useState } from 'react'
+import { CircleAlert, CircleCheck, Inbox } from 'lucide-react'
+import { renderFamily, sampleVars, SPOTS, MAILER_LATE_MINUTES } from '../../lib/mail'
+import { Segmented } from '../ui'
 
-const TABS = ['enroll_family', 'web_family', 'office', 'outbox']
+// The pieces of the Emails page (src/pages/Emails.jsx): the wording of the two
+// thank-yous with a preview, who gets the office alerts, and whether the mailer
+// script in admin@ is running.
 
-/**
- * The emails The Current sends by itself (supabase/updates-2026-10-22-mail.sql):
- * the wording of the two thank-yous, who gets the office alerts, and the outbox
- * with whether the mailer script in admin@ is running. `start` picks the first tab.
- */
-export default function MailSettings({ onClose, start = 'enroll_family' }) {
-  const { L } = useL()
-  const toast = useToast()
-  const { isOffice } = useAuth()
-  const [tab, setTab] = useState(start)
-  const [tpls, setTpls] = useState(null)
-  const [draft, setDraft] = useState(null)
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    listTemplates().then((t) => { setTpls(t); setDraft(structuredClone(t)) }).catch((e) => setError(e.message))
-  }, [])
-  const dirty = tpls && draft && TABS.slice(0, 3).some((k) => JSON.stringify(strip(draft[k])) !== JSON.stringify(strip(tpls[k])))
-  const save = async () => {
-    setSaving(true)
-    try {
-      const out = { ...tpls }
-      for (const k of TABS.slice(0, 3)) {
-        if (JSON.stringify(strip(draft[k])) !== JSON.stringify(strip(tpls[k]))) out[k] = await saveTemplate(k, draft[k])
-      }
-      setTpls(out); setDraft(structuredClone(out))
-      toast(L('Saved. Forms from now on use the new wording.', 'Đã lưu. Các đơn từ bây giờ dùng nội dung mới.'))
-    } catch (e) { toast.error(e.message) } finally { setSaving(false) }
-  }
-  const close = () => { if (!dirty || confirm(L('Close without saving the changes?', 'Đóng mà không lưu thay đổi?'))) onClose() }
-  const set = (key, fn) => setDraft((d) => ({ ...d, [key]: fn(structuredClone(d[key] || DEFAULT_TEMPLATES[key])) }))
-
-  return (
-    <Modal open wide onClose={close} title={L('Emails The Current sends', 'Email The Current tự gửi')}
-      subtitle={L('A thank-you to each family who sends a form on pra.edu.vn, an alert to the office, and scheduled newsletters. They go from admin@.', 'Thư cảm ơn mỗi gia đình gửi đơn trên pra.edu.vn, thông báo cho văn phòng, và bản tin đã hẹn giờ. Tất cả gửi từ admin@.')}
-      footer={tab === 'outbox' ? <button className="btn-secondary" onClick={close}>{L('Close', 'Đóng')}</button> : (
-        <>
-          <button className="btn-secondary" onClick={close}>{L('Close', 'Đóng')}</button>
-          {isOffice && <button className="btn-primary" disabled={!dirty || saving} onClick={save}>{saving ? <LoaderCircle size={16} className="animate-spin" /> : <Save size={16} />}{L('Save', 'Lưu')}</button>}
-        </>
-      )}>
-      <div className="space-y-4">
-        <Segmented value={tab} onChange={setTab} options={[
-          { value: 'enroll_family', label: L('Enrollment form', 'Đơn đăng ký học') },
-          { value: 'web_family', label: L('Tour and contact form', 'Đặt lịch và liên hệ') },
-          { value: 'office', label: L('Office alerts', 'Thông báo văn phòng') },
-          { value: 'outbox', label: L('Outbox', 'Hộp thư đi') },
-        ]} />
-        {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        {tab === 'outbox' ? <Outbox L={L} toast={toast} /> : !draft ? (!error && <Spinner />)
-          : tab === 'office' ? <OfficeTab value={draft.office || DEFAULT_TEMPLATES.office} onChange={(fn) => set('office', fn)} L={L} readOnly={!isOffice} />
-            : <FamilyTab k={tab} value={draft[tab] || DEFAULT_TEMPLATES[tab]} onChange={(fn) => set(tab, fn)} L={L} readOnly={!isOffice} />}
-      </div>
-    </Modal>
-  )
-}
-const strip = (t) => (t ? Object.fromEntries(Object.entries(t).filter(([k]) => !['updated_by', 'updated_at'].includes(k))) : t)
-
-function FamilyTab({ k, value, onChange, L, readOnly }) {
+/** The wording of one thank-you (`k`: enroll_family or web_family), with what the family gets. */
+export function FamilyTab({ k, value, onChange, L, readOnly }) {
   const [lang, setLang] = useState('en')
   const v = value
   const preview = renderFamily(v, lang, sampleVars(k, 'en'), sampleVars(k, 'vi'))
@@ -113,7 +54,8 @@ function FamilyTab({ k, value, onChange, L, readOnly }) {
   )
 }
 
-function OfficeTab({ value, onChange, L, readOnly }) {
+/** Who gets the office alerts and the newsletter notes. */
+export function OfficeTab({ value, onChange, L, readOnly }) {
   return (
     <div className="space-y-4 text-sm">
       <label className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -131,50 +73,6 @@ function OfficeTab({ value, onChange, L, readOnly }) {
         <input className="input" value={value.approvers || ''} disabled={readOnly} onChange={(e) => onChange((t) => ({ ...t, approvers: e.target.value }))} />
         <span className="mt-1 block text-xs text-slate-500">{L('Who may approve is set by the account (head or super admin), not by this list.', 'Ai được duyệt là do tài khoản (head hoặc super admin), không phải danh sách này.')}</span>
       </label>
-    </div>
-  )
-}
-
-/** The latest emails, and when the mailer last checked in. */
-function Outbox({ L, toast }) {
-  const [state, setState] = useState(null)
-  const load = () => Promise.all([listMail({ limit: 60 }), mailerStatus().catch(() => null)])
-    .then(([rows, status]) => setState({ rows, status: withAge(status), error: '' }))
-    .catch((e) => setState({ rows: [], status: null, error: e.message }))
-  useEffect(() => { load() }, [])
-  if (!state) return <Spinner />
-  const retry = async (r) => { try { await retryMail(r.id); toast(L('It goes within five minutes.', 'Email sẽ đi trong vòng năm phút.')); load() } catch (e) { toast.error(e.message) } }
-  const see = async (r) => { try { await openMail(r.id) } catch (e) { toast.error(e.message) } }
-  return (
-    <div className="space-y-3 text-sm">
-      {state.error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">{state.error}</p>}
-      <MailerLine status={state.status} L={L} />
-      {!state.rows.length ? <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-400">{L('No emails yet. They show here as forms arrive and newsletters are scheduled.', 'Chưa có email nào. Email sẽ hiện ở đây khi có đơn gửi đến hoặc bản tin được hẹn giờ.')}</p> : (
-        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
-          {state.rows.map((r) => {
-            const st = MAIL_STATUS[r.status] || MAIL_STATUS.ready
-            return (
-              <li key={r.id} className="flex flex-col gap-1.5 p-3 sm:flex-row sm:items-start">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Chip tone={st.tone}>{L(st.en, st.vi)}</Chip>
-                    <span className="text-xs font-semibold text-slate-500">{L(MAIL_KINDS[r.kind]?.en, MAIL_KINDS[r.kind]?.vi)}</span>
-                    <span className="text-xs text-slate-400">{new Date(r.sent_at || r.created_at).toLocaleString()}</span>
-                  </div>
-                  <div className="truncate font-semibold text-slate-800">{r.subject || '—'}</div>
-                  <div className="truncate text-xs text-slate-500">{r.to_addr || r.bcc_addr}</div>
-                  {r.error && r.status !== 'sent' && <div className="text-xs text-red-700">{r.error}</div>}
-                </div>
-                <div className="flex flex-none flex-wrap gap-1.5">
-                  {r.subject && <button className="btn-ghost text-xs" onClick={() => see(r)}><Eye size={14} />{L('See', 'Xem')}</button>}
-                  {r.message_id && <a className="btn-ghost text-xs" href={gmailLink(r.message_id)} target="_blank" rel="noreferrer"><Mail size={14} />Gmail</a>}
-                  {['failed', 'skipped'].includes(r.status) && r.subject && <button className="btn-secondary text-xs" onClick={() => retry(r)}><RotateCcw size={14} />{L('Send again', 'Gửi lại')}</button>}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
     </div>
   )
 }

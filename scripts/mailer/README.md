@@ -14,14 +14,14 @@ The code is `the-current-mailer.gs`. The copy that runs is the one pasted into A
 ## Installing it (about fifteen minutes, once)
 
 1. **The database.** In Supabase, open the SQL Editor and run `supabase/updates-2026-10-22-mail.sql`. The run ends with a table holding one long key (**MAILER_KEY**). Copy it. Keep it out of email and chat. If the run stops with "The form emails do not work yet", send Claude the message.
-2. **The project.** In Chrome, signed in as **admin@palmriveracademy.edu.vn**, open https://script.google.com and click **New project**. Name it **The Current mailer** (top left). Delete what is in `Code.gs`, paste the whole of `the-current-mailer.gs`, and save with Ctrl+S.
+2. **The project.** In Chrome, signed in as **admin@palmriveracademy.edu.vn**, open https://script.google.com and click **New project**. Name it **The Current mailer** (top left). Delete what is in `Code.gs`, paste the whole of `the-current-mailer.gs`, and save with Ctrl+S. Then switch on the Gmail service: on the left, click **+** beside **Services**, choose **Gmail API**, and click **Add**. Without it, emails still go, but through Google's older mailer, which spoils emoji, so the script leaves emoji out of subjects.
 3. **The settings.** Click **Project Settings** (the gear). Set **Time zone** to (GMT+07:00) Ho Chi Minh. Under **Script Properties**, add three:
    - `SUPABASE_URL`: `https://gpfycuxltrjeeyxnnktu.supabase.co`
    - `SUPABASE_KEY`: the publishable key, starting `sb_publishable_`. It is the `VITE_SUPABASE_PUBLISHABLE_KEY` line in `C:\Users\sbowe\admin\.env`, and the website has the same one in `src/_data/site.json`. It is public.
    - `MAILER_KEY`: the key from step 1.
 4. **The check.** Back in the **Editor**, pick `check` in the function list at the top and click **Run**. Google asks to let the script send mail as admin@ and connect to an outside service. Allow it. If Google says it "hasn't verified this app", that is normal for a script you made yourself: click **Advanced**, then **Go to The Current mailer**. A "The Current mailer: test" email should arrive in admin@'s inbox.
 5. **Switch it on.** Pick `install` and click **Run**. Under **Triggers** (the clock icon), there is now one trigger: `run`, every 5 minutes.
-6. **In The Current.** Open Enrollments → **Emails** → **Outbox**. Within five minutes it should say the mailer last checked in "just now".
+6. **In The Current.** Open **Office** → **Emails** → **Outbox**. Within five minutes it should say the mailer last checked in "just now".
 
 Do step 1 first. Forms sent before the script is switched on (step 5) still get their emails, as long as that is within two days. Anything older is marked "not sent" rather than arriving late.
 
@@ -48,7 +48,13 @@ select key from adm_mailer_key;
 
 Then paste the new key into `MAILER_KEY`. The old one stops working at once.
 
+## Changing the script
+
+Paste the new `the-current-mailer.gs` over the old one in `Code.gs` and save. Then run `check` once: Google may ask to allow a new permission (it did when the Gmail service was added on 22 October 2026), and until someone allows it, the five-minute runs fail.
+
 ## When something goes wrong
+
+- **Emoji arrive as rows of "�" or "?".** The Gmail service is not switched on (step 2). Add it, then run `check`: its test email has a pumpkin and a flag in it.
 
 - **The Outbox says the mailer has not checked in for a while.** Open the project, then **Executions** (the list icon). Each run is listed, and a failed run shows the error. "answered 401" or "Not allowed" means `SUPABASE_KEY` or `MAILER_KEY` is wrong.
 - **An email shows "Sending did not finish".** The script took it but never said how it went. Look in admin@'s **Sent** before clicking **Send again**. It is never sent twice by itself.

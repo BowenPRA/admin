@@ -5,7 +5,7 @@
 --    or the contact / book-a-tour form on pra.edu.vn, the family gets a short
 --    thank-you email (in the language they used, then the other one) and the
 --    office gets an alert (Yvonne and admin@). The office edits the thank-you
---    wording in The Current (Enrollments > Emails).
+--    wording in The Current (Office > Emails).
 -- 2. Scheduled newsletters. Anyone in the office can schedule an issue for a day
 --    and time; Seth or Bowen approves it (their own scheduling counts as the
 --    approval). Ten minutes before the time its page goes on pra.edu.vn; at the

@@ -110,7 +110,7 @@ The Current keeps its data at **Supabase**, a database service on the internet. 
 | adm_todos | The To-Do tab's tasks |
 | adm_newsletters, adm_newsletter_parts, adm_newsletter_views | The Newsletter tab, live since 16 October 2026: issues, their parts, page-open counts |
 | adm_mail_queue | The outbox: every email The Current sends (form thank-yous and alerts, scheduled newsletters, notes to Seth and Bowen), with how it went |
-| adm_mail_templates | The thank-you wording and who gets the alerts, edited under **Enrollments** → **Emails** |
+| adm_mail_templates | The thank-you wording and who gets the alerts, edited under **Office** → **Emails** |
 | adm_mailer_key | One row: the mailer's key. Nobody can read it except in the SQL Editor |
 
 ### The storage buckets
@@ -273,7 +273,7 @@ Claude checks changes to The Current on a copy that runs on the laptop, before a
 - A Google Apps Script named **The Current mailer**, in the admin@palmriveracademy.edu.vn account at https://script.google.com. Every five minutes it asks the database what is due, sends it with Gmail from admin@, and reports back. It uses no Claude, no laptop and no GitHub. Built on 22 October 2026; the database file is `supabase/updates-2026-10-22-mail.sql`.
 - The code is `scripts/mailer/the-current-mailer.gs`; the copy that runs is the one pasted into Apps Script. Installing, pausing (`PAUSED`), sending as admin@pra.edu.vn (`FROM`) and making a new key are in `scripts/mailer/README.md`.
 - Its three settings are **Script Properties** in the project: the database address, the public key, and the mailer's own key (`MAILER_KEY`, printed by the SQL file). The mailer's key is private.
-- **Is it running?** **Enrollments** → **Emails** → **Outbox** says when it last checked in. Office accounts also see a line on Home when emails are waiting and it has not checked in for 20 minutes.
+- **Is it running?** **Office** → **Emails** → **Outbox** says when it last checked in. Office accounts also see a line on Home when emails are waiting and it has not checked in for 20 minutes.
 - Nothing is ever sent twice by itself. If a run took an email and never reported, the email shows "Sending did not finish": look in admin@'s Sent before **Send again**.
 - The Google Cloud project above is a separate thing: The Current uses it only to save drafts. Sending is the mailer's.
 

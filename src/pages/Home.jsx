@@ -443,7 +443,7 @@ function OfficeHome() {
           newSteps > 0 && { icon: ClipboardCheck, to: '/students?steps=1', text: t(newSteps === 1 ? 'stepsHomeOne' : 'stepsHome', { n: newSteps }) },
           formsToCheck > 0 && { icon: FileSignature, to: '/enrollments', text: t('enHomeShort', { n: formsToCheck }) },
           toApprove > 0 && { icon: ShieldCheck, to: '/newsletter', text: t('nlApproveHome', { n: toApprove }) },
-          mailStuck && { icon: MailWarning, to: '/enrollments', text: t('mailStuckHome', { n: mailer.ready }) },
+          mailStuck && { icon: MailWarning, to: '/emails', text: t('mailStuckHome', { n: mailer.ready }) },
           todos && (todos.mine || todos.late || todos.check) > 0 && { icon: ListTodo, to: '/todo', text: `${t('todoNav')}: ${[todos.mine && t('tdHomeMine', { n: todos.mine }), todos.late && t('tdHomeLate', { n: todos.late }), todos.check && t('tdHomeCheck', { n: todos.check })].filter(Boolean).join(' · ')}` },
         ]} />
 

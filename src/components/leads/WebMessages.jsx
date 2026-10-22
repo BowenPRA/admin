@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Check, Globe, Mail, Undo2 } from 'lucide-react'
 import { listMail } from '../../lib/mail'
 import MailLine from '../mail/MailLine'
-import MailSettings from '../mail/MailSettings'
+import { Link } from 'react-router-dom'
 import { wantOf, askedFor, fmtMoment, fmtDay, personName, leadForMessage, byWaiting } from '../../lib/leads'
 import { Chip } from '../ui'
 
@@ -47,7 +47,6 @@ export function WebMessage({ m, t, lang, actions, family, mails = null }) {
  */
 export default function WebMessages({ messages, leads, busyId, onOpen, onDone, t, lang }) {
   const [showDone, setShowDone] = useState(false)
-  const [mailOpen, setMailOpen] = useState(false)
   // The thank-yous and alerts sent about these messages (supabase/updates-2026-10-22-mail.sql); none before that SQL is run.
   const [mails, setMails] = useState({})
   useEffect(() => {
@@ -76,7 +75,7 @@ export default function WebMessages({ messages, leads, busyId, onOpen, onDone, t
           <p className="text-xs text-slate-500">{t('ldWebSub')}</p>
         </div>
         <div className="flex flex-wrap gap-1">
-          <button type="button" className="btn-ghost text-xs" onClick={() => setMailOpen(true)}><Mail size={14} /> {t('mailButton')}</button>
+          <Link to="/emails?tab=web_family" className="btn-ghost text-xs"><Mail size={14} /> {t('mailButton')}</Link>
           {done.length > 0 && (
             <button type="button" className="btn-ghost text-xs" aria-expanded={showDone} onClick={() => setShowDone((v) => !v)}>
               {showDone ? t('ldWebHideDone') : t('ldWebShowDone', { n: done.length })}
@@ -84,7 +83,6 @@ export default function WebMessages({ messages, leads, busyId, onOpen, onDone, t
           )}
         </div>
       </div>
-      {mailOpen && <MailSettings onClose={() => setMailOpen(false)} start="web_family" />}
       {shown.length === 0
         ? <p className="border-t border-slate-100 px-4 py-3 text-sm text-slate-400">{t('ldWebNone')}</p>
         : (

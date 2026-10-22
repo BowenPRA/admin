@@ -12,7 +12,9 @@ import { escHtml, plain, plainLines, firstSentence } from './text.js'
 import { pick } from './payload.js'
 import { addDays } from './dates.js'
 
-const FONT = 'Arial,Helvetica,sans-serif'
+// The reader's own system font first (San Francisco on an iPhone, Roboto on Android, Segoe on
+// Windows), then Arial. All of them have every Vietnamese letter.
+const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 const PAGE_BG = '#EEF2F7'
 const LINK = TONES.blue.ink
 const RULE = '#E3EAF2'
@@ -113,12 +115,29 @@ function photoGrid(photos, L) {
   return out
 }
 
+// An emoji at the start of a heading: one picture, with its skin tone, joiners or flag pair.
+const EMOJI_HEAD = /^(?:\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)*)\s*/u
+/** A section heading; an emoji it starts with sits in a soft square beside it, as on the website. */
+function heading(text, tone) {
+  const raw = String(text || '').trim()
+  const m = raw.match(EMOJI_HEAD)
+  const words = m ? raw.slice(m[0].length).trim() : raw
+  const h = `<h2 class="pra-h2" style="margin:0;${font(21, 28, { bold: true, color: NAVY })}">${esc(words || raw)}</h2>`
+  if (!m || !words) return `<div style="margin:0 0 10px;">${h}</div>`
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px;"><tr>`
+    + `<td width="40" valign="middle" style="width:40px;"><div style="width:38px;height:38px;line-height:38px;text-align:center;border-radius:12px;background:${tone.pale};font-size:20px;">${esc(m[0].trim())}</div></td>`
+    + `<td valign="middle" style="padding-left:12px;">${h}</td></tr></table>`
+}
+
 /** One language's whole newsletter, as the Google Doc was: opening, every section in full, the closing and the sign-off. */
 function fullSection(payload, lang, tone) {
   const L = lang === 'vi' ? 'vi' : 'en'
   const rows = []
-  const pad = (html, p = '0 24px') => rows.push(`<tr><td style="padding:${p};">${html}</td></tr>`)
-  const h2 = (text) => `<h2 style="margin:0 0 10px;${font(21, 28, { bold: true, color: NAVY })}">${esc(text)}</h2>`
+  const pad = (html, p = '0 24px') => rows.push(`<tr><td class="pra-pad" style="padding:${p};">${html}</td></tr>`)
+  const h2 = (text) => heading(text, tone)
+  // A hairline between sections, so each reads as its own piece.
+  let sections = 0
+  const rule = () => { if (sections++) pad(`<div style="height:1px;line-height:1px;font-size:0;background:${RULE};">&nbsp;</div>`, '14px 24px 0') }
 
   const noVi = drafting && L === 'vi'
   const missingRow = (head) => pad(`<p style="margin:0;padding:10px 14px;background:#F3F5F8;border-radius:10px;${font(14, 20, { color: INK_SOFT })}">${head ? `<b style="color:${NAVY};">${esc(head)}</b>: ` : ''}${esc(NO_VI)}</p>`, '12px 24px 2px')
@@ -145,6 +164,7 @@ function fullSection(payload, lang, tone) {
   }
 
   for (const p of payload.parts || []) {
+    if (p.type !== 'closing') rule()
     if (noVi && p.type !== 'closing' && partViMissing(p)) {
       missingRow(p.type === 'class' ? p.class : p.type === 'press' ? p.title : t(p.heading, 'en'))
       continue
@@ -292,48 +312,61 @@ function buildEmail(payload, { logoUrl = 'https://pra.edu.vn/assets/img/logo.png
 <meta name="color-scheme" content="light only">
 <meta name="supported-color-schemes" content="light only">
 <title>${esc(subject)}</title>
+<style>
+  body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; }
+  img { -ms-interpolation-mode: bicubic; }
+  a[x-apple-data-detectors] { color: inherit !important; text-decoration: none !important; }
+  @media screen and (max-width: 520px) {
+    .pra-outer { padding: 0 !important; }
+    .pra-card { border-radius: 0 !important; }
+    .pra-pad { padding-left: 18px !important; padding-right: 18px !important; }
+    .pra-h1 { font-size: 24px !important; line-height: 30px !important; }
+    .pra-h2 { font-size: 19px !important; line-height: 26px !important; }
+  }
+</style>
 </head>
 <body style="margin:0;padding:0;background:${PAGE_BG};" bgcolor="${PAGE_BG}">
 <div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;mso-hide:all;font-size:1px;line-height:1px;color:${PAGE_BG};">${esc(preheader)}${'&#847;&zwnj;&nbsp;'.repeat(60)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${PAGE_BG}" style="background:${PAGE_BG};">
-<tr><td align="center" style="padding:20px 8px 28px;">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:14px;overflow:hidden;">
-<tr><td style="padding:18px 24px 14px;background-color:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);">
+<tr><td align="center" class="pra-outer" style="padding:20px 8px 28px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF" class="pra-card" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:14px;overflow:hidden;">
+<tr><td class="pra-pad" style="padding:18px 24px 14px;background-color:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
 <td valign="middle"><img src="${esc(logoUrl)}" width="134" height="54" alt="Palm River Academy" style="display:block;width:134px;height:54px;border:0;"></td>
-<td valign="middle" align="right" style="${font(13, 18, { color: EMAIL_STYLE === 'full' ? INK_SOFT : LINK })}">${EMAIL_STYLE === 'full' ? 'Tiếng Việt bên dưới 🇻🇳' : `<a href="${esc(viHref)}" style="color:${LINK};text-decoration:underline;">${esc(word('en', 'readVi'))}</a>`}</td>
+<td valign="middle" align="right" style="${font(13, 18, { color: EMAIL_STYLE === 'full' ? INK_SOFT : LINK })}">${EMAIL_STYLE === 'full' ? `<a href="#tieng-viet" style="color:${INK_SOFT};text-decoration:none;">Tiếng Việt bên dưới&nbsp;&darr;</a>` : `<a href="${esc(viHref)}" style="color:${LINK};text-decoration:underline;">${esc(word('en', 'readVi'))}</a>`}</td>
 </tr></table>
 </td></tr>
-<tr><td bgcolor="${band}" style="background:${band};padding:22px 24px 20px;">
-<p style="margin:0;${font(26, 32, { bold: true, color: '#FFFFFF' })}">${esc(t(payload.edition_name, 'en'))}</p>
+<tr><td bgcolor="${band}" class="pra-pad" style="background:${band};padding:22px 24px 20px;">
+<p class="pra-h1" style="margin:0;${font(26, 32, { bold: true, color: '#FFFFFF' })}">${esc(t(payload.edition_name, 'en'))}</p>
 <p style="margin:6px 0 0;${font(14, 20, { color: '#FFFFFF', extra: 'opacity:.92;' })}">${esc(t(payload.label, 'en'))} &middot; ${esc(t(payload.day, 'en'))}</p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 0;"><tr>
-<td bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:999px;"><a href="${esc(enHref)}" style="display:inline-block;padding:10px 18px;${font(15, 20, { bold: true, color: band })}text-decoration:none;border-radius:999px;">Read it online&nbsp;&rarr;</a></td>
+<td bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:999px;"><a href="${esc(enHref)}" style="display:inline-block;padding:12px 20px;${font(15, 20, { bold: true, color: band })}text-decoration:none;border-radius:999px;">Read it online&nbsp;&rarr;</a></td>
 <td width="10" style="font-size:0;line-height:0;">&nbsp;</td>
-<td style="border:2px solid #FFFFFF;border-radius:999px;"><a href="${esc(viHref)}" style="display:inline-block;padding:8px 16px;${font(15, 20, { bold: true, color: '#FFFFFF' })}text-decoration:none;border-radius:999px;">Đọc trên web</a></td>
+<td style="border:2px solid #FFFFFF;border-radius:999px;"><a href="${esc(viHref)}" style="display:inline-block;padding:10px 18px;${font(15, 20, { bold: true, color: '#FFFFFF' })}text-decoration:none;border-radius:999px;">Đọc trên web</a></td>
 </tr></table>
 <p style="margin:8px 0 0;${font(12, 17, { color: '#FFFFFF', extra: 'opacity:.88;' })}">Bigger photos, easy to share with family &middot; Ảnh lớn hơn, dễ chia sẻ với người thân</p>
 </td></tr>
 ${cover ? `<tr><td style="padding:0;"><img src="${esc(cover)}" width="600" alt="${esc(coverAlt)}" style="display:block;width:100%;max-width:600px;height:auto;border:0;"></td></tr>
-${coverAlt ? `<tr><td style="padding:8px 24px 0;${font(12, 17, { color: INK_SOFT })}">${esc(coverAlt)}</td></tr>` : ''}` : ''}
+${coverAlt && SHOW_CAPTIONS ? `<tr><td class="pra-pad" style="padding:8px 24px 0;${font(12, 17, { color: INK_SOFT })}">${esc(coverAlt)}</td></tr>` : ''}` : ''}
 ${section(payload, 'en', tone)}
-<tr><td style="padding:30px 24px 6px;">
+<tr><td class="pra-pad" style="padding:30px 24px 6px;"><a name="tieng-viet" id="tieng-viet"></a>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
 <td width="44%" valign="middle"><div style="border-top:2px dotted #C9D4E6;height:0;line-height:0;font-size:0;">&nbsp;</div></td>
 <td valign="middle" align="center" style="padding:0 12px;white-space:nowrap;${font(12, 16, { bold: true, color: INK_SOFT, extra: 'letter-spacing:2px;' })}">TIẾNG VIỆT</td>
 <td width="44%" valign="middle"><div style="border-top:2px dotted #C9D4E6;height:0;line-height:0;font-size:0;">&nbsp;</div></td>
 </tr></table>
 </td></tr>
-<tr><td style="padding:14px 24px 0;"><p style="margin:0;${font(16, 22, { bold: true, color: NAVY })}">${esc(t(payload.edition_name, 'vi'))} &middot; ${esc(t(payload.label, 'vi'))}</p><p style="margin:2px 0 0;${font(13, 19, { color: INK_SOFT })}">${esc(t(payload.day, 'vi'))}</p></td></tr>
+<tr><td class="pra-pad" style="padding:14px 24px 0;"><p style="margin:0;${font(16, 22, { bold: true, color: NAVY })}">${esc(t(payload.edition_name, 'vi'))} &middot; ${esc(t(payload.label, 'vi'))}</p><p style="margin:2px 0 0;${font(13, 19, { color: INK_SOFT })}">${esc(t(payload.day, 'vi'))}</p></td></tr>
 ${section(payload, 'vi', tone)}
-<tr><td style="padding:26px 24px 22px;border-top:1px solid ${RULE};${font(13, 20, { color: INK_SOFT })}">
+<tr><td class="pra-pad" style="padding:26px 24px 22px;border-top:1px solid ${RULE};${font(13, 20, { color: INK_SOFT })}">
 <p style="margin:0 0 4px;${font(13, 20, { bold: true, color: NAVY, extra: 'letter-spacing:1px;' })}">PALM RIVER ACADEMY</p>
 Hotline: <a href="tel:+84968494245" style="color:${NAVY};font-weight:bold;text-decoration:none;">${HOTLINE}</a><br>
 ${ADDRESS}<br>
 <a href="mailto:${SENDER}" style="color:${LINK};text-decoration:underline;">${SENDER}</a> &middot; <a href="https://pra.edu.vn/" style="color:${LINK};text-decoration:underline;">pra.edu.vn</a>
+<p style="margin:14px 0 0;${font(12, 18, { color: INK_SOFT })}">You get this email because your child learns at Palm River Academy. Questions? Just reply to it.<br>Ba mẹ nhận email này vì con đang học tại Palm River Academy. Có câu hỏi, ba mẹ chỉ cần trả lời email này.</p>
 </td></tr>
 </table>
-<p style="margin:14px 0 0;max-width:560px;${font(12, 18, { color: INK_SOFT })}">${esc(word('en', 'attached'))}<br>${esc(word('vi', 'attached'))}</p>
+${payload.pdf?.en || payload.pdf?.vi ? `<p style="margin:14px 0 0;max-width:560px;padding:0 8px;${font(12, 18, { color: INK_SOFT })}">${esc(word('en', 'attached'))}<br>${esc(word('vi', 'attached'))}</p>` : ''}
 </td></tr>
 </table>
 </body>

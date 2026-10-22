@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronsUpDown, Eye, Images, Sprout, FileSignature, FileCheck, BookMarked, ListTodo, Newspaper, Shapes, Menu, X, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronsUpDown, Eye, Images, Sprout, FileSignature, FileCheck, BookMarked, ListTodo, Newspaper, Shapes, Menu, X, ChevronsLeft, ChevronsRight, Mail } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -36,6 +36,8 @@ const NAV = [
     { to: '/invoices', icon: FileText, label: 'invoices', who: 'office' },
     { to: '/leads', icon: Sprout, label: 'leadsNav', who: 'office' },
     { to: '/enrollments', icon: FileSignature, label: 'enrollNav', who: 'office' },
+    // What The Current emails by itself: the outbox, the thank-you wording, the office alerts.
+    { to: '/emails', icon: Mail, label: 'emailsNav', who: 'office' },
   ] },
   { id: 'outreach', label: 'navOutreach', pages: [
     { to: '/photos', icon: Images, label: 'photos', who: 'office' },

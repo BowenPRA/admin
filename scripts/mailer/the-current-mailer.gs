@@ -77,10 +77,15 @@ function check() {
   var ok = rpc_(cfg, 'adm_mailer_ok', {});
   if (ok !== true) throw new Error('The database does not know this MAILER_KEY. Copy it again from the SQL Editor (README step 3).');
   var me = Session.getEffectiveUser().getEmail();
-  var opts = { htmlBody: '<p>The Current\'s mailer can reach the database and send from this account.</p>', name: FROM_NAME };
-  if (cfg.from) opts.from = cfg.from;
-  GmailApp.sendEmail(me, 'The Current mailer: test', 'The Current\'s mailer can reach the database and send from this account.', opts);
-  console.log('Key accepted. A test email went to ' + me + (cfg.from ? ' from ' + cfg.from : '') + '. Next: run install.');
+  var how = typeof Gmail !== 'undefined' ? 'the Gmail API (emoji arrive as typed)' : 'GmailApp (the Gmail service is off: README step 2)';
+  send_(cfg, {
+    to: me,
+    subject: 'The Current mailer: test 🎃',
+    text: 'The Current\'s mailer can reach the database and send from this account, through ' + how + '.\nEmoji: 🎃 🇻🇳 · Tiếng Việt',
+    html: '<p>The Current\'s mailer can reach the database and send from this account, through ' + how + '.</p><p>Emoji: 🎃 🇻🇳 · Tiếng Việt</p>',
+    attachments: [],
+  });
+  console.log('Key accepted. A test email went to ' + me + ' through ' + how + (cfg.from ? ', from ' + cfg.from : '') + '. Its emoji should show as a pumpkin and a flag. Next: run install.');
 }
 
 // ---------------- the parts ----------------
@@ -151,20 +156,91 @@ function waitForPage_(job) {
 
 /** Sends one email from admin@ and returns its Gmail id. */
 function send_(cfg, job) {
-  var opts = { htmlBody: job.html, name: FROM_NAME };
-  if (job.cc) opts.cc = job.cc;
-  if (job.bcc) opts.bcc = job.bcc;
-  if (cfg.from) opts.from = cfg.from;
   var files = (job.attachments || []).map(function (a) {
     var res = UrlFetchApp.fetch(a.url, { muteHttpExceptions: true });
     if (res.getResponseCode() !== 200) throw new Error('The attachment ' + a.name + ' could not be fetched (' + res.getResponseCode() + ').');
     return res.getBlob().setName(a.name);
   });
-  if (files.length) opts.attachments = files;
   // An email with only Bcc (a newsletter) is addressed to the account itself, as the office did by hand.
   var me = Session.getEffectiveUser().getEmail();
-  var message = GmailApp.createDraft(job.to || me, job.subject, job.text || '', opts).send();
+  var to = job.to || me;
+  var id;
+  if (typeof Gmail !== 'undefined') {
+    // The Gmail API, with the message written out here: every character arrives as it was
+    // typed, emoji included. (GmailApp turns emoji into rows of question marks.)
+    var sent = Gmail.Users.Messages.send({ raw: mime_(cfg.from || me, to, job, files) }, 'me');
+    id = sent.id;
+  } else {
+    // The Gmail service is not switched on in this project (README step 2): GmailApp, with
+    // each emoji in the HTML written as an HTML code it cannot spoil, and none in the subject.
+    var opts = { htmlBody: emojiCodes_(job.html), name: FROM_NAME };
+    if (job.cc) opts.cc = job.cc;
+    if (job.bcc) opts.bcc = job.bcc;
+    if (cfg.from) opts.from = cfg.from;
+    if (files.length) opts.attachments = files;
+    id = GmailApp.createDraft(to, noEmoji_(job.subject), noEmoji_(job.text || ''), opts).send().getId();
+  }
   // ...and kept out of admin@'s inbox: it is in Sent. Replies still arrive in the inbox.
-  if (!job.to) message.getThread().moveToArchive();
-  return message.getId();
+  if (!job.to) GmailApp.getMessageById(id).getThread().moveToArchive();
+  return id;
+}
+
+/** The whole email as one MIME message, base64url, for the Gmail API: text and HTML, then the files. */
+function mime_(from, to, job, files) {
+  var crlf = '\r\n';
+  var mixed = 'pra-mixed-' + Utilities.getUuid();
+  var alt = 'pra-alt-' + Utilities.getUuid();
+  var word = function (s) { return '=?UTF-8?B?' + Utilities.base64Encode(String(s), Utilities.Charset.UTF_8) + '?='; };
+  var lines = function (b64) { return b64.replace(/(.{76})/g, '$1' + crlf); };
+  var head = [
+    'From: ' + word(FROM_NAME) + ' <' + from + '>',
+    'To: ' + to,
+    job.cc ? 'Cc: ' + job.cc : null,
+    job.bcc ? 'Bcc: ' + job.bcc : null,
+    'Subject: ' + word(job.subject),
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/mixed; boundary="' + mixed + '"',
+  ].filter(function (x) { return x; });
+  var out = head.concat([
+    '',
+    '--' + mixed,
+    'Content-Type: multipart/alternative; boundary="' + alt + '"',
+    '',
+    '--' + alt,
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    lines(Utilities.base64Encode(job.text || '', Utilities.Charset.UTF_8)),
+    '--' + alt,
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    lines(Utilities.base64Encode(job.html || '', Utilities.Charset.UTF_8)),
+    '--' + alt + '--',
+  ]);
+  files.forEach(function (f) {
+    var name = f.getName();
+    var plain = name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
+    out.push('--' + mixed,
+      'Content-Type: ' + (f.getContentType() || 'application/octet-stream') + '; name="' + plain + '"',
+      'Content-Disposition: attachment; filename="' + plain + '"; filename*=UTF-8\'\'' + encodeURIComponent(name),
+      'Content-Transfer-Encoding: base64',
+      '',
+      lines(Utilities.base64Encode(f.getBytes())));
+  });
+  out.push('--' + mixed + '--', '');
+  // Everything above is plain ASCII by now.
+  return Utilities.base64EncodeWebSafe(out.join(crlf));
+}
+
+/** Each character outside the basic set (emoji) as an HTML code: "&#x1F383;". */
+function emojiCodes_(html) {
+  return String(html || '').replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function (pair) {
+    return '&#x' + pair.codePointAt(0).toString(16).toUpperCase() + ';';
+  });
+}
+
+/** Text with no emoji, for where GmailApp would spoil them (a subject, the plain-text part). */
+function noEmoji_(s) {
+  return String(s || '').replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[️‍]/g, '').replace(/ {2,}/g, ' ').trim();
 }
