@@ -23,16 +23,39 @@ export const LEVELS = [
   { value: 3, code: 'O', name: 'On Target', name_vi: 'Đạt mục tiêu', color: '#5f8f24',
     short: 'Independently: the goal', short_vi: 'Tự làm được, đúng mục tiêu',
     desc: 'Secure and independent. The goal for this stage.',
-    desc_vi: 'Nắm vững và tự làm được. Mục tiêu của giai đoạn này.' },
-  { value: 5, code: 'C', name: 'Confident', name_vi: 'Tự tin', color: '#0e7a74',
+    desc_vi: 'Nắm vững và tự làm được, đạt mục tiêu của giai đoạn.' },
+  { value: 5, code: 'C', name: 'Confident', name_vi: 'Vững vàng', color: '#0e7a74',
     short: 'Consistently and skilfully', short_vi: 'Ổn định và thành thạo',
     desc: 'Consistently strong, even in new situations.',
     desc_vi: 'Luôn thể hiện tốt, kể cả trong tình huống mới.' },
-  { value: 4, code: 'M', name: 'Moving Beyond', name_vi: 'Nổi trội', color: '#1f4e9c',
+  { value: 4, code: 'M', name: 'Moving Beyond', name_vi: 'Vượt mục tiêu', color: '#1f4e9c',
     short: 'Beyond what is expected', short_vi: 'Vượt mức mong đợi',
     desc: 'Goes beyond what is expected; ready for extension.',
-    desc_vi: 'Vượt mức mong đợi, sẵn sàng cho thử thách mở rộng.' },
+    desc_vi: 'Vượt mức mong đợi, sẵn sàng học nội dung nâng cao.' },
 ]
+// The Vietnamese wording before version 16 (23 October 2026), replaced wherever saved
+// settings still hold it. "Tự tin" described the child rather than the work, "Nổi
+// trội" ranked the child against others, "Hướng nghiệp" means careers guidance,
+// "nâng cao" means advanced (the classes are "tăng cường", intensive), and Tiểu học /
+// Trung học cơ sở are the names of Vietnamese school levels (the website keeps the
+// program names in English).
+const VI_BEFORE_16 = new Map([
+  ['Tự tin', 'Vững vàng'],
+  ['Nổi trội', 'Vượt mục tiêu'],
+  ['Nắm vững và tự làm được. Mục tiêu của giai đoạn này.', 'Nắm vững và tự làm được, đạt mục tiêu của giai đoạn.'],
+  ['Vượt mức mong đợi, sẵn sàng cho thử thách mở rộng.', 'Vượt mức mong đợi, sẵn sàng học nội dung nâng cao.'],
+  ['Chương trình Mầm non', 'Chương trình Early Years'],
+  ['Chương trình Tiểu học', 'Chương trình Primary'],
+  ['Chương trình Trung học cơ sở', 'Chương trình Lower Secondary'],
+  ['Chúng tôi trân trọng mọi hình thức học tập. Cảm ơn quý phụ huynh đã đồng hành cùng {nickname}.', 'PRA trân trọng từng tiến bộ của con trong mọi lĩnh vực. Cảm ơn ba mẹ đã đồng hành cùng {nickname} trong việc học.'],
+  ['Kỹ năng cảm xúc xã hội', 'Kỹ năng cảm xúc và xã hội'],
+  ['Tuân theo hướng dẫn', 'Làm theo hướng dẫn'],
+  ['Nắm bắt ý tưởng mới', 'Tiếp thu kiến thức mới'],
+  ['Tiếp tục cố gắng', 'Kiên trì cố gắng'],
+  ['Quản lý cảm xúc', 'Kiểm soát cảm xúc'],
+  ['Mối quan hệ tích cực', 'Quan hệ tốt với mọi người'],
+  ['Khả năng thích ứng', 'Khả năng thích nghi'],
+])
 
 // The three tiers of learning areas. A subject's `kind` is its tier, and the
 // tier decides what teachers write and how it prints:
@@ -53,9 +76,9 @@ export const LEVELS = [
 export const TIERS = [
   { key: 'academic', name: 'Academic Learning', name_vi: 'Học thuật', short: 'Academic',
     hint: 'Level, progress review score and an individual comment for each student, plus one course description shared by the year group.' },
-  { key: 'specialist', name: 'Specialist Learning', name_vi: 'Môn chuyên biệt', short: 'Specialist',
+  { key: 'specialist', name: 'Specialist Learning', name_vi: 'Các lớp kỹ năng', short: 'Specialist',
     hint: 'Level and an individual comment for each student.' },
-  { key: 'vocational', name: 'Vocational Learning', name_vi: 'Hướng nghiệp', short: 'Vocational',
+  { key: 'vocational', name: 'Vocational Learning', name_vi: 'Các lớp thực hành', short: 'Vocational',
     hint: 'Level for each student, plus one course description shared by the year group. No individual comment.' },
 ]
 
@@ -91,8 +114,10 @@ const lifeSkills = (key) => ({
 // Since the evening of 22 October 2026 the academic areas, the vocational classes and
 // Movement share one pattern, "Intensive English in Technology" (Bowen). Reports print
 // the lead, "Intensive English in", as a small line above the class name (nameParts in
-// utils.js); NAME_LEADS lists the leads it knows, in English and in Vietnamese.
-export const NAME_LEADS = ['Intensive English in ', 'Tiếng Anh nâng cao theo chủ đề ']
+// utils.js); NAME_LEADS lists the leads it knows, in English and in Vietnamese. The
+// Vietnamese lead was "Tiếng Anh nâng cao" (advanced) until 23 October 2026; it is kept
+// last so a name saved with it still splits.
+export const NAME_LEADS = ['Intensive English in ', 'Tiếng Anh tăng cường theo chủ đề ', 'Tiếng Anh nâng cao theo chủ đề ']
 const englishLed = (en, vi) => ({ name: `${NAME_LEADS[0]}${en}`, name_vi: `${NAME_LEADS[1]}${vi}` })
 
 // Early Years areas follow the Early Years Foundation Stage, as last year's
@@ -194,17 +219,17 @@ export const TEXT_MINIMUMS = {
 export const SKILL_GROUPS = [
   { key: 'foundational', name: 'Foundational Learning Skills', name_vi: 'Kỹ năng học tập cơ bản', items: [
     { key: 'ready', name: 'Ready to Learn', name_vi: 'Sẵn sàng học tập', icon: 'sun' },
-    { key: 'instructions', name: 'Follows Instructions', name_vi: 'Tuân theo hướng dẫn', icon: 'list' },
+    { key: 'instructions', name: 'Follows Instructions', name_vi: 'Làm theo hướng dẫn', icon: 'list' },
     { key: 'creativity', name: 'Creativity', name_vi: 'Sáng tạo', icon: 'sparkles' },
-    { key: 'grasps', name: 'Grasps New Ideas', name_vi: 'Nắm bắt ý tưởng mới', icon: 'lightbulb' },
-    { key: 'persists', name: 'Continues to Try', name_vi: 'Tiếp tục cố gắng', icon: 'flag' },
+    { key: 'grasps', name: 'Grasps New Ideas', name_vi: 'Tiếp thu kiến thức mới', icon: 'lightbulb' },
+    { key: 'persists', name: 'Continues to Try', name_vi: 'Kiên trì cố gắng', icon: 'flag' },
   ] },
-  { key: 'sel', name: 'Social & Emotional Learning', name_vi: 'Kỹ năng cảm xúc xã hội', items: [
-    { key: 'emotions', name: 'Manages Emotions', name_vi: 'Quản lý cảm xúc', icon: 'smile' },
-    { key: 'relationships', name: 'Positive Relationships', name_vi: 'Mối quan hệ tích cực', icon: 'users' },
+  { key: 'sel', name: 'Social & Emotional Learning', name_vi: 'Kỹ năng cảm xúc và xã hội', items: [
+    { key: 'emotions', name: 'Manages Emotions', name_vi: 'Kiểm soát cảm xúc', icon: 'smile' },
+    { key: 'relationships', name: 'Positive Relationships', name_vi: 'Quan hệ tốt với mọi người', icon: 'users' },
     { key: 'identity', name: 'Strong Sense of Identity', name_vi: 'Ý thức về bản thân', icon: 'user' },
     { key: 'motivation', name: 'Motivation to Learn', name_vi: 'Động lực học tập', icon: 'rocket' },
-    { key: 'adaptability', name: 'Adaptability', name_vi: 'Khả năng thích ứng', icon: 'shuffle' },
+    { key: 'adaptability', name: 'Adaptability', name_vi: 'Khả năng thích nghi', icon: 'shuffle' },
   ] },
 ]
 
@@ -238,7 +263,7 @@ export const EARLY_YEARS_SKILL_GROUPS = [
 // skills) and `titles` for its printed headings (see TEMPLATE_TITLES).
 export const TEMPLATES = {
   early_years: {
-    key: 'early_years', name: 'Early Years', program: 'Early Years Program', program_vi: 'Chương trình Mầm non',
+    key: 'early_years', name: 'Early Years', program: 'Early Years Program', program_vi: 'Chương trình Early Years',
     yearGroups: EARLY_YEARS, scoreYearGroups: [],
     areas: ['communication', 'math', 'understanding_world', 'applied_english', 'cooking', 'physical', 'expressive_arts'],
     skillGroups: EARLY_YEARS_SKILL_GROUPS,
@@ -254,12 +279,12 @@ export const TEMPLATES = {
     },
   },
   primary: {
-    key: 'primary', name: 'Primary', program: 'Primary Program', program_vi: 'Chương trình Tiểu học',
+    key: 'primary', name: 'Primary', program: 'Primary Program', program_vi: 'Chương trình Primary',
     yearGroups: PRIMARY_YEARS, scoreYearGroups: ['Year 4', 'Year 5', 'Year 6'],
     areas: ['math', 'science', 'english', 'art_craft', 'cooking', 'movement', 'master_minds', 'technology', 'wellbeing', 'everyday_experts', 'presentation_play'],
   },
   lower_secondary: {
-    key: 'lower_secondary', name: 'Lower Secondary', program: 'Lower Secondary Program', program_vi: 'Chương trình Trung học cơ sở',
+    key: 'lower_secondary', name: 'Lower Secondary', program: 'Lower Secondary Program', program_vi: 'Chương trình Lower Secondary',
     yearGroups: ['Year 7', 'Year 8', 'Year 9'],
     areas: ['math', 'science', 'english', 'art_of_science', 'history', 'movement', 'executive_function', 'technology', 'wellbeing'],
   },
@@ -272,7 +297,7 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
-const SETTINGS_VERSION = 15
+const SETTINGS_VERSION = 17
 
 // The default names before version 14, which that upgrade replaces with today's.
 const NAMES_BEFORE_14 = {
@@ -294,7 +319,7 @@ export const DEFAULT_REPORT_SETTINGS = {
     docTitle: 'Learning Progress Report',
     docTitle_vi: 'Báo cáo Tiến bộ Học tập',
     closing: "We celebrate learning in all its forms. Thank you for your partnership in {nickname}'s learning journey.",
-    closing_vi: 'Chúng tôi trân trọng mọi hình thức học tập. Cảm ơn quý phụ huynh đã đồng hành cùng {nickname}.',
+    closing_vi: 'PRA trân trọng từng tiến bộ của con trong mọi lĩnh vực. Cảm ơn ba mẹ đã đồng hành cùng {nickname} trong việc học.',
   },
   schoolYear: '2026-2027',
   periods: PERIODS,
@@ -305,7 +330,7 @@ export const DEFAULT_REPORT_SETTINGS = {
   assistants: ASSISTANTS,
   signatures: [
     { role: 'Homeroom Teacher', name: '' },
-    { role: 'Head Teacher', name: 'Mr. Seth' },
+    { role: 'Head of Academy', name: 'Mr. Seth' },
   ],
 }
 
@@ -340,7 +365,11 @@ export const DEFAULT_REPORT_SETTINGS = {
  * Technology, Everyday Life, Movement ...). Before version 15 the Early Years
  * and specialist areas still under their plain names take "Intensive English in
  * ..." too (Cooking, Social Studies, the Art of Science ...), and an Early Years
- * "Mathematics" (an hour's `areaNames`) is dropped.
+ * "Mathematics" (an hour's `areaNames`) is dropped. Before version 16 the
+ * Vietnamese wording still at an earlier default (VI_BEFORE_16: two level names
+ * and descriptions, the program lines, the closing message, learner skills, and
+ * the "Tiếng Anh nâng cao" lead on area names) takes today's. Before version 17 a
+ * "Head Teacher" signature line becomes "Head of Academy", Seth's title on the website.
  * Saving in Report settings then stores the upgraded version.
  */
 export function normalizeReportSettings(stored) {
@@ -509,11 +538,27 @@ export function normalizeReportSettings(stored) {
   }
   let levels = s.levels
   if ((Number(v.version) || 1) < 7 && ['EPCM', 'EPCAM'].includes((v.levels || []).map((l) => l.code).join(''))) levels = LEVELS.map((l) => ({ ...l }))
+  let skillGroups = s.skillGroups
+  if ((Number(v.version) || 1) < 16) {
+    // Vietnamese still at an earlier default takes today's; wording someone changed stays.
+    const swap = (x, ...fields) => {
+      const c = { ...x }
+      for (const f of fields) if (VI_BEFORE_16.has(c[f])) c[f] = VI_BEFORE_16.get(c[f])
+      return c
+    }
+    const skills = (groups) => (groups || []).map((g) => ({ ...swap(g, 'name_vi'), items: (g.items || []).map((it) => swap(it, 'name_vi')) }))
+    levels = (levels || []).map((l) => swap(l, 'name_vi', 'desc_vi'))
+    skillGroups = skills(skillGroups)
+    s.org = swap(s.org, 'closing_vi')
+    for (const [k, t] of Object.entries(templates)) templates[k] = { ...swap(t, 'program_vi'), ...(t.skillGroups && { skillGroups: skills(t.skillGroups) }) }
+    for (const sub of subjects) if (String(sub.name_vi || '').startsWith(NAME_LEADS[2])) sub.name_vi = NAME_LEADS[1] + sub.name_vi.slice(NAME_LEADS[2].length)
+  }
+  if ((Number(v.version) || 1) < 17) s.signatures = (s.signatures || []).map((sg) => (sg.role === 'Head Teacher' ? { ...sg, role: 'Head of Academy' } : sg))
   for (const sub of subjects) if (!tierKeys.includes(sub.kind)) sub.kind = 'vocational'
   for (const [k, t] of Object.entries(templates)) {
     if (!t.areas) templates[k] = { ...t, areas: [...(t.academic || []), ...(t.specialist || []), ...(t.vocational || [])] }
     if (templates[k].program_vi == null && TEMPLATES[k]?.program_vi) templates[k].program_vi = TEMPLATES[k].program_vi
     delete templates[k].academic; delete templates[k].specialist; delete templates[k].vocational
   }
-  return { ...s, levels, subjects, templates, version: SETTINGS_VERSION }
+  return { ...s, levels, skillGroups, subjects, templates, version: SETTINGS_VERSION }
 }

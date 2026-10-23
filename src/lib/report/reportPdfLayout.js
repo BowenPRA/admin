@@ -595,13 +595,18 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
   const ROW_MIN = 46
   // One or two lines, whichever the text needs.
   const lines = (b) => b.base * b.style.pitch * (M.height(boxNode(b, b.base), b.w) <= b.base * b.style.pitch + 0.5 ? 1 : 2)
+  // The Vietnamese lead takes two lines in the academic name column. It breaks before
+  // "theo chủ đề", so "tăng cường" stays together (23 October 2026).
+  const leadBreak = (text) => text.replace(/ (theo chủ đề)$/u, '\n$1')
   // The lead of a name ("Intensive English in") as a small line, on two lines if need be, a
   // little smaller: above the name in the academic name column and on the cards.
   const LEAD_SIZES = [F.lead, 6, 5.6]
   const leadFit = (text, w, color, align) => {
     let lead = null
     for (const size of LEAD_SIZES) {
-      const node = { text, ...T(size, { color, pitch: 1.12, ...(align && { align }) }) }
+      const style = T(size, { color, pitch: 1.12, ...(align && { align }) })
+      let node = { text, ...style }
+      if (M.height(node, w) > size * 1.12 + 0.5) node = { text: leadBreak(text), ...style }
       lead = { node, h: M.height(node, w) }
       if (lead.h <= size * 1.12 * 2 + 0.5) break
     }
@@ -622,7 +627,12 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
     const lead = leadText ? leadFit(leadText, colW, THEME.academic.deep, 'center') : null
     let wrap = null
     for (const size of [F.title, 8.6, 8, 7.4]) {
-      const node = { text: areaName, ...T(size, { bold: true, color: C.navy, pitch: 1.1, font: HF, align: 'center' }) }
+      const style = T(size, { bold: true, color: C.navy, pitch: 1.1, font: HF, align: 'center' })
+      let node = { text: areaName, ...style }
+      // A Vietnamese name that wraps keeps its last two words together ("Hiểu biết về" /
+      // "thế giới"): most Vietnamese words have two syllables, so a break between the last
+      // two splits a word (23 October 2026).
+      if (vi && M.height(node, colW) > size * 1.1 + 0.5) node = { text: areaName.replace(/ (?=\S+ \S+$)/u, '\n'), ...style }
       wrap = { node, h: M.height(node, colW) }
       if (wrap.h <= size * 1.1 * 2 + 0.5) break
     }

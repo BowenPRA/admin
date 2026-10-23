@@ -28,7 +28,8 @@ const STRINGS = {
   },
   vi: {
     homeroom: 'GVCN',
-    partialDay: 'Buổi chiều từ',
+    // 11:35 is not "buổi chiều" in Vietnamese, so the line says when the student comes to class.
+    partialDay: 'Đến lớp từ',
     homeroomComment: 'Nhận xét của giáo viên chủ nhiệm',
     notYet: 'Chưa đánh giá',
     topicsCovered: 'Nội dung đã học:',
@@ -41,10 +42,12 @@ const STRINGS = {
     scoresKey: '– chưa đến kỳ · N/A không theo học hoặc không đánh giá',
     howILearn: 'Kỹ năng học tập',
     levelsKey: 'Mức độ tiến bộ',
+    // Since 23 October 2026 the specialist and vocational bands follow the website's
+    // "các lớp kỹ năng và thực hành"; "Hướng nghiệp" means careers guidance.
     titles: {
-      academic: 'Học thuật', specialist: 'Môn chuyên biệt', vocational: 'Hướng nghiệp',
+      academic: 'Học thuật', specialist: 'Các lớp kỹ năng', vocational: 'Các lớp thực hành',
       specialistNote: 'Nhận xét riêng về sự tiến bộ của {nickname}',
-      vocationalNote: 'Mô tả khóa học: nội dung {yearGroup} đã học trong quý này',
+      vocationalNote: 'Mô tả khóa học: nội dung lớp {yearGroup} đã học trong quý này',
     },
   },
 }
@@ -78,11 +81,19 @@ export const LANG_NAMES = { en: 'English', vi: 'Tiếng Việt' }
 export const periodLabel = (label, lang) =>
   lang === 'vi' ? String(label || '').replace(/Quarter/i, 'Quý').replace(/Semester/i, 'Học kỳ').replace(/Term/i, 'Kỳ') : label
 
-/** "Year 7" -> "Lớp 7" on Vietnamese reports; other year groups keep their name. */
-export const yearGroupLabel = (yg, lang) => (lang === 'vi' ? String(yg || '').replace(/^Year\s+(\d+)$/i, 'Lớp $1') : yg)
+/**
+ * A year group's name on the report. It stays in English on the Vietnamese page too:
+ * Year 7 matches Vietnamese grade 6, so "Lớp 7" would give the wrong grade (website
+ * rule, VIETNAMESE.md; "Lớp 7" until 23 October 2026).
+ */
+export const yearGroupLabel = (yg) => yg
 
-const ROLE_VI = { 'homeroom teacher': 'Giáo viên chủ nhiệm', 'head teacher': 'Trưởng chuyên môn' }
-export const roleLabel = (role, lang) => (lang === 'vi' ? ROLE_VI[String(role || '').toLowerCase()] || role : role)
+// Seth's title is Head of Academy, "Giám đốc học thuật" in Vietnamese, as on the website
+// (Bowen, 29 September 2026). The signature line said "Head Teacher" until 23 October 2026,
+// and reports made before then keep that role saved, so it prints under the new title.
+const ROLE_EN = { 'head teacher': 'Head of Academy' }
+const ROLE_VI = { 'homeroom teacher': 'Giáo viên chủ nhiệm', 'head teacher': 'Giám đốc học thuật', 'head of academy': 'Giám đốc học thuật' }
+export const roleLabel = (role, lang) => (lang === 'vi' ? ROLE_VI : ROLE_EN)[String(role || '').toLowerCase()] || role
 
 /** The Vietnamese text when writing a Vietnamese page, falling back to English (flagged as untranslated). */
 export function pickText(lang, en, vi) {

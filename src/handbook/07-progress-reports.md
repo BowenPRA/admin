@@ -38,8 +38,10 @@ Every learning area and every learner skill gets one of five levels. The key at 
 | 1 | Emerging | E | 1 | Làm quen | With a lot of support | Beginning to develop the skills, with a lot of support. |
 | 2 | Practicing | P | 2 | Luyện tập | With some help | Building understanding through practice, with some help. |
 | 3 | On Target | O | 3 | Đạt mục tiêu | Independently: the goal | Secure and independent. The goal for this stage. |
-| 4 | Confident | C | 5 | Tự tin | Consistently and skilfully | Consistently strong, even in new situations. |
-| 5 | Moving Beyond | M | 4 | Nổi trội | Beyond what is expected | Goes beyond what is expected; ready for extension. |
+| 4 | Confident | C | 5 | Vững vàng | Consistently and skilfully | Consistently strong, even in new situations. |
+| 5 | Moving Beyond | M | 4 | Vượt mục tiêu | Beyond what is expected | Goes beyond what is expected; ready for extension. |
+
+Until 23 October 2026 the Vietnamese names of Confident and Moving Beyond were "Tự tin" and "Nổi trội". "Tự tin" describes the child's character rather than their work, and "Nổi trội" ranks a child against the others; "Vững vàng" and "Vượt mục tiêu" sit beside "Đạt mục tiêu" as steps on one scale. Vietnamese staff have not read the new names yet (not checked since 23 October 2026).
 
 ### Why On Target is the goal
 
@@ -85,7 +87,7 @@ A template is the set of learning areas one stage's reports contain. The templat
 - Years 1 to 3 have no review scores, so their learner skills print at full width.
 - Since 20 October 2026 the academic areas print with last year's names, "Topics" with a capital since 22 October: "Intensive English in Math Topics", "Intensive English in Science Topics" and "English Literacy" (see [Rules and wording](#/handbook/rules)). In the narrow scores table Mathematics and Science print as "Math Topics" and "Science Topics". The names and the scores-table labels (**Name in the scores table**) are set in Reports → Settings.
 - Since late on 22 October 2026 every area except English Literacy and Applied English follows the same pattern, Early Years included, so all reports read alike: "Intensive English in Technology", "in Social Studies", "in the Art of Science", "in Cooking", "in Art & Crafts", "in Master Minds", "in Communication & Language", "in Physical Development" and so on. Year 7's Executive Function and the Everyday Experts class of Years 2 to 6 both print as "Everyday Life". For a few hours that day the vocational classes were "Intensive English in Life Skills: Technology", and Nursery and Kindergarten printed "Mathematics" for about an hour. A template can still rename an area for its year groups with `areaNames` in `defaults.js` (not in Report settings); none does.
-- **The small line.** "Intensive English in" (in Vietnamese "Tiếng Anh nâng cao theo chủ đề") prints as a small coloured line above the class name, which prints big: on the academic rows, the specialist cards and the vocational cards alike, so the big names read Math Topics, English Literacy, Social Studies, Cooking, Technology. A "the" goes on the small line ("Intensive English in the" over "Art of Science"). Every card of a band leaves the same room for the line, so the class names line up. A name in Report settings with a colon ("Life Skills: Technology") splits at the colon instead; any other name prints whole. With every box full, Year 7 in Vietnamese sets comments at 7.75pt instead of 8pt; nothing is cut, and every other page prints as before.
+- **The small line.** "Intensive English in" (in Vietnamese "Tiếng Anh tăng cường theo chủ đề", "nâng cao" until 23 October 2026) prints as a small coloured line above the class name, which prints big: on the academic rows, the specialist cards and the vocational cards alike, so the big names read Math Topics, English Literacy, Social Studies, Cooking, Technology. A "the" goes on the small line ("Intensive English in the" over "Art of Science"). Every card of a band leaves the same room for the line, so the class names line up. A name in Report settings with a colon ("Life Skills: Technology") splits at the colon instead; any other name prints whole. With every box full, Year 7 in Vietnamese sets comments at 7.75pt instead of 8pt; nothing is cut, and every other page prints as before.
 - A long name wraps onto two lines, a little smaller, in the name column and in the scores table instead of being cut; every academic row then shows its icon at the same, smaller size. With every box full the page still prints at the same size as before.
 
 ### The three tiers
@@ -277,7 +279,7 @@ A report is translated when its language is set to "English and Vietnamese". The
 ### The translation file
 
 1. **Reports** → **Translate** (head and Super Admin). The window is "Translate reports with Claude".
-2. Step 1, **Download the English**: choose the period and year group. By default the file holds only the parts that still have no Vietnamese. Press **Download file**. It is a JSON file of the English text, with the rules, a glossary and each part's character limit inside it.
+2. Step 1, **Download the English**: choose the period and year group. By default the file holds only the parts that still have no Vietnamese. Press **Download file**. It is a JSON file of the English text, with the rules, a glossary and each part's character limit inside it. Since 23 October 2026 (file version 2) it also gives the teacher who wrote each part, so Claude writes "thầy" or "cô", and the pronoun for the child ("bé" in Nursery and Kindergarten, "em" from Year 1), and its rules are the ones used for the first Vietnamese reports (below).
 3. Step 2, in the Claude desktop app: start a new chat, attach the file, and send the message the window gives (its **Copy** button copies it). Claude returns a file with the Vietnamese filled in. Download it.
 4. Step 3, **Upload Claude's file**: **Choose file** and pick it. The app lists every part with what it found: over the character limit, English changed since the file was made, not found, a word on the banned list, the nickname used.
 5. Untick anything that looks wrong. Existing Vietnamese is replaced only if you choose that.
@@ -290,6 +292,16 @@ A report is translated when its language is set to "English and Vietnamese". The
 - Corrections are typed straight into the Vietnamese boxes in the editor.
 
 ## Report settings
+### The first Vietnamese reports (Quarter 1, 2026-2027)
+
+Bowen asked on 23 October 2026, the day the English reports went out, for every report in Vietnamese: natural, never calling PRA a school, and still one A4 page.
+
+- Claude took the English from the downloaded Q1 PDFs (33 reports, 216 comments, 37 course descriptions) and wrote the Vietnamese in the desktop app, by year group, to one set of rules: written as a Vietnamese teacher would write it to the family, every fact and next step kept, "bé" or "em" for the child, "thầy" or "cô" for the teacher, year groups and class names in English, English vocabulary in quotation marks, no clichés, each part within its box. Those rules are now inside the translation file.
+- The Vietnamese went into The Current through one SQL file (`q1-vietnamese-reports.sql` in the Admin Email folder), not the translation file, because the reports were not yet set to English and Vietnamese. It sets every Q1 report to English and Vietnamese, fills only empty Vietnamese boxes, and skips any box whose English changed after the PDFs were downloaded; its last table names every box it left alone.
+- Every page was rendered with the real layout in both languages: all 33 Vietnamese pages fit on one page with nothing cut, their comments at 8 or 8.25pt, never smaller than the English page.
+- The fixed Vietnamese wording on the page was reviewed the same day (settings version 16): "Hướng nghiệp" (careers guidance) became "Các lớp thực hành" and "Môn chuyên biệt" became "Các lớp kỹ năng", as on the website; year groups and programs stay in English ("Year 7", "Chương trình Primary"); "Tiếng Anh nâng cao" became "Tiếng Anh tăng cường"; two level names (see [The five levels](#/handbook/reports?s=the-five-levels)); "Đến lớp từ 11:35" for a partial day (11:35 is not "buổi chiều"); a plainer closing message for "ba mẹ"; and six learner skills that read as translated ("Làm theo hướng dẫn", "Tiếp thu kiến thức mới", "Kiên trì cố gắng", "Kiểm soát cảm xúc", "Quan hệ tốt với mọi người", "Khả năng thích nghi").
+- No Vietnamese member of staff had read the comments or the new wording when they went in (not checked since 23 October 2026). The review step above still applies.
+
 
 **Reports** → **Settings** opens "Report settings" (head only). A change there is live as soon as it is saved; no deploy is needed.
 
@@ -301,7 +313,7 @@ A report is translated when its language is set to "English and Vietnamese". The
 | Learning areas | Name, Vietnamese name, key, tier, icon, the year groups it is for, and whether it has review scores |
 | Templates | Name, program line, year groups, which year groups get review scores, learning areas, headings, own learner skills |
 | Learner skills | The "How I learn" groups and skills |
-| Signature lines | Homeroom Teacher, and Head Teacher (Mr. Seth) by default |
+| Signature lines | Homeroom Teacher, and Head of Academy (Mr. Seth) by default. A line still saved as "Head Teacher" on an older report prints as "Head of Academy" ("Giám đốc học thuật" on the Vietnamese page) since 23 October 2026 |
 
 - The settings are saved as one document. If two people edit Report settings at the same time, the last to save wins and the other's changes are lost. Edit them one person at a time.
 - Teacher names on reports come from the Teachers page, not from settings. A name typed on a report is used only while nobody is linked to that area.
@@ -310,7 +322,7 @@ A report is translated when its language is set to "English and Vietnamese". The
 
 ### The settings version
 
-- The defaults for these settings are in the code. The saved settings carry a version number: 15 since 22 October 2026.
+- The defaults for these settings are in the code. The saved settings carry a version number: 17 since 23 October 2026 (version 17 renamed a "Head Teacher" signature line to "Head of Academy"). Version 16 replaced Vietnamese wording still at its earlier default (two level names and descriptions, the program lines, the closing message, six learner skills, the "Tiếng Anh nâng cao" lead); wording changed by hand is left alone.
 - When Claude adds a learning area or a template in the code, it raises the version. The first time the new app reads the saved settings, it upgrades them: versions 14 and 15 gave the "Intensive English in ..." names to every area still under an earlier default name (a name changed by hand is left alone) and dropped an Early Years "Mathematics", versions 10 to 13 (22 October 2026) made Movement a fixed description, renamed History and the vocational classes, shortened Movement's description and gave Year 7 Movement its comments back, version 9 gave Physical Development an individual comment and added Cooking to Early Years, version 8 added Master Minds, version 7 renamed a standard four- or five-level scale to the current names (a scale changed by hand is left alone), version 5 added the Early Years template.
 - Pressing **Save** in Report settings stores the upgraded version.
 - The upgrade adds the area to the template. Reports made before it do not have it until the head presses **Add … to N reports** on the year group's card.

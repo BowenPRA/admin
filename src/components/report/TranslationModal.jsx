@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Upload, Copy, Check, AlertTriangle, Languages, FileJson } from 'lucide-react'
 import { db } from '../../lib/db'
+import { useData } from '../../lib/DataContext'
 import { buildTranslationFile, parseTranslationFile, planTranslationImport, applyTranslationImport, CLAUDE_PROMPT } from '../../lib/report/translationFile'
 import { Modal, Field, Select, Checkbox, Spinner } from '../ui'
 
@@ -27,6 +28,7 @@ function Step({ n, title, children }) {
  * desktop app, then upload the file Claude returns to fill in the Vietnamese.
  */
 export default function TranslationModal({ settings, students, defaultPeriod, defaultGroup, onClose, onDone }) {
+  const { teachers, schedule } = useData()
   const [period, setPeriod] = useState(defaultPeriod)
   const [group, setGroup] = useState(defaultGroup || '')
   const [onlyMissing, setOnlyMissing] = useState(true)
@@ -47,7 +49,7 @@ export default function TranslationModal({ settings, students, defaultPeriod, de
   const groups = useMemo(() => [...new Set((data?.reports || []).filter((r) => r.lang === 'bi').map((r) => r.year_group))].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })), [data])
   // The list page's year group may have no English and Vietnamese reports; fall back to all.
   const yg = groups.includes(group) ? group : ''
-  const file = useMemo(() => (data ? buildTranslationFile({ ...data, students, settings, period, yearGroup: yg, onlyMissing }) : null), [data, students, settings, period, yg, onlyMissing])
+  const file = useMemo(() => (data ? buildTranslationFile({ ...data, students, teachers, schedule, settings, period, yearGroup: yg, onlyMissing }) : null), [data, students, teachers, schedule, settings, period, yg, onlyMissing])
   const biCount = (data?.reports || []).filter((r) => r.lang === 'bi' && (!yg || r.year_group === yg)).length
 
   const download = () => {

@@ -2,22 +2,28 @@
 // one JSON file, has Claude (desktop app) fill in the Vietnamese, then uploads
 // the file Claude returns. Nothing is sent anywhere by the app itself.
 
-import { subjectByKey, sectionsByTier, studentSections, TIER_KEYS, templateForYearGroup, textLimits, writingFor } from './utils'
+import { subjectByKey, sectionsByTier, studentSections, TIER_KEYS, templateForYearGroup, textLimits, writingFor, sectionTeacher, reportHomeroom, printedTeacher } from './utils'
 import { legalFirstName } from '../names'
 import { wordingIssues } from './wording'
 
 export const FILE_TYPE = 'pra-report-translation'
 
+// Rewritten 23 October 2026 from the rules used for the first Vietnamese reports (Q1
+// 2026-2027) and the website's VIETNAMESE.md: staff found a sentence-by-sentence
+// translation of the website awkward, so the file asks for Vietnamese written as a
+// Vietnamese teacher would write it, and spells out the words that make it read translated.
 const INSTRUCTIONS = [
-  'You are translating Learning Progress Reports from Palm River Academy, an English language center in Hoi An, from English into Vietnamese. Vietnamese parents read the translation as its own printed page, so write natural, warm, professional Vietnamese, as a thoughtful Vietnamese teacher would, not word for word.',
+  'You are writing the Vietnamese page of Learning Progress Reports from Palm River Academy (PRA), a licensed English language center in Hội An. Teachers wrote the comments in English; Vietnamese parents read your Vietnamese as a separate printed page. PRA\'s Vietnamese staff found an earlier sentence-by-sentence translation awkward, so the test for every part is: would a thoughtful Vietnamese teacher at PRA have written this to the parents? Write it that way, then check that every fact, judgement, example and next step of the English is still there, in the same order of praise, next step and positive close.',
   'Fill in every empty "vietnamese" value in "shared_topics" and in every report\'s "parts". Do not change ids, "english" or anything else. Leave a "vietnamese" value that is already filled exactly as it is.',
-  'Call the student by the name in "call_the_student" (with its Vietnamese accents), never by "nickname_do_not_use". Use "em" when a pronoun is needed.',
-  'Palm River Academy is never a "trường" (school): write "Palm River Academy" or "trung tâm". The document is a "Báo cáo tiến bộ học tập", never a "học bạ" or report card.',
-  'Scores are "điểm" and assessments are "bài đánh giá". Never write "bài kiểm tra", "bài thi" or "thi".',
-  'Use the Vietnamese in "glossary" for learning areas, levels and skills. Keep people\'s names and titles (e.g. Mr. Caleb), program names, numbers, percentages and scores exactly as written.',
-  'Each part has "max_chars", the most characters its box on the one-page report can hold. Stay within it; if Vietnamese runs long, say the same thing more concisely rather than dropping meaning.',
-  'Reporting periods are quarters: write "quý", never "học kỳ" or "kỳ".',
-  'Plain text only, no markdown. Translate only what is there: no greetings, additions or notes.',
+  'The child: use the name exactly as the English writes it ("call_the_student" is the legal first name), never "nickname_do_not_use". For a pronoun use the report\'s "pronoun": "bé" in Nursery and Kindergarten, "em" from Year 1 up. Never "nó", "cậu bé", "cô bé", "bạn ấy". Do not start every sentence with the name; Vietnamese can leave out a subject that is clear.',
+  'The teacher who wrote the part ("writer") speaks as "thầy" (Mr.) or "cô" (Ms.), never "tôi": "I look forward to..." is "Cô rất mong...". For "we", say who is meant ("thầy và em", "cả lớp"). Parents are "ba mẹ" and their child "con"; not "quý phụ huynh" or "bố mẹ".',
+  'PRA is never a school: never "trường", "trường học", "nhà trường", "đến trường" for PRA ("môi trường" is fine). Students are "học viên", never "học sinh". The document is a "báo cáo tiến bộ học tập", never "học bạ". Assessments are "bài đánh giá" and scores "điểm", never "bài kiểm tra", "kiểm tra", "bài thi" or "thi". Periods are quarters: "quý", never "học kỳ" or "kỳ".',
+  'Keep in English: year groups ("Year 7", never "lớp 7": Year 7 is grade 6 in Vietnam), Nursery, Kindergarten, Upper Secondary, named classes (Master Minds, Art of Science, Presentation & Play, Everyday Life), and words the child is learning in English, in quotation marks (các từ “mixing”, “stirring”; letter sounds, CVC). People\'s names and titles (Mr. Caleb), numbers, percentages and scores stay exactly as written. Subjects in running text: Toán, Khoa học, tiếng Anh, Mỹ thuật, Nấu ăn, Công nghệ, Vận động. For learning areas, levels and skills use "glossary".',
+  'Natural, not translated: join or split sentences as Vietnamese needs, and give every sentence a subject and a verb. Say what a Vietnamese teacher says, not the English idiom: "a joy to teach" is "cô rất vui khi được dạy em", "continue to flourish" is "ngày càng tiến bộ", "give things a go" is "mạnh dạn thử". Do not translate "real", "truly", "genuinely" word for word. Avoid chains of "việc", "một cách" before every adjective, and "được" passives where Vietnamese uses an active verb.',
+  'Never use these clichés: toàn diện, năng động, đẳng cấp, hàng đầu, chắp cánh, khơi dậy, khơi gợi, tiềm năng, hành trang, hành trình, vững bước, tương lai tươi sáng, vươn tầm, bứt phá, tỏa sáng, trải nghiệm tuyệt vời. Use the words of central and southern Vietnam (bị bệnh, not ốm; trái cây, not hoa quả), modern tone marks (hóa, khỏe, xóa, not hoá, khoẻ, xoá) and quotation marks “like this”.',
+  'Each part has "max_chars", the most characters (spaces included) its box on the one-page report holds. Never go over it; count with code, not by eye. When the English is near the limit, say the same thing more tightly (join sentences, drop a repeated compliment), never by dropping a fact, a difficulty or a next step.',
+  'Course descriptions in "shared_topics" print after the label "Nội dung đã học:", so a compact list of topics is right there, starting with a capital and ending with a full stop.',
+  'Plain text only, no markdown and no line breaks. Translate only what is there: no greetings, additions or notes. If the English has a slip, translate what the teacher meant.',
   'When done, give back the complete file as a downloadable JSON file with exactly the same structure, named like the original with "-vi" added.',
 ]
 
@@ -39,17 +45,18 @@ function glossary(settings) {
 const topicsLimit = (settings, key, yearGroup) =>
   textLimits(settings, { year_group: yearGroup, template: templateForYearGroup(settings, yearGroup)?.key })[subjectByKey(settings, key).kind === 'academic' ? 'academic_topics' : 'vocational_topics']
 
-/** Every translatable part of one report: [{ id, where, english, vietnamese, max_chars }]. */
-function reportParts(report, sections, settings) {
+/** Every translatable part of one report: [{ id, where, writer, english, vietnamese, max_chars }]. */
+function reportParts(report, sections, settings, teachers, schedule) {
   const parts = []
   const limits = textLimits(settings, report)
-  const add = (id, where, english, vietnamese, max) => { if (filled(english)) parts.push({ id, where, max_chars: max, english: english.trim(), vietnamese: vietnamese || '' }) }
-  add(`report:${report.id}:homeroom_note`, 'Homeroom teacher comment', report.homeroom_note, report.homeroom_note_vi, limits.homeroom_note)
+  const add = (id, where, writer, english, vietnamese, max) => { if (filled(english)) parts.push({ id, where, writer, max_chars: max, english: english.trim(), vietnamese: vietnamese || '' }) }
+  add(`report:${report.id}:homeroom_note`, 'Homeroom teacher comment', printedTeacher(reportHomeroom(schedule, report)), report.homeroom_note, report.homeroom_note_vi, limits.homeroom_note)
   const tiers = sectionsByTier(settings, sections, report.year_group)
   for (const tier of TIER_KEYS) {
     for (const s of tiers[tier] || []) {
       const name = subjectByKey(settings, s.subject_key).name
-      if (writingFor(settings, s.subject_key, report.year_group).comment) add(`section:${s.id}:comment`, `${name}: individual teacher comment`, s.comment, s.comment_vi, limits[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
+      const writer = printedTeacher(sectionTeacher(teachers, s, report.year_group, settings.assistants))
+      if (writingFor(settings, s.subject_key, report.year_group).comment) add(`section:${s.id}:comment`, `${name}: individual teacher comment`, writer, s.comment, s.comment_vi, limits[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
     }
   }
   return parts
@@ -60,7 +67,7 @@ function reportParts(report, sections, settings) {
  * `onlyMissing` leaves out parts that already have Vietnamese.
  * Returns { data, filename, count, total } (count = parts still to translate, total = parts in the file).
  */
-export function buildTranslationFile({ reports, sections, notes, students, settings, period, yearGroup, onlyMissing = true }) {
+export function buildTranslationFile({ reports, sections, notes, students, teachers = [], schedule = null, settings, period, yearGroup, onlyMissing = true }) {
   const bi = reports.filter((r) => r.lang === 'bi' && (!yearGroup || r.year_group === yearGroup))
     .sort((a, b) => String(a.year_group).localeCompare(String(b.year_group), undefined, { numeric: true }) || String(a.student_name).localeCompare(String(b.student_name)))
   const keep = (p) => !onlyMissing || !filled(p.vietnamese)
@@ -80,13 +87,14 @@ export function buildTranslationFile({ reports, sections, notes, students, setti
       year_group: r.year_group,
       call_the_student: legal.name,
       nickname_do_not_use: student?.nickname && student.nickname.toLowerCase() !== legal.name.toLowerCase() ? student.nickname : '',
-      parts: reportParts(r, studentSections(settings, sections.filter((s) => s.report_id === r.id), student), settings).filter(keep),
+      pronoun: templateForYearGroup(settings, r.year_group)?.key === 'early_years' ? 'bé' : 'em',
+      parts: reportParts(r, studentSections(settings, sections.filter((s) => s.report_id === r.id), student), settings, teachers, schedule).filter(keep),
     }
   }).filter((r) => r.parts.length)
   const count = shared_topics.filter((p) => !filled(p.vietnamese)).length + out.reduce((n, r) => n + r.parts.filter((p) => !filled(p.vietnamese)).length, 0)
   const data = {
     file_type: FILE_TYPE,
-    version: 1,
+    version: 2,
     instructions_for_claude: INSTRUCTIONS,
     academic_year: settings.schoolYear,
     period,
