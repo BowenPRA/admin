@@ -69,6 +69,12 @@
 // now closes the capsule's padding or moves the capsule rather than being cut.
 // The logo then doubled (Bowen), "ACADEMY" on the rule, the photo and name kept
 // under its wave (LOGO): every page above at the same size as before, nothing cut.
+// Later that day (Bowen) the rule moved down about 6pt to run through the logo's blue
+// wave rather than under "ACADEMY", and the gap under it closed from 8pt to 4pt to make
+// up for it. The rule then stayed put (RULE_Y) while the logo became 126pt wide, 12pt in
+// from the margin and lower, the rule through its green arcs and the top of the wave's
+// crest. The photo grew from 46pt to 52pt, and the homeroom comment gave up the 6pt so
+// the name keeps its width.
 
 import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor, fixedDescription, nameParts, printedTeacher } from './utils'
 import { reportStrings, reportTitle, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
@@ -117,9 +123,9 @@ const F = {
 const PAGE_W = 595.28
 const X = 20
 const W = PAGE_W - 2 * X
-const TOP = 14
+const RULE_Y = 50.3 // the masthead's rule; the logo moves about it, the page below does not
 const FOOT_Y = 819
-const TOP_GAP = 8 // below the masthead's rule
+const TOP_GAP = 4 // below the masthead's rule (as between the sections)
 const BAND_GAP = 7 // above the band of the level key and signatures
 const FOOT_GAP = 6 // above the footer rule
 const R = 7
@@ -135,12 +141,14 @@ const KEY_PITCH = 8.4 // the level key: one line per level
 const KEY_LABEL = 44 // its "Progress levels" tile
 const SIG_W = 100 // a signature block, at most
 // The logo (public/logo-transparent.png, the logo with its white made clear so the rule
-// shows through it), as fractions of its height: its height for its width, where the
-// foot of "ACADEMY" is, and how far down the artwork reaches in twenty strips across
-// it (the arcs and the wave hang below "ACADEMY" over its left half). Measured from
-// the 2128 × 858 artwork on 23 October 2026.
+// shows through it): its width, how far in from the margin and down from the top of the
+// page it starts (the rule then passes behind its green arcs and the top of its blue
+// wave's crest, about 0.69 of its height down), then as fractions of its height: its
+// height for its width, and how far down the artwork reaches in twenty strips across it
+// (the arcs and the wave hang below "ACADEMY" over its left half). Measured from the
+// 2128 × 858 artwork on 23 October 2026.
 const LOGO = {
-  w: 128, aspect: 858 / 2128, baseline: 501 / 858,
+  w: 126, left: 12, top: 15.5, aspect: 858 / 2128,
   foot: [0.817, 0.914, 0.943, 0.946, 0.998, 1, 0.986, 0.939, 0.871, 0.819, 0.843, 0.584, 0.584, 0.584, 0.584, 0.584, 0.584, 0.521, 0.381, 0.381],
 }
 const LOGO_CLEAR = 3 // between the wave and the student's photo and name below it
@@ -560,26 +568,26 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   // =========================================================================
   // Masthead: the logo on the left; the title, and the period, programme and
   // date on one line, on the right; a blue-to-green rule underneath. Since 23
-  // October 2026 (Bowen) the logo is twice the size, with "ACADEMY" standing on
-  // the rule as if written on it and the arcs and wave crossing it; the student's
-  // photo and name below keep clear of the wave (logoFoot).
-  const ruleY = TOP + 30.5
+  // October 2026 (Bowen) the logo is larger, and the rule runs through the top of
+  // its blue wave's crest (it ran under "ACADEMY" earlier that day); the title and its
+  // line stand on the rule. The student's photo and name below keep clear of the wave
+  // (logoFoot).
+  const logoY = LOGO.top
   const logoH = LOGO.w * LOGO.aspect
-  // "ACADEMY" stands just clear of the rule (Bowen: a very slight gap above the line).
-  const logoY = ruleY - 0.7 - LOGO.baseline * logoH
-  nodes.push({ absolutePosition: { x: X, y: logoY }, image: 'logo', width: LOGO.w, height: logoH })
-  /** The lowest point of the logo's artwork between x0 and x1 (from the logo's left edge); -Infinity outside it. */
+  const ruleY = RULE_Y
+  nodes.push({ absolutePosition: { x: X + LOGO.left, y: logoY }, image: 'logo', width: LOGO.w, height: logoH })
+  /** The lowest point of the logo's artwork between x0 and x1 (from the margin); -Infinity outside it. */
   const logoFoot = (x0, x1) => {
     const n = LOGO.foot.length
-    const k0 = Math.max(0, Math.floor((x0 / LOGO.w) * n))
-    const k1 = Math.min(n - 1, Math.floor((x1 / LOGO.w) * n))
-    return x1 < 0 || k0 > n - 1 ? -Infinity : logoY + logoH * Math.max(...LOGO.foot.slice(k0, k1 + 1))
+    const k0 = Math.max(0, Math.floor(((x0 - LOGO.left) / LOGO.w) * n))
+    const k1 = Math.min(n - 1, Math.floor(((x1 - LOGO.left) / LOGO.w) * n))
+    return x1 < LOGO.left || k0 > n - 1 ? -Infinity : logoY + logoH * Math.max(...LOGO.foot.slice(k0, k1 + 1))
   }
   const reportDate = report.report_date
     ? new Date(`${report.report_date}T00:00:00`).toLocaleDateString(vi ? 'vi-VN' : 'en-GB', { day: 'numeric', month: vi ? 'numeric' : 'long', year: 'numeric' })
     : ''
   const RW = 340
-  putLine(X + W - RW, TOP - 0.5, RW, (vi && org.docTitle_vi) || org.docTitle || '', F.docTitle, { bold: true, color: C.navy, font: HF, align: 'right' })
+  putLine(X + W - RW, ruleY - 31, RW, (vi && org.docTitle_vi) || org.docTitle || '', F.docTitle, { bold: true, color: C.navy, font: HF, align: 'right' })
   // A year range takes an en dash in print: 2026–2027.
   const schoolYear = String(report.school_year || '').replace(/^(\d{4})-(\d{4})$/, '$1–$2')
   const program = (vi && template.program_vi) || template.program || template.name || ''
@@ -587,7 +595,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     { text: `${periodLabel(report.period_label, lang)}  ·  ${schoolYear}`, bold: true, color: THEME.academic.deep },
     ...[program, reportDate].filter(Boolean).map((x) => ({ text: `   ·   ${x}`, color: C.muted })),
   ]
-  putLine(X + W - RW, TOP + 19.5, RW, subline, F.period, { align: 'right' })
+  putLine(X + W - RW, ruleY - 11, RW, subline, F.period, { align: 'right' })
   rect(X, ruleY, W, 1.3, { gradient: [THEME.academic.accent, THEME.academic.accent, THEME.vocational.accent] })
 
   // =========================================================================
@@ -635,8 +643,8 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   // =========================================================================
   // Prepare the parts that share the page's height.
   const startY = ruleY + 1.3 + TOP_GAP
-  const photoD = 46
-  const hrX = X + 146
+  const photoD = 52
+  const hrX = X + 152
   const hrW = X + W - hrX
   const infoX = X + photoD + 8
   const infoW = hrX - 8 - infoX
