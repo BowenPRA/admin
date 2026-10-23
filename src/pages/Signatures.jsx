@@ -14,7 +14,7 @@ import UploadSheet from '../components/signatures/UploadSheet'
 // Setup > Signatures: one signature per member of staff, drawn on a touch screen (or with
 // a pen or a mouse) or taken from a photo of it on paper. Office accounts and head
 // teachers see everyone, so the touch-screen laptop can be passed round the staff room;
-// a teacher sees only their own. Nothing prints them yet (supabase/updates-2026-10-23-signatures.sql).
+// a teacher sees only their own (supabase/updates-2026-10-23-signatures.sql). The progress reports print them.
 
 const ROLE_ORDER = { head: 0, teacher: 1, office: 2, other: 3 }
 const needsSql = (msg) => /adm_signatures|does not exist|schema cache/i.test(msg || '')

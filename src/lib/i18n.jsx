@@ -1519,7 +1519,7 @@ const STRINGS = {
   sigNav: ['Signatures', 'Chữ ký'],
   sigTitle: ['Signatures', 'Chữ ký'],
   sigYours: ['Your signature', 'Chữ ký của bạn'],
-  sigIntro: ['Each member of staff signs once: on this screen with a finger or the pen, or from a photo of their signature on paper. Nothing prints them yet.', 'Mỗi nhân viên ký một lần: ký ngay trên màn hình bằng ngón tay hoặc bút cảm ứng, hoặc tải lên ảnh chụp chữ ký trên giấy. Hiện chữ ký chưa được in lên giấy tờ nào.'],
+  sigIntro: ['Each member of staff signs once: on this screen with a finger or the pen, or from a photo of their signature on paper. The progress reports print the homeroom teacher’s and the Head of Academy’s beside their names.', 'Mỗi nhân viên ký một lần: ký ngay trên màn hình bằng ngón tay hoặc bút cảm ứng, hoặc tải lên ảnh chụp chữ ký trên giấy. Báo cáo tiến bộ in chữ ký của giáo viên chủ nhiệm và Giám đốc học thuật bên cạnh tên.'],
   sigIntroOwn: ['Sign once here with a finger, a pen or the mouse, or upload a photo of your signature on paper.', 'Bạn chỉ cần ký một lần tại đây bằng ngón tay, bút cảm ứng hoặc chuột, hoặc tải lên ảnh chụp chữ ký trên giấy.'],
   sigCount: ['{n} of {total} signed', 'Đã ký {n}/{total}'],
   sigFilterAll: ['Everyone', 'Tất cả'],

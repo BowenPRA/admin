@@ -319,7 +319,7 @@ async function measure(pdfMake, missing, cache) {
  * boxes whose text was cut, boxes set smaller than usual, parts printed in
  * English on a Vietnamese page, and the size the comments were set at.
  */
-function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
+function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signatures = [] }) {
   const { bundle, settings, teachers = [], schedule = null, lang = 'en', photoKey } = item
   const { report, sections = [], student, history = [], cohortAvg = {}, summativeAvg = {}, courseNotes = [] } = bundle
   const vi = lang === 'vi'
@@ -1022,9 +1022,26 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
   const SIG_GAP = 18
   const sigW = sigs.length ? Math.min(140, (W * 0.48 - SIG_GAP * (sigs.length - 1)) / sigs.length) : 0
   const sigX0 = X + W - (sigs.length ? sigs.length * sigW + SIG_GAP * (sigs.length - 1) : 0)
+  // A signature line's own signature (Setup > Signatures): the one saved under the same title
+  // and name ("Ms. Thắm N"), or else the only one that prints the same ("Ms. Thắm").
+  const signatureOf = (name) => {
+    const full = (sg) => `${sg.title} ${sg.name}`.trim()
+    const exact = signatures.filter((sg) => full(sg).toLowerCase() === String(name || '').trim().toLowerCase())
+    if (exact.length === 1) return exact[0]
+    const near = signatures.filter((sg) => printedTeacher(full(sg)).toLowerCase() === printedTeacher(name).toLowerCase())
+    return near.length === 1 ? near[0] : null
+  }
+  const INK_H = 21 // the tallest a signature prints, its foot a little below the line
   sigs.forEach((sg, i) => {
     const sx = sigX0 + i * (sigW + SIG_GAP)
-    if (sg.name) putLine(sx, sigY + 1, sigW, printedTeacher(sg.name), F.sig, { italics: true, color: C.navy })
+    const typed = sg.name ? putLine(sx, sigY + 1, sigW, printedTeacher(sg.name), F.sig, { italics: true, color: C.navy }) : 0
+    // The signature beside the typed name, as large as the room allows, its foot just below the line.
+    const ink = sg.name ? signatureOf(sg.name) : null
+    const room = sigW - typed - 8
+    if (ink?.w > 0 && ink?.h > 0 && room >= 24) {
+      const scale = Math.min(INK_H / ink.h, room / ink.w)
+      nodes.push({ absolutePosition: { x: sx + typed + 8, y: sigY + 18 - ink.h * scale }, image: ink.key, width: ink.w * scale, height: ink.h * scale })
+    }
     line(sx, sigY + 14.5, sx + sigW, sigY + 14.5, { color: C.sigLine, lw: 0.7, cap: 'round' })
     putLine(sx, sigY + 17.5, sigW, roleLabel(sg.role, lang).toUpperCase(), F.role, { bold: true, color: C.muted, spacing: 0.5 })
   })
@@ -1064,14 +1081,15 @@ const measured = new Map()
  * @param {object} [opts.icons] icon name -> SVG markup
  * @param {boolean} [opts.proof] outline boxes that are too full or untranslated (on-screen preview only)
  * @param {string} [opts.headFont] the font for names and headings: HEAD_FONT once Be Vietnam Pro is registered, else 'Roboto'
+ * @param {Array<{ key, title, name, w, h }>} [opts.signatures] staff signatures: the image key in `images`, whose they are, and their size in pixels
  * @param {string} [opts.title]
  * @returns {Promise<{ definition: object, checks: Array<object> }>}
  */
-export async function reportPdfDefinition(pdfMake, items, { images = {}, icons = {}, proof = false, headFont = 'Roboto', title = '' } = {}) {
+export async function reportPdfDefinition(pdfMake, items, { images = {}, icons = {}, proof = false, headFont = 'Roboto', signatures = [], title = '' } = {}) {
   let pages = []
   for (let pass = 0; pass < 8; pass++) {
     const M = measurer(measured)
-    pages = items.map((item) => buildPage(item, M, { proof, icons, headFont }))
+    pages = items.map((item) => buildPage(item, M, { proof, icons, headFont, signatures }))
     if (!M.missing.size) break
     await measure(pdfMake, M.missing, measured)
   }

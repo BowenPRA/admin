@@ -3,7 +3,7 @@
 // A drawn signature is kept twice: as its pen strokes, each point [x, y, width] in screen
 // pixels, and as a PNG cropped to the ink with a see-through background. A photo or scan
 // becomes the same kind of PNG: the paper is taken out, shadows and all, and the ink kept.
-// Nothing prints them yet.
+// The progress reports print them beside the names on the signature lines (reportPdf.js).
 
 export const INK = '#1B2A41'
 const MAX_OUT = 1600 // the widest a saved picture gets, in pixels
