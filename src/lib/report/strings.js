@@ -15,7 +15,8 @@ const STRINGS = {
     summative: 'Summative',
     endOfYearTest: 'end-of-year assessment',
     classAvg: 'class',
-    scoresKey: 'TBD: still to come · N/A: not enrolled or not assessed',
+    // The table marks a score still to come with a light dash (since 23 October 2026, was "TBD").
+    scoresKey: '– still to come · N/A not enrolled or not assessed',
     howILearn: 'How I Learn',
     levelsKey: 'Progress levels',
     // Headings a template may reword ({nickname}, {yearGroup} are filled in).
@@ -37,7 +38,7 @@ const STRINGS = {
     summative: 'Tổng kết',
     endOfYearTest: 'đánh giá cuối năm',
     classAvg: 'lớp',
-    scoresKey: 'TBD: chưa đến kỳ · N/A: không theo học hoặc không đánh giá',
+    scoresKey: '– chưa đến kỳ · N/A không theo học hoặc không đánh giá',
     howILearn: 'Kỹ năng học tập',
     levelsKey: 'Mức độ tiến bộ',
     titles: {

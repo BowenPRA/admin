@@ -345,7 +345,7 @@ export default function ReportEditor() {
             <div className={`flex flex-wrap items-center gap-2 rounded-xl border px-4 py-2.5 text-sm ${mine.length || homeroomOk ? 'border-sky-200 bg-sky-50 text-sky-900' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
               {mine.length || homeroomOk ? (<>
                 <span className="font-semibold">You can edit:</span>
-                {mine.map((s) => <a key={s.id} href={`#sec-${s.subject_key}`} onClick={(e) => { e.preventDefault(); document.getElementById(`sec-${s.subject_key}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }} className="chip bg-white text-sky-800 ring-1 ring-sky-200 hover:bg-sky-100">{subjectByKey(settings, s.subject_key).name}</a>)}
+                {mine.map((s) => <a key={s.id} href={`#sec-${s.subject_key}`} onClick={(e) => { e.preventDefault(); document.getElementById(`sec-${s.subject_key}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }} className="chip bg-white text-sky-800 ring-1 ring-sky-200 hover:bg-sky-100">{subjectByKey(settings, s.subject_key, report.year_group).name}</a>)}
                 {homeroomOk && <span className="chip bg-white text-amber-800 ring-1 ring-amber-200">Homeroom parts</span>}
                 <span className="text-xs text-sky-700/80">Other sections are shown for reference.</span>
               </>) : <span><Lock size={14} className="mr-1 inline" />You are not linked to any part of this {report.year_group} report, so it is read-only.</span>}

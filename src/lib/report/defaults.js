@@ -88,6 +88,13 @@ const lifeSkills = (key) => ({
   name_vi: `Tiếng Anh giao tiếp trong hoạt động hằng ngày: Chủ đề ${LIFE_SKILLS_CLASSES[key][1]}`,
 })
 
+// Since the evening of 22 October 2026 the academic areas, the vocational classes and
+// Movement share one pattern, "Intensive English in Technology" (Bowen). Reports print
+// the lead, "Intensive English in", as a small line above the class name (nameParts in
+// utils.js); NAME_LEADS lists the leads it knows, in English and in Vietnamese.
+export const NAME_LEADS = ['Intensive English in ', 'Tiếng Anh nâng cao theo chủ đề ']
+const englishLed = (en, vi) => ({ name: `${NAME_LEADS[0]}${en}`, name_vi: `${NAME_LEADS[1]}${vi}` })
+
 // Early Years areas follow the Early Years Foundation Stage, as last year's
 // Nursery and Kindergarten reports did: Communication & Language, Mathematics
 // and Understanding the World get a comment each; Applied English and Cooking
@@ -96,38 +103,59 @@ const lifeSkills = (key) => ({
 // with an individual comment (`comment: true`) and Expressive Arts & Design
 // with a level plus the class's shared description. Personal, social and
 // emotional development is in the Early Years learner skills.
+// Since late on 22 October 2026 every area but English Literacy and Applied English
+// is "Intensive English in ...", Early Years included, so all reports read alike (Bowen).
 export const SUBJECTS = [
-  { key: 'communication', kind: 'academic', name: 'Communication & Language', name_vi: 'Giao tiếp & Ngôn ngữ', icon: 'chat', scored: false, yearGroups: EARLY_YEARS },
+  { key: 'communication', kind: 'academic', ...englishLed('Communication & Language', 'Giao tiếp & Ngôn ngữ'), icon: 'chat', scored: false, yearGroups: EARLY_YEARS },
   // The academic areas carry last year's names, which present them as English classes
-  // (Ms. Xuan, 20 October 2026). `short` / `short_vi` is the label in the narrow scores
-  // table, where the full name would need three lines.
-  { key: 'math', kind: 'academic', name: 'Intensive English in Math topics', name_vi: 'Tiếng Anh nâng cao theo chủ đề Toán học', short: 'Math topics', short_vi: 'Chủ đề Toán học', icon: 'calculator', scored: true },
-  { key: 'science', kind: 'academic', name: 'Intensive English in Science topics', name_vi: 'Tiếng Anh nâng cao theo chủ đề Khoa học', short: 'Science topics', short_vi: 'Chủ đề Khoa học', icon: 'flask', scored: true },
+  // (Ms. Xuan, 20 October 2026; "Topics" with a capital since 22 October). `short` /
+  // `short_vi` is the label in the narrow scores table.
+  { key: 'math', kind: 'academic', ...englishLed('Math Topics', 'Toán học'), short: 'Math Topics', short_vi: 'Chủ đề Toán học', icon: 'calculator', scored: true },
+  { key: 'science', kind: 'academic', ...englishLed('Science Topics', 'Khoa học'), short: 'Science Topics', short_vi: 'Chủ đề Khoa học', icon: 'flask', scored: true },
   { key: 'english', kind: 'academic', name: 'English Literacy', name_vi: 'Tiếng Anh', icon: 'book', scored: true },
-  { key: 'understanding_world', kind: 'academic', name: 'Understanding the World', name_vi: 'Hiểu biết về thế giới', icon: 'sprout', scored: false, yearGroups: EARLY_YEARS },
+  { key: 'understanding_world', kind: 'academic', ...englishLed('Understanding the World', 'Hiểu biết về thế giới'), icon: 'sprout', scored: false, yearGroups: EARLY_YEARS },
   { key: 'applied_english', kind: 'specialist', name: 'Applied English', name_vi: 'Tiếng Anh ứng dụng', icon: 'languages', scored: false, yearGroups: EARLY_YEARS },
-  { key: 'art_of_science', kind: 'specialist', name: 'Art of Science', name_vi: 'Nghệ thuật Khoa học', icon: 'palette', scored: false },
+  // "Intensive English in the Art of Science": the report prints "Intensive English in the" small, "Art of Science" big.
+  { key: 'art_of_science', kind: 'specialist', ...englishLed('the Art of Science', 'Nghệ thuật Khoa học'), icon: 'palette', scored: false },
   // The key stays `history` (saved reports and the Teachers page use it); the class has been Social Studies since 22 October 2026.
-  { key: 'history', kind: 'specialist', name: 'Social Studies', name_vi: 'Khoa học xã hội', icon: 'landmark', scored: false },
-  { key: 'art_craft', kind: 'specialist', name: 'Art & Crafts', name_vi: 'Mỹ thuật & Thủ công', icon: 'brush', scored: false, yearGroups: PRIMARY_YEARS },
-  { key: 'cooking', kind: 'specialist', name: 'Cooking', name_vi: 'Nấu ăn', icon: 'chef', scored: false, yearGroups: [...EARLY_YEARS, ...PRIMARY_YEARS] },
-  { key: 'master_minds', kind: 'specialist', name: 'Master Minds', name_vi: 'Tư duy & Giải đố', icon: 'puzzle', scored: false, yearGroups: ['Year 1'] },
-  // The Primary and Lower Secondary vocational areas carry last year's "Life Skills" names,
-  // which present them as English classes like the academic areas (Bowen, 22 October 2026;
-  // Movement keeps its name). Reports print the part before the colon as a small line
-  // above the class name.
-  { key: 'executive_function', kind: 'vocational', ...lifeSkills('executive_function'), icon: 'brain', scored: false },
-  { key: 'technology', kind: 'vocational', ...lifeSkills('technology'), icon: 'monitor', scored: false },
-  { key: 'wellbeing', kind: 'vocational', ...lifeSkills('wellbeing'), icon: 'heart', scored: false, yearGroups: [...YEARS_2_TO_6, ...LOWER_SECONDARY_YEARS] },
-  { key: 'everyday_experts', kind: 'vocational', ...lifeSkills('everyday_experts'), icon: 'lightbulb', scored: false, yearGroups: YEARS_2_TO_6 },
-  { key: 'presentation_play', kind: 'vocational', ...lifeSkills('presentation_play'), icon: 'drama', scored: false, yearGroups: ['Year 1'] },
+  { key: 'history', kind: 'specialist', ...englishLed('Social Studies', 'Khoa học xã hội'), icon: 'landmark', scored: false },
+  { key: 'art_craft', kind: 'specialist', ...englishLed('Art & Crafts', 'Mỹ thuật & Thủ công'), icon: 'brush', scored: false, yearGroups: PRIMARY_YEARS },
+  { key: 'cooking', kind: 'specialist', ...englishLed('Cooking', 'Nấu ăn'), icon: 'chef', scored: false, yearGroups: [...EARLY_YEARS, ...PRIMARY_YEARS] },
+  { key: 'master_minds', kind: 'specialist', ...englishLed('Master Minds', 'Tư duy & Giải đố'), icon: 'puzzle', scored: false, yearGroups: ['Year 1'] },
+  // The Primary and Lower Secondary vocational areas and Movement are English classes too
+  // (Bowen, 22 October 2026): Executive Function (Year 7) and Everyday Experts (Years 2
+  // to 6) both became "Everyday Life".
+  { key: 'executive_function', kind: 'vocational', ...englishLed('Everyday Life', 'Cuộc sống hằng ngày'), icon: 'brain', scored: false },
+  { key: 'technology', kind: 'vocational', ...englishLed('Technology', 'Công nghệ'), icon: 'monitor', scored: false },
+  { key: 'wellbeing', kind: 'vocational', ...englishLed('Wellbeing', 'Sức khỏe tinh thần'), icon: 'heart', scored: false, yearGroups: [...YEARS_2_TO_6, ...LOWER_SECONDARY_YEARS] },
+  { key: 'everyday_experts', kind: 'vocational', ...englishLed('Everyday Life', 'Cuộc sống hằng ngày'), icon: 'lightbulb', scored: false, yearGroups: YEARS_2_TO_6 },
+  { key: 'presentation_play', kind: 'vocational', ...englishLed('Presentation & Play', 'Thuyết trình & Vui chơi'), icon: 'drama', scored: false, yearGroups: ['Year 1'] },
   // Movement was a specialist area with a comment on each student until 22 October 2026.
   // That evening Year 7 (Mr. Caleb's comments) went back to that; Years 1 to 6 keep the description.
-  { key: 'movement', kind: 'vocational', name: 'Movement', name_vi: 'Vận động', icon: 'movement', scored: false, yearGroups: [...PRIMARY_YEARS, 'Year 7'],
+  { key: 'movement', kind: 'vocational', ...englishLed('Movement', 'Vận động'), icon: 'movement', scored: false, yearGroups: [...PRIMARY_YEARS, 'Year 7'],
     description: MOVEMENT_DESCRIPTION, description_vi: MOVEMENT_DESCRIPTION_VI, specialistIn: ['Year 7'] },
-  { key: 'physical', kind: 'vocational', comment: true, name: 'Physical Development', name_vi: 'Phát triển thể chất', icon: 'footprints', scored: false, yearGroups: EARLY_YEARS },
-  { key: 'expressive_arts', kind: 'vocational', name: 'Expressive Arts & Design', name_vi: 'Nghệ thuật & Sáng tạo', icon: 'music', scored: false, yearGroups: EARLY_YEARS },
+  { key: 'physical', kind: 'vocational', comment: true, ...englishLed('Physical Development', 'Phát triển thể chất'), icon: 'footprints', scored: false, yearGroups: EARLY_YEARS },
+  { key: 'expressive_arts', kind: 'vocational', ...englishLed('Expressive Arts & Design', 'Nghệ thuật & Sáng tạo'), icon: 'music', scored: false, yearGroups: EARLY_YEARS },
 ]
+
+// The names the version 15 upgrade replaces: [English, Vietnamese] before "Intensive English in".
+const NAMES_BEFORE_15 = {
+  communication: ['Communication & Language', 'Giao tiếp & Ngôn ngữ'],
+  understanding_world: ['Understanding the World', 'Hiểu biết về thế giới'],
+  art_of_science: ['Art of Science', 'Nghệ thuật Khoa học'],
+  history: ['Social Studies', 'Khoa học xã hội'],
+  art_craft: ['Art & Crafts', 'Mỹ thuật & Thủ công'],
+  cooking: ['Cooking', 'Nấu ăn'],
+  master_minds: ['Master Minds', 'Tư duy & Giải đố'],
+  physical: ['Physical Development', 'Phát triển thể chất'],
+  expressive_arts: ['Expressive Arts & Design', 'Nghệ thuật & Sáng tạo'],
+}
+
+// Teachers who help in a class another teacher leads: on a card they share, the printed
+// report names only the other teacher ("Mr. Caleb", not "Mr. Caleb & Ms. Thắm V", on
+// Technology and Art & Crafts in Years 2 to 5; Bowen, 22 October 2026). An entry is an
+// email or a name as on the Teachers page. Where she is the only teacher, she prints.
+const ASSISTANTS = ['tham.v@pra.edu.vn', 'Thắm V']
 
 // Character limits for the printed boxes. The report is one A4 page, printed
 // in English or in Vietnamese (never both on one page), so the same limit
@@ -214,6 +242,8 @@ export const TEMPLATES = {
     yearGroups: EARLY_YEARS, scoreYearGroups: [],
     areas: ['communication', 'math', 'understanding_world', 'applied_english', 'cooking', 'physical', 'expressive_arts'],
     skillGroups: EARLY_YEARS_SKILL_GROUPS,
+    // A template may also have `areaNames` ({ math: { name, name_vi } }): names it prints
+    // instead of the area's own. Early Years printed "Mathematics" for an hour on 22 October 2026.
     limits: { specialist_comment: 600 }, minimums: { specialist_comment: 300 },
     titles: {
       academic: 'Areas of Learning', academic_vi: 'Các lĩnh vực học tập',
@@ -242,7 +272,18 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
-const SETTINGS_VERSION = 13
+const SETTINGS_VERSION = 15
+
+// The default names before version 14, which that upgrade replaces with today's.
+const NAMES_BEFORE_14 = {
+  math: { name: ['Intensive English in Math topics'], short: ['Math topics'] },
+  science: { name: ['Intensive English in Science topics'], short: ['Science topics'] },
+  movement: { name: ['Movement'], name_vi: ['Vận động'] },
+  ...Object.fromEntries(Object.keys(LIFE_SKILLS_CLASSES).map((key) => [key, {
+    name: [LIFE_SKILLS_CLASSES[key][0], lifeSkills(key).name],
+    name_vi: [LIFE_SKILLS_CLASSES[key][1], lifeSkills(key).name_vi],
+  }])),
+}
 
 export const DEFAULT_REPORT_SETTINGS = {
   version: SETTINGS_VERSION,
@@ -261,6 +302,7 @@ export const DEFAULT_REPORT_SETTINGS = {
   subjects: SUBJECTS,
   skillGroups: SKILL_GROUPS,
   templates: TEMPLATES,
+  assistants: ASSISTANTS,
   signatures: [
     { role: 'Homeroom Teacher', name: '' },
     { role: 'Head Teacher', name: 'Mr. Seth' },
@@ -293,7 +335,12 @@ export const DEFAULT_REPORT_SETTINGS = {
  * History, if still so named, becomes Social Studies. Before version 11 the
  * Primary and Lower Secondary vocational areas still under their old names
  * take the "Life Skills" names (Technology becomes "Intensive English in Life
- * Skills: Technology").
+ * Skills: Technology"). Before version 14 the names still at an earlier default
+ * take the "Intensive English in ..." ones (Math Topics with a capital,
+ * Technology, Everyday Life, Movement ...). Before version 15 the Early Years
+ * and specialist areas still under their plain names take "Intensive English in
+ * ..." too (Cooking, Social Studies, the Art of Science ...), and an Early Years
+ * "Mathematics" (an hour's `areaNames`) is dropped.
  * Saving in Report settings then stores the upgraded version.
  */
 export function normalizeReportSettings(stored) {
@@ -434,6 +481,31 @@ export function normalizeReportSettings(stored) {
     // Year 7 Movement takes Mr. Caleb's comment again, with the specialist areas.
     const movement = subjects.find((sub) => sub.key === 'movement')
     if (movement && !movement.specialistIn) movement.specialistIn = ['Year 7']
+  }
+  if ((Number(v.version) || 1) < 14 && v.subjects) {
+    // The "Intensive English in ..." names; a name someone changed stays.
+    for (const sub of subjects) {
+      const was = NAMES_BEFORE_14[sub.key]
+      const now = SUBJECTS.find((x) => x.key === sub.key)
+      if (was && now) for (const f of Object.keys(was)) if (was[f].includes(sub[f])) sub[f] = now[f]
+    }
+  }
+  if ((Number(v.version) || 1) < 15 && v.subjects) {
+    // The rest of the areas take "Intensive English in ..."; a name someone changed stays.
+    for (const sub of subjects) {
+      const old = NAMES_BEFORE_15[sub.key]
+      const now = SUBJECTS.find((x) => x.key === sub.key)
+      if (!old || !now) continue
+      if (sub.name === old[0]) sub.name = now.name
+      if (sub.name_vi === old[1]) sub.name_vi = now.name_vi
+    }
+  }
+  if ((Number(v.version) || 1) < 15 && v.templates) {
+    for (const [k, t] of Object.entries(templates)) {
+      if (t.areaNames?.math?.name !== 'Mathematics') continue
+      const { math, ...rest } = t.areaNames // eslint-disable-line no-unused-vars
+      templates[k] = { ...t, areaNames: rest }
+    }
   }
   let levels = s.levels
   if ((Number(v.version) || 1) < 7 && ['EPCM', 'EPCAM'].includes((v.levels || []).map((l) => l.code).join(''))) levels = LEVELS.map((l) => ({ ...l }))

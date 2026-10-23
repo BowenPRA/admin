@@ -231,6 +231,12 @@ function SettingsForm({ initial }) {
           <button className="btn-secondary text-xs" onClick={() => add('signatures', { role: 'Principal', name: '' })}><Plus size={14} /> Add signature line</button>
         </div>
       </Card>
+
+      <Card title="Helping teachers" subtitle="Teachers who help in a class another teacher leads. On a card they share, the printed report names only the other teacher (Technology in Year 3 prints “Mr. Caleb”, not “Mr. Caleb & Ms. Thắm V”). Where a helping teacher is the only one, they still print.">
+        <Field label="Emails or names, as on the Teachers page, separated by commas">
+          <TextInput value={(s.assistants || []).join(', ')} onChange={(v) => set('assistants', v.split(',').map((x) => x.trim()))} />
+        </Field>
+      </Card>
     </div>
   )
 }

@@ -2,8 +2,8 @@
 // page per report. The same PDF is shown in the editor preview, opened for
 // printing and downloaded, so what teachers check is what parents receive.
 
-import { loadPdfMake, publicDataUrl } from '../pdfmake'
-import { reportPdfDefinition } from './reportPdfLayout'
+import { loadPdfMake, loadBrandFonts, publicDataUrl } from '../pdfmake'
+import { reportPdfDefinition, HEAD_FONT } from './reportPdfLayout'
 import { photoSrc, preparePhotos } from './photo'
 import { LANG_NAMES } from './strings'
 import { iconSvgs } from '../../components/report/icons'
@@ -75,6 +75,8 @@ export const reportFilename = (bundle, lang) =>
  */
 export async function reportPdf(reports, { settings, teachers = [], schedule = null, proof = false, title = '' }) {
   const [pdfMake, logo] = await Promise.all([loadPdfMake(), loadLogo()])
+  // Names and headings in Be Vietnam Pro (since 23 October 2026), or Roboto if it did not load.
+  const headFont = (await loadBrandFonts(pdfMake)) ? HEAD_FONT : 'Roboto'
   const images = { logo }
   await preparePhotos(reports.map((r) => r.bundle.student?.photo)).catch(() => {})
   const srcs = [...new Set(reports.map((r) => photoSrc(r.bundle.student?.photo)).filter(Boolean))]
@@ -85,7 +87,7 @@ export async function reportPdf(reports, { settings, teachers = [], schedule = n
     return { bundle, settings, teachers, schedule, lang, photoKey: images[`photo${i}`] ? `photo${i}` : null }
   })
   const pdfTitle = title || (reports.length === 1 ? reportFilename(reports[0].bundle, reports[0].lang).replace(/\.pdf$/, '') : 'Learning Progress Reports')
-  const { definition, checks } = await reportPdfDefinition(pdfMake, items, { images, icons: iconSvgs(), proof, title: pdfTitle })
+  const { definition, checks } = await reportPdfDefinition(pdfMake, items, { images, icons: iconSvgs(), proof, headFont, title: pdfTitle })
   const blob = await pdfMake.createPdf(definition).getBlob()
   return { blob, checks }
 }

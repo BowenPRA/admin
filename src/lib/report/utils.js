@@ -1,5 +1,5 @@
 import { genId } from '../db'
-import { TEXT_LIMITS, TEXT_MINIMUMS } from './defaults'
+import { TEXT_LIMITS, TEXT_MINIMUMS, NAME_LEADS } from './defaults'
 import { legalFirstName } from '../names'
 import { classForYearGroup } from '../schedule'
 import { partialFrom } from '../studentRecords'
@@ -14,11 +14,31 @@ export const fmtDate = (d, opts) => {
 /**
  * A learning area from Report settings. With `yearGroup`, as that year group has
  * it: an area with `specialistIn` (Movement: Year 7, since 22 October 2026) is a
- * specialist area there, with an individual comment and no fixed description.
+ * specialist area there, with an individual comment and no fixed description;
+ * and a template's `areaNames` rename an area in its year groups (none since
+ * 22 October 2026).
  */
 export function subjectByKey(settings, key, yearGroup) {
-  const sub = (settings?.subjects || []).find((s) => s.key === key) || { key, name: key, kind: 'vocational' }
+  let sub = (settings?.subjects || []).find((s) => s.key === key) || { key, name: key, kind: 'vocational' }
+  const renamed = yearGroup && templateForYearGroup(settings, yearGroup)?.areaNames?.[key]
+  if (renamed?.name) sub = { ...sub, name: renamed.name, name_vi: renamed.name_vi || sub.name_vi }
   return yearGroup && (sub.specialistIn || []).includes(yearGroup) ? { ...sub, kind: 'specialist', comment: false } : sub
+}
+
+/**
+ * An area's name in two parts for the printed report: the lead ("Intensive English
+ * in", a small line) and the class name ("Technology", in bold). A "the" after the lead
+ * joins it ("Intensive English in the" / "Art of Science"). A name with a colon splits
+ * there, as the "Life Skills: Technology" names did; any other name has no lead.
+ */
+export function nameParts(name) {
+  const text = String(name || '').trim()
+  const colon = text.indexOf(': ')
+  if (colon > 0) return { lead: text.slice(0, colon), head: text.slice(colon + 2) }
+  const lead = NAME_LEADS.find((p) => text.startsWith(p) && text.length > p.length)
+  if (!lead) return { lead: '', head: text }
+  const the = /^the (?=\S)/.exec(text.slice(lead.length))?.[0] || ''
+  return { lead: `${lead}${the}`.trim(), head: text.slice(lead.length + the.length) }
 }
 
 export function levelInfo(settings, value) {
@@ -125,10 +145,16 @@ export function missingAreas(settings, report, sections, student = null) {
   return areasFor(settings, template, report.year_group, student).filter((k) => !sections.some((s) => s.subject_key === k))
 }
 
-/** "Mr. Caleb" for the active teacher(s) linked to `movement:Year 7` on the Teachers page, or ''. */
-export function teacherNameFor(teachers, key, yearGroup) {
-  return (teachers || [])
-    .filter((x) => x.active !== false && (x.subjects || []).includes(`${key}:${yearGroup}`))
+/**
+ * "Mr. Caleb" for the active teacher(s) linked to `movement:Year 7` on the Teachers page, or ''.
+ * `assistants` (emails or names, Report settings) are left out where another teacher shares the area.
+ */
+export function teacherNameFor(teachers, key, yearGroup, assistants = []) {
+  const fold = (s) => String(s || '').normalize('NFC').trim().toLowerCase()
+  const helps = new Set(assistants.map(fold).filter(Boolean))
+  const linked = (teachers || []).filter((x) => x.active !== false && (x.subjects || []).includes(`${key}:${yearGroup}`))
+  const leads = linked.filter((t) => !helps.has(fold(t.email)) && !helps.has(fold(t.name)))
+  return (leads.length ? leads : linked)
     .map((t) => `${t.title ? `${t.title} ` : ''}${t.name}`)
     .join(' & ')
 }
@@ -136,10 +162,11 @@ export function teacherNameFor(teachers, key, yearGroup) {
 /**
  * The teacher shown for a learning area. The Teachers page is the source, so
  * existing reports follow changes there; a name typed on the report is used
- * only while nobody is linked to that area and year group.
+ * only while nobody is linked to that area and year group. The printed report
+ * passes `assistants` (Report settings), so a helping teacher is left out.
  */
-export const sectionTeacher = (teachers, section, yearGroup) =>
-  teacherNameFor(teachers, section.subject_key, yearGroup) || section.teacher_name || ''
+export const sectionTeacher = (teachers, section, yearGroup, assistants = []) =>
+  teacherNameFor(teachers, section.subject_key, yearGroup, assistants) || section.teacher_name || ''
 
 /** "Ms. Kiu": the homeroom teacher of the class a year group follows on the Schedule, or ''. */
 export const scheduledHomeroom = (schedule, yearGroup) =>
@@ -152,6 +179,13 @@ export const scheduledHomeroom = (schedule, yearGroup) =>
  */
 export const reportHomeroom = (schedule, report) =>
   scheduledHomeroom(schedule, report?.year_group) || report?.homeroom_teacher || ''
+
+/**
+ * A teacher's name as the printed report shows it: without the initial that tells
+ * two teachers apart in The Current ("Ms. Thắm V" prints "Ms. Thắm", "Mr. Caleb &
+ * Ms. Thắm V" prints "Mr. Caleb & Ms. Thắm"; Bowen, 22 October 2026).
+ */
+export const printedTeacher = (name) => String(name || '').replace(/(\p{L}{2,}) \p{Lu}\.?(?= &|$)/gu, '$1').trim()
 
 export const isHomeroomSignature = (sg) => /homeroom/i.test(sg?.role || '')
 

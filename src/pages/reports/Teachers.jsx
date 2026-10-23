@@ -225,7 +225,7 @@ export default function Teachers() {
               <thead><tr className="border-b border-slate-100">
                 <th className="th pl-5">Year group</th>
                 <th className="th">Homeroom</th>
-                {/* Long names ("Intensive English in Life Skills: Technology") wrap rather than widen the grid. */}
+                {/* Long names ("Intensive English in Presentation & Play") wrap rather than widen the grid. */}
                 {subjects.map((s) => <th key={s.key} className="th min-w-[5.5rem] max-w-[9rem] align-bottom">{s.name}<span className="block"><WritingTags settings={settings} subjectKey={s.key} compact /></span></th>)}
               </tr></thead>
               <tbody>
