@@ -1,19 +1,22 @@
 // Layout of the Learning Progress Report as a pdfmake document: one A4 page
-// per report, in English or in Vietnamese. Top to bottom: the masthead (logo,
-// title, period, programme and date over a blue-to-green rule), the level key
-// as five tiles in the levels' colours, the student (photo, name, nickname,
-// year group) beside the homeroom comment, academic rows (the subject's icon,
-// then its name, teacher and level on the left; course description above the individual
-// comment), review scores and learner skills, specialist cards (individual
-// comments), vocational cards (course descriptions, or a comment where the
-// area takes one), a slim signature row and the footer (motto and legal line).
+// per report, in English or in Vietnamese. Top to bottom: the masthead (the logo
+// standing on a blue-to-green rule; title, period, programme and date), the student
+// (photo, name, nickname, year group) beside the homeroom comment, academic rows
+// (the subject's icon, then its name, teacher and level on the left; course
+// description above the individual comment), review scores and learner skills,
+// specialist cards (individual comments), vocational cards (course descriptions,
+// or a comment where the area takes one), a band with the level key (a line per
+// level) on the left and the signature blocks on the right, and the footer (the
+// closing message and the legal line).
 // Each section is a pale panel in its own colour under a solid title band, with
-// no outline; rows inside it are parted by hairlines.
+// no outline; rows and cards inside it are parted by hairlines.
 //
 // Text is measured with pdfmake itself before it is placed. All comments share
 // one text size: the largest at which every comment fits once the page height
 // is shared out between the sections (a section with more to say gets a little
-// more room). Course descriptions are set in their own smaller style. Only if
+// more room). Then the page opens up as far as its room allows: more space
+// between and inside the sections and more line spacing in the comments (SPACE).
+// Course descriptions are set in their own smaller style. Only if
 // the smallest size still does not fit is text cut short, and that is reported
 // so the editor can say which box is too full. No browser APIs here:
 // `reportPdf.js` loads pdfmake, the fonts, the logo, photos and icons.
@@ -53,6 +56,19 @@
 // (Nursery, Kindergarten, Years 1, 2, 3, 5 and 7, every box at its limit and at
 // 85%, in English and Vietnamese): every page at exactly the size it had,
 // nothing cut.
+// Rearranged that afternoon (Bowen): the motto left the footer, the closing
+// message took its place, and the level key moved from under the masthead to
+// beside the signatures, a line per level at 7pt (it was two lines at 5.9pt in
+// five tiles); the signature goes above its line, the name and role below it. The
+// room this frees opens up the spacing (SPACE). Measured with the same text: no
+// page set smaller than before, and Nursery, Kindergarten and Years 2, 3 and 5 at
+// the limit rose from 8pt to 8.25pt (Year 1 Vietnamese from 7.75pt to 8pt);
+// the comments' line spacing opened from 1.23 to as much as 1.33 (1.23 to 1.30 on
+// five real pages, which kept their size or rose: Carrot 8pt to 8.25pt); nothing
+// cut. A level name in a narrow capsule ("Moving Beyond" in four cards in a row)
+// now closes the capsule's padding or moves the capsule rather than being cut.
+// The logo then doubled (Bowen), "ACADEMY" on the rule, the photo and name kept
+// under its wave (LOGO): every page above at the same size as before, nothing cut.
 
 import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor, fixedDescription, nameParts, printedTeacher } from './utils'
 import { reportStrings, reportTitle, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
@@ -93,8 +109,8 @@ export const HEAD_FONT = 'BeVietnamProStrong'
 const F = {
   body: 8.25, bodyMin: 6.75,
   topics: 7.2, topicsMin: 6.8, section: 9.6, sectionSub: 6.8, title: 9, cardTitle: 8.5, teacher: 6.7, pill: 6.6, lead: 6.3,
-  skill: 7, score: 8.8, ref: 5.8, head: 6.1, key: 6.1, sig: 9.3, role: 6.1, closing: 7, level: 6.7, levelDesc: 5.9, levelDescMin: 5.4,
-  foot: 6.4, name: 15, info: 7.8, docTitle: 15, period: 8.4, hrSign: 7.8,
+  skill: 7, score: 8.8, ref: 5.8, head: 6.1, key: 6.1, sig: 7.6, role: 5.8, closing: 6.6, closingMin: 5.9, level: 7, levelDesc: 7, levelDescMin: 6.2,
+  foot: 6.2, name: 15, info: 7.8, docTitle: 15, period: 8.4, hrSign: 7.8,
 }
 
 // Page geometry in points (A4 = 595.28 × 841.89).
@@ -103,15 +119,33 @@ const X = 20
 const W = PAGE_W - 2 * X
 const TOP = 14
 const FOOT_Y = 819
-const GAP = 4 // between sections
-const FOOT_GAP = 5 // above the footer rule
+const TOP_GAP = 8 // below the masthead's rule
+const BAND_GAP = 7 // above the band of the level key and signatures
+const FOOT_GAP = 6 // above the footer rule
 const R = 7
 const BAR = 14 // a section's title band
 const PAD = 7 // inside a section's panel, left and right
-const SIG_H = 24 // the signature row above the footer: closing message left, signature lines right
-const KEY_PAD = 3.25 // the level key: padding above and below
-const KEY_NAME = 9 // its line of dots and names, above the descriptions
+// Spacing that opens up where a page has room to spare (since 23 October 2026), each as
+// [a full page, the most room]: between the sections, inside the academic rows (top,
+// bottom, and around the rule under the course description), under the cards' text, and
+// the comments' line spacing as a multiple of their size. A full page is spaced as before.
+const SPACE = { gap: [4, 6.5], padT: [3.75, 5], padB: [3, 4], rule: [3, 5], cardPad: [4, 6], lead: [1.23, 1.34] }
+const LOOSE_STEPS = 11 // how finely it opens: the line spacing in steps of 0.01
+const KEY_PITCH = 8.4 // the level key: one line per level
+const KEY_LABEL = 44 // its "Progress levels" tile
+const SIG_W = 100 // a signature block, at most
+// The logo (public/logo-transparent.png, the logo with its white made clear so the rule
+// shows through it), as fractions of its height: its height for its width, where the
+// foot of "ACADEMY" is, and how far down the artwork reaches in twenty strips across
+// it (the arcs and the wave hang below "ACADEMY" over its left half). Measured from
+// the 2128 × 858 artwork on 23 October 2026.
+const LOGO = {
+  w: 128, aspect: 858 / 2128, baseline: 501 / 858,
+  foot: [0.817, 0.914, 0.943, 0.946, 0.998, 1, 0.986, 0.939, 0.871, 0.819, 0.843, 0.584, 0.584, 0.584, 0.584, 0.584, 0.584, 0.521, 0.381, 0.381],
+}
+const LOGO_CLEAR = 3 // between the wave and the student's photo and name below it
 const ICON_MAX = 26 // an academic subject's icon, as large as the rows allow up to this
+const ICON_FLOOR = 20 // room kept for it before the comments' line spacing opens up
 const ROW_COMFY = 80 // an academic row with room for a large icon, when the page has it to spare
 // Room to spare is shared out in proportion to these weights, and the homeroom
 // comment, the review scores and skills, and the vocational cards (course
@@ -315,9 +349,10 @@ async function measure(pdfMake, missing, cache) {
 
 /**
  * Lays out one report page. Returns { fills, strokes, nodes, checks } where
- * checks = { overflow, tooFull, shrunk, smaller, untranslated, bodySize, sizes }:
+ * checks = { overflow, tooFull, shrunk, smaller, untranslated, bodySize, sizes, iconSize, pitch, spare }:
  * boxes whose text was cut, boxes set smaller than usual, parts printed in
- * English on a Vietnamese page, and the size the comments were set at.
+ * English on a Vietnamese page, the size the comments were set at, and (for
+ * stress tests) the icon size, the comments' line spacing and the room left over.
  */
 function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signatures = [] }) {
   const { bundle, settings, teachers = [], schedule = null, lang = 'en', photoKey } = item
@@ -446,7 +481,16 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
       put(b.x, b.y, b.w, boxNode(b, size, content))
     })
   }
-  const BODY = { min: F.bodyMin, usual: F.body, body: true, style: { pitch: 1.23 } }
+  // Every comment box shares this style object, so they all take the line spacing chosen
+  // with the comment size below.
+  const BODY = { min: F.bodyMin, usual: F.body, body: true, style: { pitch: SPACE.lead[0] } }
+  // The page's spacing (SPACE) at looseness `t`, from 0 (full) to 1.
+  const S = {}
+  const loosen = (t) => {
+    Object.entries(SPACE).forEach(([k, [a, b]]) => { S[k] = a + (b - a) * t })
+    BODY.style.pitch = Math.round(S.lead * 100) / 100
+  }
+  loosen(0)
   // Course descriptions: the same small muted style on the academic rows and the vocational cards.
   const TOPICS = { base: F.topics, min: F.topicsMin, style: { pitch: 1.22, color: C.topics }, label: t.topicsCovered }
   const picked = (en, v) => {
@@ -475,21 +519,28 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
       }
     })
   }
-  /** The size a level capsule will take in `maxW`: { w, h }, plus its name as one line (set smaller if need be). */
+  // In a narrow column (the academic name column, four cards in a row) the capsule's
+  // padding closes up before its name is set smaller (23 October 2026).
+  const TIGHT = { ...BUBBLE, padL: 3, mid: 2.4, padR: 3.6 }
+  /** The size a level capsule will take in `maxW`: { w, h }, plus its name as one line (set smaller if need be) and its padding. */
   const pillFit = (value, maxW) => {
     const l = levelInfo(settings, value)
-    const fixed = BUBBLE.padL + bubblesW() + BUBBLE.mid + BUBBLE.padR
-    const one = oneLine(l ? nameIn(l) : t.notYet, F.pill, maxW - fixed, { bold: true, color: l ? l.color : C.emptyText, min: 0.78 })
-    return { l, one, w: fixed + one.width, h: PILL_H }
+    const fitWith = (b) => {
+      const fixed = b.padL + bubblesW() + b.mid + b.padR
+      const one = oneLine(l ? nameIn(l) : t.notYet, F.pill, maxW - fixed, { bold: true, color: l ? l.color : C.emptyText, min: 0.78 })
+      return { l, one, b, w: fixed + one.width, h: PILL_H, full: one.node.text === (l ? nameIn(l) : t.notYet) }
+    }
+    const f = fitWith(BUBBLE)
+    return f.one.node.fontSize < F.pill - 0.01 ? fitWith(TIGHT) : f
   }
   /** Level capsule; `align` 'right' or 'center' puts its right edge or middle at x. Returns { w, h }. */
   const pill = (value, x, y, maxW, align = 'left') => {
     const f = pillFit(value, maxW)
-    const { l, w, h } = f
+    const { l, w, h, b } = f
     const left = align === 'right' ? x - w : align === 'center' ? x - w / 2 : x
     rect(left, y, w, h, { r: h / 2, fill: l ? mix(l.color, 0.85) : C.empty })
-    bubbleRow(value, left + BUBBLE.padL, y + h / 2)
-    put(left + BUBBLE.padL + bubblesW() + BUBBLE.mid, midTop(y + h / 2, f.one.node.fontSize), f.one.width + 1, f.one.node)
+    bubbleRow(value, left + b.padL, y + h / 2)
+    put(left + b.padL + bubblesW() + b.mid, midTop(y + h / 2, f.one.node.fontSize), f.one.width + 1, f.one.node)
     return { w, h }
   }
 
@@ -508,9 +559,22 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
 
   // =========================================================================
   // Masthead: the logo on the left; the title, and the period, programme and
-  // date on one line, on the right; a blue-to-green rule underneath. (The
-  // motto is in the footer since 23 October 2026.)
-  nodes.push({ absolutePosition: { x: X, y: TOP }, image: 'logo', width: 66 })
+  // date on one line, on the right; a blue-to-green rule underneath. Since 23
+  // October 2026 (Bowen) the logo is twice the size, with "ACADEMY" standing on
+  // the rule as if written on it and the arcs and wave crossing it; the student's
+  // photo and name below keep clear of the wave (logoFoot).
+  const ruleY = TOP + 30.5
+  const logoH = LOGO.w * LOGO.aspect
+  // "ACADEMY" stands just clear of the rule (Bowen: a very slight gap above the line).
+  const logoY = ruleY - 0.7 - LOGO.baseline * logoH
+  nodes.push({ absolutePosition: { x: X, y: logoY }, image: 'logo', width: LOGO.w, height: logoH })
+  /** The lowest point of the logo's artwork between x0 and x1 (from the logo's left edge); -Infinity outside it. */
+  const logoFoot = (x0, x1) => {
+    const n = LOGO.foot.length
+    const k0 = Math.max(0, Math.floor((x0 / LOGO.w) * n))
+    const k1 = Math.min(n - 1, Math.floor((x1 / LOGO.w) * n))
+    return x1 < 0 || k0 > n - 1 ? -Infinity : logoY + logoH * Math.max(...LOGO.foot.slice(k0, k1 + 1))
+  }
   const reportDate = report.report_date
     ? new Date(`${report.report_date}T00:00:00`).toLocaleDateString(vi ? 'vi-VN' : 'en-GB', { day: 'numeric', month: vi ? 'numeric' : 'long', year: 'numeric' })
     : ''
@@ -524,47 +588,53 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     ...[program, reportDate].filter(Boolean).map((x) => ({ text: `   ·   ${x}`, color: C.muted })),
   ]
   putLine(X + W - RW, TOP + 19.5, RW, subline, F.period, { align: 'right' })
-  const ruleY = TOP + 30.5
   rect(X, ruleY, W, 1.3, { gradient: [THEME.academic.accent, THEME.academic.accent, THEME.vocational.accent] })
 
   // =========================================================================
-  // Level key: the whole scale in order, first steps to the top, as five tiles
-  // in the levels' own colours under the masthead, each with the level's dot,
-  // name and what it means (its description from Report settings). Every pill
-  // and dot on the page reads from it. The tiles are as tall as the longest
-  // description needs: two lines, set a little smaller before it takes a third.
-  const keyY = ruleY + 1.3 + 5.5
-  // Tiles 4pt apart, the last one ending at the right margin like the rule above.
-  const labelW = 46
-  const cellW = levels.length ? (W - labelW + 4) / levels.length : 0
-  const descW = cellW - 13
-  const DESC_PITCH = 1.16
+  // The foot of the page, worked out first, as what it takes comes off the room the
+  // sections share. Since 23 October 2026 (Bowen: the motto left the page) the footer
+  // holds the closing message on the left and the legal line on the right, and above it
+  // a band holds the level key on the left (it was five tiles under the masthead) and
+  // the signature blocks on the right (the closing message was there).
+  const legal = org.legalLine || ''
+  const legalW = legal ? M.width({ text: legal, ...T(F.foot, { pitch: 1 }) }) : 0
+  const closing = curly(((vi && org.closing_vi) || org.closing || '').replace('{nickname}', nick).replace('{name}', student?.full_name || ''))
+  const closingW = W - (legal ? legalW + 16 : 0)
+  const closingStyle = (s) => T(s, { italics: true, color: THEME.academic.deep, pitch: 1.2 })
+  // One line beside the legal line, a little smaller if need be; else two, broken between the sentences.
+  const closingSize = closing ? [6.6, 6.4, 6.2, 6, F.closingMin].find((s) => M.width({ text: closing, ...closingStyle(s) }) <= closingW) : F.closing
+  const stop = closing.indexOf('. ')
+  const closingText = closingSize || stop < 0 ? closing : `${closing.slice(0, stop + 1)}\n${closing.slice(stop + 2)}`
+  const closingNode = { text: closingText, ...closingStyle(closingSize || F.closing) }
+  const footLines = closing ? Math.max(1, Math.round(M.height(closingNode, closingW) / ((closingSize || F.closing) * 1.2))) : 1
+  const footY = FOOT_Y - (footLines - 1) * F.closing * 1.2
+
+  // The signature blocks, side by side at the right: each signature above its line, the
+  // name and role below it.
+  const sigs = reportSignatures(schedule, report)
+  const SIG_GAP = 16
+  const sigW = sigs.length ? Math.min(SIG_W, (W * 0.42 - SIG_GAP * (sigs.length - 1)) / sigs.length) : 0
+  const sigsW = sigs.length ? sigs.length * sigW + SIG_GAP * (sigs.length - 1) : 0
+  // The key: the label tile, then a line per level, with its bubbles, name and what it
+  // means (its description from Report settings) in columns. Descriptions are set a
+  // little smaller rather than wrap, and wrap only below F.levelDescMin.
+  const keyW = W - (sigsW ? sigsW + 22 : 0)
+  const KB = { d: 4, gap: 1.05 }
+  const levelNameW = Math.max(0, ...levels.map((l) => M.width({ text: nameIn(l), ...T(F.level, { bold: true, pitch: 1 }) })))
+  const keyBubblesX = X + KEY_LABEL + 7
+  const descX = keyBubblesX + bubblesW(KB) + 4 + levelNameW + 7
+  const descW = X + keyW - descX
   const descOf = (l) => ((vi && l.desc_vi) || l.desc || '').trim()
-  const descNode = (l, size) => ({ text: descOf(l), ...T(size, { color: C.muted, pitch: DESC_PITCH }) })
-  const descLines = (size) => Math.max(0, ...levels.map((l) => (descOf(l) ? Math.round(M.height(descNode(l, size), descW) / (size * DESC_PITCH)) : 0)))
-  const descSize = sizesOf({ base: F.levelDesc, min: F.levelDescMin }).find((s) => descLines(s) <= 2) ?? F.levelDesc
-  const keyLines = descLines(descSize)
-  const keyH = levels.length ? 2 * KEY_PAD + KEY_NAME + keyLines * descSize * DESC_PITCH : 0
-  if (levels.length) {
-    rect(X, keyY, labelW - 4, keyH, { r: 5, fill: C.keyFill })
-    const label = { text: t.levelsKey.toUpperCase(), ...T(5.9, { bold: true, color: C.muted, spacing: 0.5, pitch: 1.12 }) }
-    put(X + 7, keyY + (keyH - M.height(label, labelW - 12)) / 2 + 0.5, labelW - 12, label)
-    const nameCy = keyY + KEY_PAD + KEY_NAME / 2
-    levels.forEach((l, i) => {
-      const tx = X + labelW + i * cellW
-      rect(tx, keyY, cellW - 4, keyH, { r: 5, fill: mix(l.color, 0.9) })
-      // The level's bubbles, then its name: the key to every capsule on the page.
-      const KB = { d: 3.9, gap: 1 }
-      bubbleRow(l.value, tx + 5, nameCy, KB)
-      const nameX = tx + 5 + bubblesW(KB) + 3.5
-      putLine(nameX, midTop(nameCy, F.level), cellW - 4 - (nameX - tx) - 5, nameIn(l), F.level, { bold: true, color: l.color, min: 0.85 })
-      if (descOf(l)) put(tx + 5, keyY + KEY_PAD + KEY_NAME + 0.5, descW, descNode(l, descSize))
-    })
-  }
+  const descNode = (l, size) => ({ text: descOf(l), ...T(size, { color: C.muted, pitch: 1.15 }) })
+  const descSize = sizesOf({ base: F.levelDesc, min: F.levelDescMin }).find((s) => levels.every((l) => !descOf(l) || M.width(descNode(l, s)) <= descW)) ?? F.levelDescMin
+  const keyRows = levels.map((l) => KEY_PITCH + (descOf(l) ? Math.max(0, Math.round(M.height(descNode(l, descSize), descW) / (descSize * 1.15)) - 1) * descSize * 1.15 : 0))
+  const keyH = sum(keyRows)
+  const bandH = Math.max(keyH, sigs.length ? 36 : 0)
+  const bandY = footY - FOOT_GAP - bandH
 
   // =========================================================================
   // Prepare the parts that share the page's height.
-  const startY = levels.length ? keyY + keyH + 5.5 : ruleY + 9
+  const startY = ruleY + 1.3 + TOP_GAP
   const photoD = 46
   const hrX = X + 146
   const hrW = X + W - hrX
@@ -572,6 +642,44 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const infoW = hrX - 8 - infoX
   const HR_TOP = 15
   const HR_PAD = 4.5
+  // The full name, the largest words on the page after the title: on one line where it
+  // fits (set smaller if need be). A longer one breaks before the first name ("Bùi
+  // Nguyễn / Nhã Vy"), or else where the two lines come out most even, so no word is
+  // left on a line of its own.
+  const fullName = student?.full_name || report.student_name || ''
+  const nameStyle = (s) => T(s, { bold: true, color: C.navy, pitch: 1.08, font: HF })
+  const fullW = (text, s) => M.width({ text, ...nameStyle(s) })
+  const nameBreak = (s) => {
+    const words = fullName.split(/\s+/).filter(Boolean)
+    const splits = words.slice(1).map((_, i) => [words.slice(0, i + 1).join(' '), words.slice(i + 1).join(' ')])
+      .filter((p) => p.every((l) => fullW(l, s) <= infoW))
+    const longer = (p) => Math.max(fullW(p[0], s), fullW(p[1], s))
+    const best = splits.find((p) => foldName(p[1]) === foldName(nick)) || splits.sort((a, b) => longer(a) - longer(b))[0]
+    return best && best.join('\n')
+  }
+  const nameText = [F.name, 14, 13, 12].map((s) => fullW(fullName, s) <= infoW && { s, text: fullName }).find(Boolean)
+    || [14, 13, 12, 11, 10.5, 10].map((s) => nameBreak(s) && { s, text: nameBreak(s) }).find(Boolean)
+    || { s: 10, text: fullName }
+  const nameNode = { text: nameText.text, ...nameStyle(nameText.s) }
+  const fullH = M.height(nameNode, infoW)
+  const infoPitch = F.info * 1.3
+  const infoLines = [
+    student?.nickname && !nicknameInName(student.nickname, fullName, nick) && { text: `“${student.nickname}”`, style: { color: C.muted } },
+    { text: yearGroup, style: { bold: true, color: THEME.academic.deep } },
+    // A partial-day student joins after the morning (academic) lessons, which is why the page has none.
+    partialFrom(student) && { text: [`${t.partialDay} `, { text: partialFrom(student), bold: true }], style: { color: C.muted } },
+  ].filter(Boolean)
+  // The photo and the name block, centred on each other and in the homeroom row, but
+  // below the logo's wave, which hangs under the rule over the photo and the start of
+  // the name. Where the wave is lower than the centred column, the column sits under it
+  // and the row grows to hold it.
+  const infoH = fullH + 3 + infoLines.length * infoPitch
+  const colH = Math.max(photoD, infoH)
+  const clearTop = Math.max(
+    logoFoot(0, photoD) + LOGO_CLEAR - (colH - photoD) / 2,
+    logoFoot(infoX - X, infoX - X + infoW) + LOGO_CLEAR - (colH - infoH) / 2,
+  )
+  const studentNeed = Math.max(colH + 8, clearTop - startY + colH + 3)
   // The homeroom teacher signs the comment ("— Mr. Caleb"), on a line of its own below it,
   // or at the end of its last line where that line leaves room, which costs no height.
   const HR_SIGN = homeroomTeacher ? 10 : 0
@@ -586,9 +694,6 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const colW = nameW - 4
   const bx = X + PAD + nameW + 4
   const bw = X + W - PAD - bx
-  const PAD_T = 3.75
-  const PAD_B = 3
-  const RULE = 3 // gap, dotted rule and gap between the course description and the comment
   const ROW_MIN = 46
   // One or two lines, whichever the text needs.
   const lines = (b) => b.base * b.style.pitch * (M.height(boxNode(b, b.base), b.w) <= b.base * b.style.pitch + 0.5 ? 1 : 2)
@@ -637,8 +742,8 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     const leadH = lead ? lead.h + 0.6 : 0
     const nameH = leadH + wrap.h
     const textH = nameH + (teacher ? 1.5 + F.teacher * LINE : 0) + 4 + pillFit(s.level, colW).h
-    const label = { teacher, lead, leadH, wrap, nameH, textH, min: textH + PAD_T + 3 }
-    return { s, topics, comment, label, fixed: PAD_T + PAD_B + (topics ? topics.h + RULE : 0) }
+    const label = { teacher, lead, leadH, wrap, nameH, textH }
+    return { s, topics, comment, label }
   })
 
   const cardTiers = ['specialist', 'vocational'].filter((k) => tiers[k].length)
@@ -664,7 +769,6 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   // down to the teacher's line ('stacked'), or below it when a teacher's name
   // would be cut beside the pill ('stacked3': "Mr. Caleb & Ms. Thắm V").
   const CARD_HEAD = 3.5
-  const CARD_PAD = 4
   const HEAD_ONE = CARD_HEAD + PILL_H + 4 // text top when the teacher shares the title line
   const TEACHER_Y = CARD_HEAD + PILL_H + 0.5 // the teacher's own line, when needed
   const HEAD_TWO = TEACHER_Y + F.teacher * LINE + 1
@@ -688,6 +792,11 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     const titleW = M.width({ text: head, ...T(F.cardTitle, { ...TITLE_STYLE, pitch: 1 }) })
     const teacherW = teacher ? M.width({ text: teacher, ...T(F.teacher, { pitch: 1 }) }) : 0
     const pillBox = pillFit(s.level, cw * 0.55)
+    // On the teacher's line ('stacked') the capsule may take the room the teacher leaves, and
+    // where even that would cut the level's name ("Moving Beyond" in four cards in a row) it
+    // takes a line of its own ('stacked3').
+    const stackPillW = cw - TX - (teacher ? teacherW + 6 : 0)
+    const pillBesideTeacher = pillFit(s.level, stackPillW).full
     const roomForTeacher = cw - TX - pillBox.w - 4 - titleW - 5
     const teacherBeside = !teacher || teacherW <= roomForTeacher
     // Beside the pill the name may be set a little smaller (as putLine does), but not cut.
@@ -700,13 +809,14 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     // A comment is set at the shared body size; a course description in the smaller topics style.
     return {
       ...(desc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, head, kick, teacher, titleW, teacherBeside, titleBeside, teacherBesidePill, teacherOnLead, pillH: pillBox.h,
+      pillFull: pillBox.full, stackPillW, pillBesideTeacher,
       name: `${sub.name} ${desc ? 'course description' : 'comment'}`, w: cw,
       label: desc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
       ...(desc ? picked(note?.description, note?.description_vi) : picked(s.comment, s.comment_vi)),
     }
   })]))
   const tierLayout = Object.fromEntries(cardTiers.map((k) => [k,
-    !cards[k].every((c) => c.titleBeside) ? (cards[k].every((c) => c.teacherBesidePill) ? 'stacked' : 'stacked3')
+    !cards[k].every((c) => c.titleBeside && c.pillFull) ? (cards[k].every((c) => c.teacherBesidePill && c.pillBesideTeacher) ? 'stacked' : 'stacked3')
       : cards[k].every((c) => c.teacherBeside) ? 'one'
         // Since the five-bubble capsules (wider than the old pills, 23 October 2026), three cards
         // in a row rarely leave room for the teacher beside the name; the lead's line has it.
@@ -728,32 +838,52 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const midMin = Math.max(reviews.length ? BAR + SCORE_HEAD + reviews.length * 17 + SCORE_KEY : 0, groups.length ? BAR + SKILL_TOP + maxItems * 10.8 + 2 : 0)
 
   // Every part from the homeroom row down to the last card tier shares the page's
-  // height; the signature row above the footer is a fixed height.
+  // height down to the band of the key and signatures.
   const flexKeys = ['homeroom', ...(rows.length ? ['academic'] : []), ...(midMin ? ['mid'] : []), ...cardTiers]
-  const sigY = FOOT_Y - FOOT_GAP - SIG_H
-  const flexTotal = sigY - GAP - startY - GAP * (flexKeys.length - 1)
+  const flexAt = () => bandY - BAND_GAP - startY - S.gap * (flexKeys.length - 1)
 
-  // The largest comment size at which everything fits.
-  const rowNeed = (r, s) => Math.max(ROW_MIN, r.label.min, r.fixed + M.height(boxNode(r.comment, s), bw) + 0.5)
-  // A row with room for a 24pt icon above its name (a two-line name, as in the Early Years, needs more).
-  const comfyRow = (r) => Math.max(ROW_COMFY, r.label.textH + PAD_T + PAD_B + 6 + 24)
+  // A row's padding, and the course description with the rule under it.
+  const rowFixed = (r) => S.padT + S.padB + (r.topics ? r.topics.h + S.rule : 0)
+  const rowNeed = (r, s) => Math.max(ROW_MIN, r.label.textH + S.padT + 3, rowFixed(r) + M.height(boxNode(r.comment, s), bw) + 0.5)
+  // A row with room for an icon of `d` above its name (a two-line name, as in the Early Years,
+  // needs more), and with room for a 24pt one.
+  const iconRow = (r, d) => r.label.textH + S.padT + S.padB + 6 + d
+  const comfyRow = (r) => Math.max(ROW_COMFY, iconRow(r, 24))
   const needsAt = (s) => flexKeys.map((k) => {
-    if (k === 'homeroom') return Math.max(photoD + 8, HR_TOP + M.height(boxNode(homeroom, s), homeroom.w) + signRoom(s) + HR_PAD)
+    if (k === 'homeroom') return Math.max(studentNeed, HR_TOP + M.height(boxNode(homeroom, s), homeroom.w) + signRoom(s) + HR_PAD)
     if (k === 'academic') return BAR + sum(rows.map((r) => rowNeed(r, s)))
     if (k === 'mid') return midMin
-    return BAR + cardTop[k] + Math.max(...cards[k].map((c) => cardText(c, s))) + CARD_PAD
+    return BAR + cardTop[k] + Math.max(...cards[k].map((c) => cardText(c, s))) + S.cardPad
   })
+  // The largest comment size at which everything fits, spaced as a full page.
   const bodySizes = sizesOf({ base: F.body, min: F.bodyMin })
   const allNeeds = bodySizes.map(needsAt)
-  let bi = allNeeds.findIndex((list) => sum(list) <= flexTotal)
+  let bi = allNeeds.findIndex((list) => sum(list) <= flexAt())
   if (bi < 0) bi = bodySizes.length - 1
   const body = bodySizes[bi]
   checks.bodySize = body
+  // Then the page opens up as far as it can at that size (SPACE), keeping room for a
+  // good-sized subject icon (ICON_FLOOR, or a little smaller where two-line names leave
+  // no room for one, as on Vietnamese Early Years pages) in every academic row; room left
+  // over after that makes the icons larger. (Every step is measured on each pass, so the
+  // measuring settles in as few passes as before.)
+  const roomyNeeds = (d) => needsAt(body).map((v, i) => (flexKeys[i] === 'academic' ? BAR + sum(rows.map((r) => Math.max(rowNeed(r, body), iconRow(r, d)))) : v))
+  const steps = Array.from({ length: LOOSE_STEPS + 1 }, (_, k) => (LOOSE_STEPS - k) / LOOSE_STEPS)
+  const roomAt = [ICON_FLOOR, 17, 14].map((d) => steps.map((tt) => {
+    loosen(tt)
+    return sum(roomyNeeds(d)) <= flexAt()
+  }))
+  const floor = roomAt.find((list) => list.includes(true))
+  loosen(floor ? steps[floor.indexOf(true)] : 0)
+  checks.pitch = BODY.style.pitch
+  const flexTotal = flexAt()
+  const needs = needsAt(body)
+  checks.spare = Math.round((flexTotal - sum(needs)) * 10) / 10
   // A tier of one or two cards has less to say than the usual three, so it takes a smaller share of spare room.
   const weightOf = (k) => WEIGHT[k] * (cardTiers.includes(k) ? Math.min(1, tiers[k].length / 3) : 1)
   // Room to spare goes first to the academic rows, up to enough for a large subject icon.
-  const spare = Math.max(0, flexTotal - sum(allNeeds[bi]))
-  const shareNeeds = allNeeds[bi].map((v, i) => (flexKeys[i] === 'academic'
+  const spare = Math.max(0, flexTotal - sum(needs))
+  const shareNeeds = needs.map((v, i) => (flexKeys[i] === 'academic'
     ? Math.min(v + spare, BAR + sum(rows.map((r) => Math.max(rowNeed(r, body), comfyRow(r)))))
     : v))
   const caps = flexKeys.map((k, i) => (k in GROW ? shareNeeds[i] + GROW[k] : Infinity))
@@ -769,7 +899,8 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   // Student and homeroom teacher comment
   let y = startY
   const hrH = heights.homeroom
-  const photoY = y + (hrH - photoD) / 2
+  const colTop = Math.max(y + (hrH - colH) / 2, clearTop)
+  const photoY = colTop + (colH - photoD) / 2
   if (photoKey) {
     nodes.push({ absolutePosition: { x: X, y: photoY }, image: photoKey, width: photoD, height: photoD })
   } else {
@@ -778,34 +909,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     const initials = (student?.full_name || '?').split(' ').filter(Boolean).map((w) => w[0]).slice(-2).join('').toUpperCase()
     put(X, midTop(photoY + photoD / 2, 14, true, HF), photoD, { text: initials, ...T(14, { bold: true, color: C.initials, align: 'center', pitch: 1, font: HF }) })
   }
-  // The full name, the largest words on the page after the title: on one line where it
-  // fits (set smaller if need be). A longer one breaks before the first name ("Bùi
-  // Nguyễn / Nhã Vy"), or else where the two lines come out most even, so no word is
-  // left on a line of its own.
-  const fullName = student?.full_name || report.student_name || ''
-  const nameStyle = (s) => T(s, { bold: true, color: C.navy, pitch: 1.08, font: HF })
-  const fullW = (text, s) => M.width({ text, ...nameStyle(s) })
-  const nameBreak = (s) => {
-    const words = fullName.split(/\s+/).filter(Boolean)
-    const splits = words.slice(1).map((_, i) => [words.slice(0, i + 1).join(' '), words.slice(i + 1).join(' ')])
-      .filter((p) => p.every((l) => fullW(l, s) <= infoW))
-    const longer = (p) => Math.max(fullW(p[0], s), fullW(p[1], s))
-    const best = splits.find((p) => foldName(p[1]) === foldName(nick)) || splits.sort((a, b) => longer(a) - longer(b))[0]
-    return best && best.join('\n')
-  }
-  const nameText = [F.name, 14, 13, 12].map((s) => fullW(fullName, s) <= infoW && { s, text: fullName }).find(Boolean)
-    || [14, 13, 12, 11, 10.5, 10].map((s) => nameBreak(s) && { s, text: nameBreak(s) }).find(Boolean)
-    || { s: 10, text: fullName }
-  const nameNode = { text: nameText.text, ...nameStyle(nameText.s) }
-  const fullH = M.height(nameNode, infoW)
-  const infoPitch = F.info * 1.3
-  const infoLines = [
-    student?.nickname && !nicknameInName(student.nickname, fullName, nick) && { text: `“${student.nickname}”`, style: { color: C.muted } },
-    { text: yearGroup, style: { bold: true, color: THEME.academic.deep } },
-    // A partial-day student joins after the morning (academic) lessons, which is why the page has none.
-    partialFrom(student) && { text: [`${t.partialDay} `, { text: partialFrom(student), bold: true }], style: { color: C.muted } },
-  ].filter(Boolean)
-  let infoY = y + (hrH - (fullH + 3 + infoLines.length * infoPitch)) / 2
+  let infoY = colTop + (colH - infoH) / 2
   put(infoX, infoY, infoW, nameNode)
   infoY += fullH + 3
   infoLines.forEach((l) => { put(infoX, infoY, infoW, oneLine(l.text, F.info, infoW, l.style).node); infoY += infoPitch })
@@ -825,7 +929,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     const signY = below ? y + hrH - HR_PAD - HR_SIGN + 1 : lastTop + (body - F.hrSign) * ASC
     putLine(hrX + 10, signY, hrW - 15, signature, F.hrSign, { italics: true, color: C.homeroomInk, align: 'right' })
   }
-  y += hrH + GAP
+  y += hrH + S.gap
 
   // =========================================================================
   // Academic learning
@@ -841,7 +945,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     const rowHeights = shareHeight(plainRows.map((v, i) => v + extra[i] * part), h - BAR)
     // One icon size for every academic row, set by the row with the least room (a two-line
     // name takes some), so the icons match; below 14pt none of them shows.
-    const iconD = Math.min(ICON_MAX, ...rows.map((r, i) => rowHeights[i] - PAD_T - PAD_B - 6 - r.label.textH))
+    const iconD = Math.min(ICON_MAX, ...rows.map((r, i) => rowHeights[i] - S.padT - S.padB - 6 - r.label.textH))
     checks.iconSize = iconD >= 14 ? Math.floor(iconD) : 0
     const comments = []
     let ry = y + BAR
@@ -855,7 +959,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
       // lead, the name, the teacher and the level.
       const nx = X + PAD
       const mid = nx + colW / 2
-      let cy = ry + PAD_T + 0.5
+      let cy = ry + S.padT + 0.5
       const { teacher, lead, leadH, wrap } = r.label
       if (iconD >= 14) {
         circle(mid, cy + iconD / 2, iconD / 2, '#ffffff')
@@ -873,19 +977,19 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
       pill(r.s.level, mid, cy + 4, colW, 'center')
 
       // The course description, a dotted rule, then the comment filling the rest of the row.
-      let yTop = ry + PAD_T
-      const yBottom = ry + rowH - PAD_B
+      let yTop = ry + S.padT
+      const yBottom = ry + rowH - S.padB
       if (r.topics) {
         placeBoxes([{ ...r.topics, y: yTop }])
-        yTop += r.topics.h + 1.5
+        yTop += r.topics.h + S.rule / 2
         dotted(bx, yTop, bx + bw, yTop, theme.edge)
-        yTop += RULE - 1.5
+        yTop += S.rule / 2
       }
       comments.push({ ...r.comment, base: body, y: yTop, h: yBottom - yTop })
       ry += rowH
     })
     placeBoxes(comments)
-    y += h + GAP
+    y += h + S.gap
   }
 
   // =========================================================================
@@ -981,7 +1085,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
         })
       })
     }
-    y += midH + GAP
+    y += midH + S.gap
   }
 
   // =========================================================================
@@ -997,10 +1101,12 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
       const cw = ws[i]
       const cx = X + PAD + sum(ws.slice(0, i)) + GUT * i
       const cy = y + BAR
+      // A hairline between cards, like the rules between the academic rows (23 October 2026).
+      if (i > 0) line(cx - GUT / 2, cy + CARD_HEAD + 1, cx - GUT / 2, y + h - S.cardPad, { color: mix(theme.accent, 0.8), lw: 0.6 })
       // The small first line of a long name, then the header (badge, name, teacher, pill) below it.
       if (c.kick) put(cx + TX, cy + CARD_HEAD, cw - TX, c.kick.node)
       const hy = cy + kickH[tier]
-      const p = pill(c.s.level, cx + cw, hy + (pillTop[layout] ?? CARD_HEAD), cw * 0.55, 'right')
+      const p = pill(c.s.level, cx + cw, hy + (pillTop[layout] ?? CARD_HEAD), layout === 'stacked' ? c.stackPillW : layout === 'stacked3' ? cw - TX : cw * 0.55, 'right')
       const mid = hy + CARD_HEAD + PILL_H / 2
       badge(c.sub.icon, cx + 7.5, mid, 15, theme.tint, theme.accent)
       const titleMax = cw - TX - (layout in pillTop ? 0 : p.w + 4)
@@ -1009,19 +1115,37 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
       else if (c.teacher && layout === 'one') putLine(cx + TX + tw + 5, midTop(mid, F.teacher), titleMax - tw - 5, c.teacher, F.teacher, { color: C.muted })
       else if (c.teacher && layout === 'stacked') putLine(cx + TX, midTop(hy + STACK_PILL_Y + PILL_H / 2, F.teacher), cw - TX - p.w - 5, c.teacher, F.teacher, { color: C.muted })
       else if (c.teacher) putLine(cx + TX, hy + TEACHER_Y, cw - TX, c.teacher, F.teacher, { color: C.muted })
-      return { ...c, base: c.body ? body : c.base, x: cx, y: cy + top, h: y + h - CARD_PAD - (cy + top) }
+      return { ...c, base: c.body ? body : c.base, x: cx, y: cy + top, h: y + h - S.cardPad - (cy + top) }
     })
     placeBoxes(boxes)
-    y += h + GAP
+    y += h + S.gap
   }
 
   // =========================================================================
-  // Signatures: the closing message on the left, the signature lines side by
-  // side on the right, in one slim row above the footer.
-  const sigs = reportSignatures(schedule, report)
-  const SIG_GAP = 18
-  const sigW = sigs.length ? Math.min(140, (W * 0.48 - SIG_GAP * (sigs.length - 1)) / sigs.length) : 0
-  const sigX0 = X + W - (sigs.length ? sigs.length * sigW + SIG_GAP * (sigs.length - 1) : 0)
+  // The band above the footer. On the left the level key: the whole scale in order,
+  // first steps to the top, each level's bubbles and name in its colour, then what it
+  // means. Every capsule on the page reads from it.
+  const lastCy = bandY + bandH - KEY_PITCH / 2 // the middle of the band's last line
+  if (levels.length) {
+    const ky0 = bandY + bandH - keyH
+    rect(X, ky0, KEY_LABEL, keyH, { r: 5, fill: C.keyFill })
+    const label = { text: t.levelsKey.toUpperCase(), ...T(5.9, { bold: true, color: C.muted, spacing: 0.5, pitch: 1.15, align: 'center' }) }
+    put(X + 3, ky0 + (keyH - M.height(label, KEY_LABEL - 6)) / 2 + 0.4, KEY_LABEL - 6, label)
+    let ky = ky0
+    levels.forEach((l, i) => {
+      const cy = ky + KEY_PITCH / 2
+      bubbleRow(l.value, keyBubblesX, cy, KB)
+      putLine(keyBubblesX + bubblesW(KB) + 4, midTop(cy, F.level), levelNameW + 1, nameIn(l), F.level, { bold: true, color: l.color })
+      if (descOf(l)) put(descX, midTop(cy, descSize), descW, descNode(l, descSize))
+      ky += keyRows[i]
+    })
+  }
+
+  // On the right the signature blocks: the signature (Setup > Signatures) above the line,
+  // the name and role below it, the role on the key's last line.
+  const sigX0 = X + W - sigsW
+  const roleTop = midTop(lastCy, F.role, true)
+  const sigLineY = roleTop - F.sig * HEAD_METRICS.LINE - 3.2
   // A signature line's own signature (Setup > Signatures): the one saved under the same title
   // and name ("Ms. Thắm N"), or else the only one that prints the same ("Ms. Thắm").
   const signatureOf = (name) => {
@@ -1031,38 +1155,27 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     const near = signatures.filter((sg) => printedTeacher(full(sg)).toLowerCase() === printedTeacher(name).toLowerCase())
     return near.length === 1 ? near[0] : null
   }
-  const INK_H = 21 // the tallest a signature prints, its foot a little below the line
+  const INK_H = 26 // the tallest a signature prints, its foot a little below the line
   sigs.forEach((sg, i) => {
     const sx = sigX0 + i * (sigW + SIG_GAP)
-    const typed = sg.name ? putLine(sx, sigY + 1, sigW, printedTeacher(sg.name), F.sig, { italics: true, color: C.navy }) : 0
-    // The signature beside the typed name, as large as the room allows, its foot just below the line.
+    // The signature as large as the room above the line allows, its foot just below the line.
     const ink = sg.name ? signatureOf(sg.name) : null
-    const room = sigW - typed - 8
-    if (ink?.w > 0 && ink?.h > 0 && room >= 24) {
-      const scale = Math.min(INK_H / ink.h, room / ink.w)
-      nodes.push({ absolutePosition: { x: sx + typed + 8, y: sigY + 18 - ink.h * scale }, image: ink.key, width: ink.w * scale, height: ink.h * scale })
+    if (ink?.w > 0 && ink?.h > 0) {
+      const scale = Math.min(INK_H / ink.h, (sigW - 6) / ink.w, (sigLineY + 3 - bandY + 3) / ink.h)
+      nodes.push({ absolutePosition: { x: sx + 3, y: sigLineY + 3 - ink.h * scale }, image: ink.key, width: ink.w * scale, height: ink.h * scale })
     }
-    line(sx, sigY + 14.5, sx + sigW, sigY + 14.5, { color: C.sigLine, lw: 0.7, cap: 'round' })
-    putLine(sx, sigY + 17.5, sigW, roleLabel(sg.role, lang).toUpperCase(), F.role, { bold: true, color: C.muted, spacing: 0.5 })
+    line(sx, sigLineY, sx + sigW, sigLineY, { color: C.sigLine, lw: 0.7, cap: 'round' })
+    if (sg.name) putLine(sx, sigLineY + 2.4, sigW, printedTeacher(sg.name), F.sig, { bold: true, color: C.navy, font: HF })
+    putLine(sx, roleTop, sigW, roleLabel(sg.role, lang).toUpperCase(), F.role, { bold: true, color: C.muted, spacing: 0.5 })
   })
-  const closing = curly(((vi && org.closing_vi) || org.closing || '').replace('{nickname}', nick).replace('{name}', student?.full_name || ''))
-  if (closing) {
-    const cw = sigX0 - SIG_GAP - X
-    const closingStyle = T(F.closing, { italics: true, color: C.muted, pitch: 1.22 })
-    // Two lines break between the sentences, so no word is left on the second line by itself.
-    const stop = closing.indexOf('. ')
-    const halves = stop > 0 ? [closing.slice(0, stop + 1), closing.slice(stop + 2)] : null
-    const wraps = M.width({ text: closing, ...closingStyle }) > cw
-    const text = wraps && halves?.every((p) => M.width({ text: p, ...closingStyle }) <= cw) ? halves.join('\n') : closing
-    const node = { text, ...closingStyle }
-    put(X, sigY + Math.max(0, (SIG_H - M.height(node, cw)) / 2), cw, node)
-  }
 
   // =========================================================================
-  // Footer: the motto on the left, the legal line on the right.
-  line(X, FOOT_Y, X + W, FOOT_Y, { color: C.line, lw: 0.6 })
-  const motto = org.tagline ? putLine(X, FOOT_Y + 3.5, 200, org.tagline, F.foot, { bold: true, color: C.blue }) : 0
-  if (org.legalLine) putLine(X + motto + 12, FOOT_Y + 3.5, W - motto - 12, org.legalLine, F.foot, { color: C.muted, align: motto ? 'right' : 'center' })
+  // Footer: the closing message on the left, the legal line on the right, on the
+  // closing message's last line.
+  line(X, footY, X + W, footY, { color: C.line, lw: 0.6 })
+  const footBase = footY + 3.5 + ASC * F.closing + (footLines - 1) * F.closing * 1.2
+  if (closing) put(X, footY + 3.5 + ASC * (F.closing - closingNode.fontSize), closingW, closingNode)
+  if (legal) putLine(X + W - legalW - 1, footBase - ASC * F.foot, legalW + 1, legal, F.foot, { color: C.muted })
 
   return { fills, strokes, nodes, checks }
 }

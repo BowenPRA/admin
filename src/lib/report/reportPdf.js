@@ -10,7 +10,7 @@ import { iconSvgs } from '../../components/report/icons'
 import { db } from '../db'
 
 let logoPromise = null
-const loadLogo = () => (logoPromise ||= publicDataUrl('logo.png').catch((e) => { logoPromise = null; throw e }))
+const loadLogo = () => (logoPromise ||= publicDataUrl('logo-transparent.png').catch((e) => { logoPromise = null; throw e }))
 
 // Student photos are cropped to a circle with a light ring, on white, as on the
 // screen design (a PDF image cannot be clipped to a circle by pdfmake).

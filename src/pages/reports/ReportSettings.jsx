@@ -53,9 +53,9 @@ function SettingsForm({ initial }) {
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Document title"><TextInput value={s.org.docTitle} onChange={(v) => set('org.docTitle', v)} /></Field>
           <Field label="Document title (Vietnamese)"><TextInput value={s.org.docTitle_vi} onChange={(v) => set('org.docTitle_vi', v)} /></Field>
-          <Field label="Tagline under the logo"><TextInput value={s.org.tagline} onChange={(v) => set('org.tagline', v)} /></Field>
+          <Field label="Tagline (motto)" hint="Not printed on the report since 23 October 2026."><TextInput value={s.org.tagline} onChange={(v) => set('org.tagline', v)} /></Field>
           <Field label="Footer line (legal name)"><TextInput value={s.org.legalLine} onChange={(v) => set('org.legalLine', v)} /></Field>
-          <Field label="Closing message" className="sm:col-span-2" hint="{nickname} is replaced by the student's legal first name. Leave blank to print none."><TextInput value={s.org.closing} onChange={(v) => set('org.closing', v)} /></Field>
+          <Field label="Closing message" className="sm:col-span-2" hint="Prints at the left of the footer. {nickname} is replaced by the student's legal first name. Leave blank to print none."><TextInput value={s.org.closing} onChange={(v) => set('org.closing', v)} /></Field>
           <Field label="Closing message (Vietnamese report)" className="sm:col-span-2"><TextInput value={s.org.closing_vi || ''} onChange={(v) => set('org.closing_vi', v)} /></Field>
         </div>
       </Card>
