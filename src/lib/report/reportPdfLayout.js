@@ -1,6 +1,6 @@
 // Layout of the Learning Progress Report as a pdfmake document: one A4 page
-// per report, in English or in Vietnamese. Top to bottom: the masthead (the logo
-// standing on a blue-to-green rule; title, period, programme and date), the student
+// per report, in English or in Vietnamese. Top to bottom: the masthead (the logo,
+// then a blue-to-green rule from its right; title, period, programme and date), the student
 // (photo, name, nickname, year group) beside the homeroom comment, academic rows
 // (the subject's icon, then its name, teacher and level on the left; course
 // description above the individual comment), review scores and learner skills,
@@ -74,7 +74,10 @@
 // up for it. The rule then stayed put (RULE_Y) while the logo became 126pt wide, 12pt in
 // from the margin and lower, the rule through its green arcs and the top of the wave's
 // crest. The photo grew from 46pt to 52pt, and the homeroom comment gave up the 6pt so
-// the name keeps its width.
+// the name keeps its width. Then (Bowen) the rule stopped cutting through the logo: it
+// starts just past the tip of the wave's crest, under "ACADEMY", 2pt thick (was 1.3)
+// about the same middle line, from the light blue of the logo's wave; the page below it
+// did not move.
 
 import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor, fixedDescription, nameParts, printedTeacher } from './utils'
 import { reportStrings, reportTitle, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
@@ -124,6 +127,11 @@ const PAGE_W = 595.28
 const X = 20
 const W = PAGE_W - 2 * X
 const RULE_Y = 50.3 // the masthead's rule; the logo moves about it, the page below does not
+// The rule: its thickness, how far past the tip of the logo's wave it starts (under
+// "ACADEMY"), and its colours from left to right (the light blue of the logo's wave, the
+// brand blue, the green). It is centred on the line the 1.3pt rule ran along, so the page
+// below starts where it did.
+const RULE = { h: 2, gap: 4, colors: ['#21a3dc', '#1f6fbf', '#3f8d29'] }
 const FOOT_Y = 819
 const TOP_GAP = 4 // below the masthead's rule (as between the sections)
 const BAND_GAP = 7 // above the band of the level key and signatures
@@ -140,15 +148,16 @@ const LOOSE_STEPS = 11 // how finely it opens: the line spacing in steps of 0.01
 const KEY_PITCH = 8.4 // the level key: one line per level
 const KEY_LABEL = 44 // its "Progress levels" tile
 const SIG_W = 100 // a signature block, at most
-// The logo (public/logo-transparent.png, the logo with its white made clear so the rule
-// shows through it): its width, how far in from the margin and down from the top of the
-// page it starts (the rule then passes behind its green arcs and the top of its blue
-// wave's crest, about 0.69 of its height down), then as fractions of its height: its
-// height for its width, and how far down the artwork reaches in twenty strips across it
-// (the arcs and the wave hang below "ACADEMY" over its left half). Measured from the
-// 2128 × 858 artwork on 23 October 2026.
+// The logo (public/logo-transparent.png, the logo with its white made clear): its width,
+// how far in from the margin and down from the top of the page it starts (the rule's
+// height falls across its green arcs and the top of its blue wave's crest, about 0.69 of
+// its height down), how far across its width the tip of the wave's crest reaches (the
+// rule starts past it), then as fractions of its height: its height for its width, and
+// how far down the artwork reaches in twenty strips across it (the arcs and the wave hang
+// below "ACADEMY" over its left half). Measured from the 2128 × 858 artwork on 23
+// October 2026.
 const LOGO = {
-  w: 126, left: 12, top: 15.5, aspect: 858 / 2128,
+  w: 126, left: 12, top: 15.5, crest: 0.537, aspect: 858 / 2128,
   foot: [0.817, 0.914, 0.943, 0.946, 0.998, 1, 0.986, 0.939, 0.871, 0.819, 0.843, 0.584, 0.584, 0.584, 0.584, 0.584, 0.584, 0.521, 0.381, 0.381],
 }
 const LOGO_CLEAR = 3 // between the wave and the student's photo and name below it
@@ -568,10 +577,10 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   // =========================================================================
   // Masthead: the logo on the left; the title, and the period, programme and
   // date on one line, on the right; a blue-to-green rule underneath. Since 23
-  // October 2026 (Bowen) the logo is larger, and the rule runs through the top of
-  // its blue wave's crest (it ran under "ACADEMY" earlier that day); the title and its
-  // line stand on the rule. The student's photo and name below keep clear of the wave
-  // (logoFoot).
+  // October 2026 (Bowen) the logo is larger and sits across the rule's height; the rule
+  // starts just after it (it ran through the logo until later that day). The title and
+  // its line stand on the rule. The student's photo and name below keep clear of the
+  // wave (logoFoot).
   const logoY = LOGO.top
   const logoH = LOGO.w * LOGO.aspect
   const ruleY = RULE_Y
@@ -596,7 +605,8 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     ...[program, reportDate].filter(Boolean).map((x) => ({ text: `   ·   ${x}`, color: C.muted })),
   ]
   putLine(X + W - RW, ruleY - 11, RW, subline, F.period, { align: 'right' })
-  rect(X, ruleY, W, 1.3, { gradient: [THEME.academic.accent, THEME.academic.accent, THEME.vocational.accent] })
+  const ruleX = X + LOGO.left + LOGO.w * LOGO.crest + RULE.gap
+  rect(ruleX,ruleY + 0.65 - RULE.h / 2, X + W - ruleX, RULE.h, { r: RULE.h / 2, gradient: RULE.colors })
 
   // =========================================================================
   // The foot of the page, worked out first, as what it takes comes off the room the
