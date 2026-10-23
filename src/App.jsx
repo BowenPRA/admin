@@ -33,6 +33,7 @@ import PhotoEvent from './pages/photos/PhotoEvent'
 import Handbook from './pages/Handbook'
 import Newsletters from './pages/newsletter/Newsletters'
 import NewsletterEditor from './pages/newsletter/NewsletterEditor'
+import Signatures from './pages/Signatures'
 import { DataProvider } from './lib/DataContext'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { Spinner } from './components/ui'
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="/reports/settings" element={<ReportSettings />} />
           <Route path="/reports/:id" element={<ReportEditor />} />
           <Route path="/teachers" element={<Teachers />} />
+          <Route path="/signatures" element={<Signatures />} />
           <Route path="/students" element={<Students />} />
           <Route path="/leads" element={<Office><Leads /></Office>} />
           <Route path="/enrollments" element={<Office><Enrollments /></Office>} />

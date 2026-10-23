@@ -47,6 +47,8 @@ const TABLES = {
   ecaActivities: 'adm_eca_activities',
   ecaMembers: 'adm_eca_members',
   ecaAttendance: 'adm_eca_attendance',
+  // Staff signatures, one per person, kept as a PNG in the row
+  signatures: 'adm_signatures',
 }
 
 // Rows that come straight from form inputs may hold '' where Postgres wants
@@ -491,6 +493,12 @@ export const db = {
     /** One correction per file and student: saving again changes it. */
     save: (row) => A.upsertBy(TABLES.driveDocLinks, [row], ['file_id', 'student_id']).then((r) => r[0]),
     remove: (id) => A.removeStrict(TABLES.driveDocLinks, id),
+  },
+  // Staff signatures (supabase/updates-2026-10-23-signatures.sql). One per person: saving again replaces it.
+  signatures: {
+    list: () => A.list(TABLES.signatures),
+    save: (row) => A.upsertBy(TABLES.signatures, [row], ['person']).then((r) => r[0]),
+    remove: (id) => A.removeStrict(TABLES.signatures, id),
   },
   /** When Drive was last read, by whom, and how many files it held. */
   getDriveCheck: () => A.getSetting('driveDocs'),

@@ -112,6 +112,7 @@ The Current keeps its data at **Supabase**, a database service on the internet. 
 | adm_mail_queue | The outbox: every email The Current sends (form thank-yous and alerts, scheduled newsletters, notes to Seth and Bowen), with how it went |
 | adm_mail_templates | The thank-you wording and who gets the alerts, edited under **Office** → **Emails** |
 | adm_mailer_key | One row: the mailer's key. Nobody can read it except in the SQL Editor |
+| adm_signatures | One signature per member of staff (**Setup** → **Signatures**, since 23 October 2026), as a PNG inside the row; office accounts and head teachers read all, a teacher only their own |
 
 ### The storage buckets
 

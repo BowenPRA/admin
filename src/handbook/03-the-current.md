@@ -64,9 +64,9 @@ Every page you can open is listed in the menu down the left side of the screen, 
 | **Teaching** | Reports, Schedule, Assessments; for teachers also Newsletter | Everyone |
 | **Office** | Invoices, Leads, Enrollments | Office accounts |
 | **Outreach** | Photos, Newsletter | Office accounts |
-| **Setup**, at the foot | Settings, Teachers (Super Admin and Head Teacher only), Handbook | Office accounts |
+| **Setup**, at the foot | Settings, Signatures, Teachers (Super Admin and Head Teacher only), Handbook | Office accounts; Signatures for everyone on the Teachers page too |
 
-- A heading with no page you may open is left out. A teacher sees no Office, Outreach or Setup.
+- A heading with no page you may open is left out. A teacher sees no Office or Outreach, and under Setup only Signatures.
 - Under the pages come the **English | Tiếng Việt** switch and your name, which opens your own menu.
 - On a laptop, the small round arrow button on the edge of the menu, beside the logo, makes the menu narrow: icons only, and each page's name shows when you point at its icon. The same button makes it wide again. Each computer remembers the choice. On a screen under 1,100 pixels wide the menu starts narrow.
 - On a phone or a tablet the menu is hidden. Tap the three lines at the top left to open it. It closes when you pick a page, tap outside it, or press the cross.
@@ -217,6 +217,18 @@ Under **Setup**.
 > **Careful:** Save writes the whole fee schedule and calendar at once. If two people have Settings open and both save, the second one wins and the first person's changes are gone. Change Settings one person at a time.
 
 - Deeper: [Fees, invoices and receipts](#/handbook/fees) and, for the new academic year, [The year at PRA](#/handbook/the-year).
+
+### Signatures
+
+Under **Setup**. Added on 23 October 2026.
+
+- **What it is for:** collecting one signature from each member of staff, so it can go onto documents later. Nothing prints them yet: reports, invoices and receipts are unchanged until we decide where each signature goes.
+- **Who is on it:** everyone active on the Teachers page (Mr. Chiến too, though he has no login), the office accounts, and anyone added with **Someone not on the list** (a person who signs PRA papers but has no account). The chip at the top counts how many have signed; **Not signed** lists who is left.
+- **Signing on the touch-screen laptop:** tap a person's card (or **Sign**). The whole screen becomes a signing pad with their name under the line. They sign with a finger or the pen, then **Save signature**. **Undo** takes back the last stroke, **Clear** starts again. After saving, **Next:** opens the next person who has not signed, so the laptop can be passed round the staff room. Once the pen has touched the pad, touches from a hand resting on the screen are ignored.
+- **From a photo:** **Upload**, then choose a photo or scan of the signature on plain white paper (JPG or PNG; an iPhone HEIC photo will not open, a screenshot of it will). The page takes out the paper and any shadows and keeps the ink. **Rotate** turns the picture; drag a box round the signature if there is anything else in the picture; the **Ink** slider keeps fainter lines (**Darker**) or drops grey marks (**Lighter**); **Colour** keeps the pen's colour or uses the same dark ink as a signature drawn on screen.
+- **Sign again** or a new upload replaces the saved signature. The download button saves it as a PNG with a see-through background, for a Word document in the meantime. The bin deletes it.
+- **Who sees it:** office accounts and head teachers see and change everyone's. A teacher sees only their own card, under **Setup** → **Signatures**, and can sign from their own laptop or phone.
+- Each signature is kept in the database as a picture cropped to the ink (table adm_signatures); one drawn on screen also keeps its pen strokes, so it can be drawn again at any size or in another colour.
 
 ### Teachers
 

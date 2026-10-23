@@ -456,49 +456,43 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
 
   // ---------- small pieces ----------
   const PILL_H = 11.5
-  /** The size a level pill will take in `maxW`: { w, h }, plus what drawing it needs. */
+  // A level is shown as five bubbles, filled up to it in its colour and white with a soft
+  // ring after it, in a pale capsule of the same colour with the level's name ("●●●●○
+  // Confident"). Since 23 October 2026 (Seth and Hien chose it over the solid pill with a
+  // letter); the key, the cards, the academic rows and How I Learn all use it.
+  const BUBBLE = { d: 4.3, gap: 1.15, padL: 4, mid: 3.2, padR: 5.5 }
+  const bubblesW = (b = BUBBLE) => levels.length * b.d + Math.max(0, levels.length - 1) * b.gap
+  /** Five bubbles in a row from x, centred on cy. */
+  const bubbleRow = (value, x, cy, b = BUBBLE) => {
+    const l = levelInfo(settings, value)
+    const at = levels.findIndex((v) => v.value === Number(value))
+    levels.forEach((_, k) => {
+      const cx = x + b.d / 2 + k * (b.d + b.gap)
+      if (l && k <= at) circle(cx, cy, b.d / 2, l.color)
+      else {
+        circle(cx, cy, b.d / 2, '#ffffff')
+        strokes.push({ type: 'ellipse', x: cx, y: cy, r1: b.d / 2 - 0.3, r2: b.d / 2 - 0.3, lineColor: l ? mix(l.color, 0.45) : C.tag, lineWidth: 0.6 })
+      }
+    })
+  }
+  /** The size a level capsule will take in `maxW`: { w, h }, plus its name as one line (set smaller if need be). */
   const pillFit = (value, maxW) => {
     const l = levelInfo(settings, value)
-    if (!l) return { l, w: Math.min(maxW, M.width({ text: t.notYet, ...T(F.pill, { bold: true, pitch: 1 }) }) + 13), h: PILL_H }
-    const label = nameIn(l)
-    const avail = maxW - 19.5
-    const style = { bold: true, color: 'white', pitch: 1 }
-    const full = M.width({ text: label, ...T(F.pill, style) })
-    // A long name ("Làm quen kỹ năng mới") in a narrow column: a little smaller, or on two lines.
-    let size = F.pill
-    let textW = full
-    let twoLines = false
-    if (full > avail) {
-      size = Math.floor(((F.pill * avail) / full) * 0.98 * 20) / 20
-      if (size >= 6) textW = M.width({ text: label, ...T(size, style) })
-      else { size = 6.2; twoLines = true; textW = Math.min(avail, M.width({ text: label, ...T(6.2, style) })) }
-    }
-    return { l, label, style, size, textW, twoLines, w: 14 + textW + 5.5, h: twoLines ? 19.5 : PILL_H }
+    const fixed = BUBBLE.padL + bubblesW() + BUBBLE.mid + BUBBLE.padR
+    const one = oneLine(l ? nameIn(l) : t.notYet, F.pill, maxW - fixed, { bold: true, color: l ? l.color : C.emptyText, min: 0.78 })
+    return { l, one, w: fixed + one.width, h: PILL_H }
   }
-  /** Level pill; `align` 'right' or 'center' puts its right edge or middle at x. Returns { w, h }. */
+  /** Level capsule; `align` 'right' or 'center' puts its right edge or middle at x. Returns { w, h }. */
   const pill = (value, x, y, maxW, align = 'left') => {
     const f = pillFit(value, maxW)
     const { l, w, h } = f
     const left = align === 'right' ? x - w : align === 'center' ? x - w / 2 : x
-    if (!l) {
-      rect(left, y, w, h, { r: h / 2, fill: C.empty })
-      putLine(left + 6.5, midTop(y + h / 2, F.pill), w - 13, t.notYet, F.pill, { bold: true, color: C.emptyText })
-      return { w, h }
-    }
-    rect(left, y, w, h, { r: PILL_H / 2, fill: l.color })
-    const cx = left + PILL_H / 2 + 0.5
-    circle(cx, y + PILL_H / 2, 4.4, '#ffffff', { opacity: 0.28 })
-    put(cx - 4.5, midTop(y + PILL_H / 2, 6.1, true), 9, { text: l.code, ...T(6.1, { bold: true, color: 'white', align: 'center', pitch: 1 }) })
-    if (f.twoLines) put(left + 14, y + 2.2, f.textW + 1, { text: f.label, ...T(6.2, { ...f.style, pitch: 1.18 }) })
-    else put(left + 14, midTop(y + PILL_H / 2, f.size), f.textW + 1, { text: f.label, ...T(f.size, f.style) })
+    rect(left, y, w, h, { r: h / 2, fill: l ? mix(l.color, 0.85) : C.empty })
+    bubbleRow(value, left + BUBBLE.padL, y + h / 2)
+    put(left + BUBBLE.padL + bubblesW() + BUBBLE.mid, midTop(y + h / 2, f.one.node.fontSize), f.one.width + 1, f.one.node)
     return { w, h }
   }
-  const dot = (value, cx, cy, d = 11) => {
-    const l = levelInfo(settings, value)
-    circle(cx, cy, d / 2, l ? l.color : C.empty)
-    const s = d * 0.56
-    put(cx - d / 2, midTop(cy, s, true), d, { text: l ? l.code : '–', ...T(s, { bold: true, color: l ? 'white' : C.tag, align: 'center', pitch: 1 }) })
-  }
+
   /**
    * A section: a pale panel in the section's colour, `h` tall, under a solid
    * title band with a white icon badge and the title (and a subtitle on the right).
@@ -559,8 +553,11 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
     levels.forEach((l, i) => {
       const tx = X + labelW + i * cellW
       rect(tx, keyY, cellW - 4, keyH, { r: 5, fill: mix(l.color, 0.9) })
-      dot(l.value, tx + 9.5, nameCy, 9)
-      putLine(tx + 16.5, midTop(nameCy, F.level), cellW - 4 - 16.5 - 5, nameIn(l), F.level, { bold: true, color: l.color, min: 0.85 })
+      // The level's bubbles, then its name: the key to every capsule on the page.
+      const KB = { d: 3.9, gap: 1 }
+      bubbleRow(l.value, tx + 5, nameCy, KB)
+      const nameX = tx + 5 + bubblesW(KB) + 3.5
+      putLine(nameX, midTop(nameCy, F.level), cellW - 4 - (nameX - tx) - 5, nameIn(l), F.level, { bold: true, color: l.color, min: 0.85 })
       if (descOf(l)) put(tx + 5, keyY + KEY_PAD + KEY_NAME + 0.5, descW, descNode(l, descSize))
     })
   }
@@ -595,12 +592,12 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
   const ROW_MIN = 46
   // One or two lines, whichever the text needs.
   const lines = (b) => b.base * b.style.pitch * (M.height(boxNode(b, b.base), b.w) <= b.base * b.style.pitch + 0.5 ? 1 : 2)
-  // The Vietnamese lead takes two lines in the academic name column. It breaks before
-  // "theo chủ đề", so "tăng cường" stays together (23 October 2026).
-  const leadBreak = (text) => text.replace(/ (theo chủ đề)$/u, '\n$1')
   // The lead of a name ("Intensive English in") as a small line, on two lines if need be, a
   // little smaller: above the name in the academic name column and on the cards.
   const LEAD_SIZES = [F.lead, 6, 5.6]
+  // The Vietnamese lead takes two lines in the academic name column. It breaks before
+  // "theo chủ đề", so "tăng cường" stays together (23 October 2026).
+  const leadBreak = (text) => text.replace(/ (theo chủ đề)$/u, '\n$1')
   const leadFit = (text, w, color, align) => {
     let lead = null
     for (const size of LEAD_SIZES) {
@@ -697,9 +694,12 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
     const titleBeside = oneLine(head, F.cardTitle, cw - TX - pillBox.w - 5, TITLE_STYLE).node.text === head
     // Likewise the teacher beside the pill, when the pill moves down to the teacher's line.
     const teacherBesidePill = !teacher || oneLine(teacher, F.teacher, cw - TX - pillBox.w - 5, { color: C.muted }).node.text === teacher
+    // Or the teacher at the right of the lead's line ('lead'), where the lead takes one line and both fit.
+    const leadW = !kick ? 0 : kick.h <= kick.node.fontSize * 1.12 + 0.5 ? M.width({ text: lead, ...T(kick.node.fontSize, { pitch: 1 }) }) : Infinity
+    const teacherOnLead = !teacher || leadW + 8 + teacherW <= cw - TX
     // A comment is set at the shared body size; a course description in the smaller topics style.
     return {
-      ...(desc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, head, kick, teacher, titleW, teacherBeside, titleBeside, teacherBesidePill, pillH: pillBox.h,
+      ...(desc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, head, kick, teacher, titleW, teacherBeside, titleBeside, teacherBesidePill, teacherOnLead, pillH: pillBox.h,
       name: `${sub.name} ${desc ? 'course description' : 'comment'}`, w: cw,
       label: desc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
       ...(desc ? picked(note?.description, note?.description_vi) : picked(s.comment, s.comment_vi)),
@@ -707,11 +707,14 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
   })]))
   const tierLayout = Object.fromEntries(cardTiers.map((k) => [k,
     !cards[k].every((c) => c.titleBeside) ? (cards[k].every((c) => c.teacherBesidePill) ? 'stacked' : 'stacked3')
-      : cards[k].every((c) => c.teacherBeside) ? 'one' : 'two']))
+      : cards[k].every((c) => c.teacherBeside) ? 'one'
+        // Since the five-bubble capsules (wider than the old pills, 23 October 2026), three cards
+        // in a row rarely leave room for the teacher beside the name; the lead's line has it.
+        : cards[k].some((c) => c.kick) && cards[k].every((c) => c.teacherOnLead) ? 'lead' : 'two']))
   const pillTop = { stacked: STACK_PILL_Y, stacked3: STACK3_PILL_Y }
   const kickH = Object.fromEntries(cardTiers.map((k) => [k, Math.max(0, ...cards[k].map((c) => c.kick?.h || 0))]))
   const cardTop = Object.fromEntries(cardTiers.map((k) => [k, kickH[k] +
-    (tierLayout[k] in pillTop ? pillTop[tierLayout[k]] + Math.max(...cards[k].map((c) => c.pillH)) + 2.5 : tierLayout[k] === 'one' ? HEAD_ONE : HEAD_TWO)]))
+    (tierLayout[k] in pillTop ? pillTop[tierLayout[k]] + Math.max(...cards[k].map((c) => c.pillH)) + 1.5 : tierLayout[k] === 'two' ? HEAD_TWO : HEAD_ONE)]))
   // A card's text height at comment size `s` (vocational cards keep their own size).
   const cardText = (c, s) => M.height(boxNode(c, c.body ? s : c.base), c.w)
 
@@ -972,8 +975,9 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
           const cy = iy + ih / 2
           if (k > 0) line(gx, iy, gx + gw, iy, { color: mix(theme.accent, 0.82), lw: 0.5 })
           icon(it.icon, gx, cy - 4, 8, theme.accent)
-          putLine(gx + 11.5, midTop(cy, F.skill), gw - 11.5 - 14, nameIn(it), F.skill)
-          dot(report.skills?.[it.key], gx + gw - 5, cy, 9.8)
+          const SB = { d: 4.6, gap: 1.2 }
+          putLine(gx + 11.5, midTop(cy, F.skill), gw - 11.5 - bubblesW(SB) - 6, nameIn(it), F.skill)
+          bubbleRow(report.skills?.[it.key], gx + gw - bubblesW(SB), cy, SB)
         })
       })
     }
@@ -1001,7 +1005,8 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT }) {
       badge(c.sub.icon, cx + 7.5, mid, 15, theme.tint, theme.accent)
       const titleMax = cw - TX - (layout in pillTop ? 0 : p.w + 4)
       const tw = putLine(cx + TX, midTop(mid, F.cardTitle, true, HF), titleMax, c.head, F.cardTitle, TITLE_STYLE)
-      if (c.teacher && layout === 'one') putLine(cx + TX + tw + 5, midTop(mid, F.teacher), titleMax - tw - 5, c.teacher, F.teacher, { color: C.muted })
+      if (c.teacher && layout === 'lead') putLine(cx + TX, cy + CARD_HEAD - 0.35, cw - TX, c.teacher, F.teacher, { color: C.muted, align: 'right' })
+      else if (c.teacher && layout === 'one') putLine(cx + TX + tw + 5, midTop(mid, F.teacher), titleMax - tw - 5, c.teacher, F.teacher, { color: C.muted })
       else if (c.teacher && layout === 'stacked') putLine(cx + TX, midTop(hy + STACK_PILL_Y + PILL_H / 2, F.teacher), cw - TX - p.w - 5, c.teacher, F.teacher, { color: C.muted })
       else if (c.teacher) putLine(cx + TX, hy + TEACHER_Y, cw - TX, c.teacher, F.teacher, { color: C.muted })
       return { ...c, base: c.body ? body : c.base, x: cx, y: cy + top, h: y + h - CARD_PAD - (cy + top) }

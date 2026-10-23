@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronsUpDown, Eye, Images, Sprout, FileSignature, FileCheck, BookMarked, ListTodo, Newspaper, Shapes, Menu, X, ChevronsLeft, ChevronsRight, Mail } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronsUpDown, Eye, Images, Sprout, FileSignature, FileCheck, BookMarked, ListTodo, Newspaper, Shapes, Menu, X, ChevronsLeft, ChevronsRight, Mail, Signature } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -45,6 +45,8 @@ const NAV = [
   ] },
   { id: 'setup', label: 'navSetup', foot: true, pages: [
     { to: '/settings', icon: Settings, label: 'settings', who: 'office' },
+    // Everyone's signatures for office accounts and head teachers; a teacher signs their own.
+    { to: '/signatures', icon: Signature, label: 'sigNav', who: 'staff' },
     { to: '/teachers', icon: GraduationCap, label: 'teachers', who: 'head' },
     { to: '/handbook', icon: BookMarked, label: 'handbookNav', who: 'office' },
   ] },
@@ -97,7 +99,7 @@ export default function Layout() {
   const closeRef = useRef(null)
   const openRef = useRef(null)
 
-  const can = { all: true, office: isOffice, head: isHead, teacher: !isOffice, eca: isOffice || isHead || runsEca(data.eca, me?.email) }
+  const can = { all: true, office: isOffice, head: isHead, teacher: !isOffice, eca: isOffice || isHead || runsEca(data.eca, me?.email), staff: isOffice || isHead || !!me?.linked }
   const nav = NAV.map((s) => ({ ...s, pages: s.pages.filter((p) => can[p.who || 'all']) })).filter((s) => s.pages.length)
   const current = nav.flatMap((s) => s.pages).find((p) => under(pathname, p.to))
   const narrow = narrowPref ?? !roomy
