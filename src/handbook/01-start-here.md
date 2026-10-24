@@ -79,7 +79,7 @@ Do each of these once, with the matching chapter open.
 - **Every day**, registers are taken; the Home page shows which are done. Missing marks show on the month summary.
 - **Fridays at 16:30**, the newsletter and the menu go to parents. The **Newsletter** tab (live since 16 October 2026) builds the issue; [The year at PRA](#/handbook/the-year) has the rhythm.
 - **After an event**, photos go through the album, the no-photo list and then the Photos tab, Facebook and the website. ([Photos and Facebook](#/handbook/photos))
-- **Two to three weeks before a quarter ends**, invoices for the next quarter go out as Gmail drafts; the last week of a quarter is report writing; the first week of a new quarter is **Class references**, publishing and printing. ([The year at PRA](#/handbook/the-year))
+- **Two to three weeks before a quarter ends**, invoices for the next quarter go out as Gmail drafts; the last week of a quarter is report writing; the first week of a new quarter is checking every review score is in, publishing and printing. ([The year at PRA](#/handbook/the-year))
 
 ## The handover list
 

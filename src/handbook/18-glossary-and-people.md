@@ -110,7 +110,7 @@ Each entry is one or two sentences. Where a word has a chapter of its own, the e
 | Tiers | The three kinds of learning area. Academic (Mathematics, Science, English): level, review score, comment and course description. Specialist: level and comment. Vocational: level and a shared course description. |
 | The five levels | Emerging, Practicing, On Target, Confident, Moving Beyond, in that order; On Target is the goal. Stored as the values 1, 2, 3, 5, 4, which are labels and not ranks: never renumber them. |
 | Progress review, review score | PRA's own quarterly assessment in an academic area, and its score on the report (Years 4 to 6 and Lower Secondary). "Reviews" always means these, never the practice packets. |
-| Class reference | The year group's average review score, printed beside each student's score. The head fills it in with the **Class references** button. |
+| Class reference | The average of every review score entered for that area in the year group that quarter, printed beside each student's score. The Current works it out each time a report is shown or printed. |
 | Summative | The end-of-year assessment; its score appears on the last quarter's report. |
 | Course description | One short text per year group and learning area each quarter, saying what was taught. It prints on every report of that year group. |
 | Learner skills | The rated skills under "How I learn" on every report, filled in by the homeroom teacher. Early Years has its own set. |

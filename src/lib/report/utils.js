@@ -355,15 +355,16 @@ export function reportWork(settings, reports, sections, { subjects = [], homeroo
 
 export const hasNum = (v) => v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v))
 
-/** Average per subject across a cohort's sections (ignores blanks). */
-export function cohortAverages(sections, field = 'score_pct') {
-  const acc = {}
-  for (const s of sections) {
-    if (!hasNum(s[field])) continue
-    acc[s.subject_key] = acc[s.subject_key] || { sum: 0, n: 0 }
-    acc[s.subject_key].sum += Number(s[field]); acc[s.subject_key].n++
-  }
-  return Object.fromEntries(Object.entries(acc).map(([k, v]) => [k, Math.round(v.sum / v.n)]))
+/**
+ * Every score behind the class reference for one area in one period: the other students'
+ * (`cohort`: their sections, each with its report's `period_index`) and this student's own
+ * section. Blanks and N/A are left out. The reference is worked out from these each time a
+ * report is drawn, so it always covers every score entered so far.
+ */
+export function classScores(cohort, periodIndex, key, own, field = 'score_pct') {
+  const naField = field === 'summative_pct' ? 'summative_raw' : 'score_raw'
+  return [...cohort.filter((c) => c.period_index === periodIndex && c.subject_key === key), own]
+    .filter((s) => s && !isNA(s[naField]) && hasNum(s[field])).map((s) => Number(s[field]))
 }
 
 /** "45/50" -> 90; anything else -> null, as is a score above its total ("45/5" while typing). */
@@ -386,12 +387,11 @@ export const isNA = (raw) => /^\s*n\s*\/?\s*a\s*$/i.test(raw || '')
  * The summative is the end-of-year test, entered on the last period's report
  * (earlier reports show TBD).
  */
-export function reviewRows(settings, { report, sections, history = [], cohortAvg = {}, summativeAvg = {} }) {
+export function reviewRows(settings, { report, sections, history = [], cohort = [] }) {
   if (!hasReviewScores(settings, report)) return []
   const periods = settings?.periods || []
   const cur = Number(report.period_index)
   const last = Math.max(...periods.map((p) => Number(p.index)), cur)
-  const avgOr = (s, fallback) => (hasNum(s.class_avg) ? Number(s.class_avg) : fallback ?? null)
   return sectionsByTier(settings, sections).academic
     .filter((sec) => subjectByKey(settings, sec.subject_key).scored !== false)
     .map((sec) => {
@@ -404,11 +404,11 @@ export function reviewRows(settings, { report, sections, history = [], cohortAvg
         const found = past.sections.find((x) => x.subject_key === key)
         if (!found || isNA(found.score_raw)) return { state: 'na' }
         if (!hasNum(found.score_pct)) return { state: idx === cur ? 'tbd' : 'blank' }
-        return { state: 'score', pct: Math.round(Number(found.score_pct)), ref: idx === cur ? avgOr(found, cohortAvg[key]) : avgOr(found) }
+        return { state: 'score', pct: Math.round(Number(found.score_pct)), ref: avg(classScores(cohort, idx, key, found)) }
       })
       let summative = { state: 'tbd' }
       if (cur >= last && isNA(sec.summative_raw)) summative = { state: 'na' }
-      else if (cur >= last && hasNum(sec.summative_pct)) summative = { state: 'score', pct: Math.round(Number(sec.summative_pct)), ref: summativeAvg[key] ?? null }
+      else if (cur >= last && hasNum(sec.summative_pct)) summative = { state: 'score', pct: Math.round(Number(sec.summative_pct)), ref: avg(classScores(cohort, cur, key, sec, 'summative_pct')) }
       return { key, name: subjectByKey(settings, key).name, icon: subjectByKey(settings, key).icon, cells, summative }
     })
 }

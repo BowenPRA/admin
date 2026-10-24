@@ -25,7 +25,7 @@ Reports follow the word rules in [Rules and wording](#/handbook/rules). Never wr
 | Assessment, score | Say "assessments" and "scores", not "tests". |
 | Progress review | PRA's own quarterly assessment in an academic area. Its result is the review score. |
 | Review score | The raw score typed in ("40/50") and the percentage worked out from it. |
-| Class reference | The year group's average review score, printed beside the student's score. |
+| Class reference | The average of every review score entered for that area in the year group that quarter, the student's own included, printed beside the student's score. The Current works it out each time a report is shown or printed, so it is always up to date. |
 | Summative | The end-of-year assessment. Its score appears on the last quarter's report only. |
 | Course description | One short text per year group and learning area saying what the class covered. It prints as "topics covered". |
 | Homeroom comment | The homeroom teacher's comment on the whole child. |
@@ -148,7 +148,7 @@ There is no Upper Secondary template, so Upper Secondary students get no report 
 | Who | What they may change |
 |---|---|
 | A teacher | The learning areas ticked for them on the Teachers page, year group by year group: level, comment, review score, course description. For their homeroom year groups also the homeroom comment, the learner skills, the report's language and its status. |
-| The head: Seth, Bowen as Super Admin, and anyone whose Teachers row is ticked "Head teacher (can edit every report)" | Every part of every report, Report settings, Create reports, Class references, Translate, and publishing. |
+| The head: Seth, Bowen as Super Admin, and anyone whose Teachers row is ticked "Head teacher (can edit every report)" | Every part of every report, Report settings, Create reports, Translate, and publishing. |
 | An office account (Yvonne, Hien, Duyen, Nga) | Only a learning area the Teachers page gives them. Duyen has Technology and Art & Crafts in Year 1. |
 
 - A teacher's rights come from their row on **Setup** → **Teachers** (head only). The database enforces them, so a part a teacher may not edit cannot be saved, whatever the screen shows.
@@ -183,7 +183,7 @@ There is no Upper Secondary template, so Upper Secondary students get no report 
 
 1. The head opens **Reports**. The **Ready to review** tile counts the reports waiting. Each year group's card shows its completion bar and "n ready to review · n in draft".
 2. The head reads each report in the editor with **Preview** open and corrects what needs it.
-3. On each year group card that has review scores, the head presses **Class references** once every score is in. It averages the year group's scores into every report's class reference. Press it again if a score changes later. (Older notes call this button "Update class references".)
+3. On each year group that has review scores, the head checks that every score is in. The class reference beside each score is the average of all the scores entered for that area in the year group that quarter, the student's own included. The Current works it out each time a report is shown or printed, so a late or corrected score changes every report's class reference at once, and the editor shows it under the score ("Class average 82%, from 10 scores in Year 7 so far"). There is nothing to press. Until 24 October 2026 the head pressed a **Class references** button and the figure was saved on each report; the saved figures are no longer used, which is why the Quarter 1 English figures printed before that date differ from report to report.
 4. Reports set to English and Vietnamese get their Vietnamese now (see [Vietnamese reports](#/handbook/reports?s=vietnamese-reports) below).
 5. The head sets each report's status to **Published**. A published report is locked for everyone but the head.
 6. **Print all** on each year group card opens one PDF with every report of that year group, one page per student, in English. When some reports are set to English and Vietnamese, the button reads **Print all (English)** and a second button, **Tiếng Việt (n)**, makes the Vietnamese PDF for those n reports.
@@ -345,7 +345,7 @@ Bowen asked on 23 October 2026, the day the English reports went out, for every 
 | A new learning area is missing from this quarter's reports | The reports were made before it was added | **Add … to N reports** on the year group card |
 | A Year 1 report has no Master Minds card | The area has not been added to that year group's reports, or Master Minds has no teacher | **Add … to N reports**, and tick Master Minds for its teacher on the Teachers page |
 | A Nursery or Kindergarten report has no Cooking card, or no teacher on it | Cooking has not been added to that year group's reports, or nobody is ticked for it | **Add … to N reports**, and give Mr. Seth Cooking for Nursery and Kindergarten on the Teachers page (**Add … new classes from the schedule**, since 19 October 2026) |
-| The class reference is empty | **Class references** has not been pressed since the scores went in | Press it on the year group card |
+| The class reference looks wrong | A score in the year group is missing, typed wrong, or typed as a percentage that does not match its raw score | Check the year group's scores in the editor; the reference follows them by itself |
 | A child is missing from Create reports | The student is Pending or Past, or in another year group | Fix the record on **Students**, then create that one student's report |
 | The Reports list shows "now Year X" beside a student | The student moved year group after the report was made | Decide with Seth which year group the report should be for |
 | "Permission denied" or reports will not save at all | A database file has not been run, or a rule is missing | See [Behind the scenes](#/handbook/behind) |

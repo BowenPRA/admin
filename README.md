@@ -99,8 +99,9 @@ progress reports (Lower Secondary first). Full details are in the code under
    learning areas they may edit and/or the year groups they are homeroom for.
    **Create login** makes a Supabase account with a temporary password.
 4. Progress reports → **Create reports** for a period and year groups, then each
-   teacher fills in their parts (auto-saved). **Update class references** averages
-   the year group's review scores; **Print all** prints a whole year group.
+   teacher fills in their parts (auto-saved). The class reference beside a review
+   score is the live average of the year group's scores for that area and period,
+   worked out when the report is drawn; **Print all** prints a whole year group.
 
 Who can do what is described under *Roles, teachers and attendance* below.
 These rules are enforced in the database, not just hidden in the interface.

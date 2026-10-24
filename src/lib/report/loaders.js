@@ -1,30 +1,40 @@
 import { db } from '../db'
-import { cohortAverages, studentSections } from './utils'
+import { studentSections } from './utils'
 
 const bySort = (a, b) => (a.sort ?? 0) - (b.sort ?? 0)
 
-/** Everything the printed document needs for one report. A partial-day student's academic sections are left out. */
+/**
+ * Everything the printed document needs for one report. A partial-day student's academic sections are left out.
+ * `cohort` holds the other students' sections from the same year group and period as each of this
+ * student's reports this year, so the class references are worked out from every score entered so far.
+ */
 export async function loadReportBundle(id, settings = null) {
   const report = await db.reports.get(id)
   if (!report) throw new Error('Report not found')
-  const [saved, student, yearReports, cohortReports, courseNotes] = await Promise.all([
+  const [saved, student, yearReports, courseNotes] = await Promise.all([
     db.sections.list({ report_id: id }),
     report.student_id ? db.students.get(report.student_id) : null,
     report.student_id ? db.reports.list({ student_id: report.student_id, school_year: report.school_year }) : [report],
-    db.reports.list({ school_year: report.school_year, period_label: report.period_label, year_group: report.year_group }),
     db.courseNotes.list({ school_year: report.school_year, period_label: report.period_label, year_group: report.year_group }),
   ])
-  const otherIds = yearReports.map((r) => r.id).filter((x) => x !== id)
+  const own = yearReports.some((r) => r.id === id) ? yearReports : [...yearReports, report]
+  const ownIds = own.map((r) => r.id)
+  // A student who moved year group is compared with the group they were in that period.
+  const groupReports = await db.reports.list({ school_year: report.school_year, year_group: [...new Set(own.map((r) => r.year_group))] })
+  const cohortReports = groupReports.filter((c) => !ownIds.includes(c.id) && Number(c.period_index) <= Number(report.period_index)
+    && own.some((r) => r.period_label === c.period_label && r.year_group === c.year_group))
+  const otherIds = ownIds.filter((x) => x !== id)
   const cohortIds = cohortReports.map((r) => r.id)
   const [histSections, cohortSections] = await Promise.all([
     otherIds.length ? db.sections.list({ report_id: otherIds }) : [],
     cohortIds.length ? db.sections.list({ report_id: cohortIds }) : [],
   ])
+  const periodOf = Object.fromEntries(cohortReports.map((r) => [r.id, Number(r.period_index)]))
   const sections = studentSections(settings || (await db.getReportSettings()), saved, student).sort(bySort)
   const history = yearReports.map((r) => ({ report: r, sections: r.id === id ? sections : histSections.filter((s) => s.report_id === r.id).sort(bySort) }))
   return {
     report, sections, student: student || { full_name: report.student_name }, history, courseNotes,
-    cohortAvg: cohortAverages(cohortSections), summativeAvg: cohortAverages(cohortSections, 'summative_pct'),
+    cohort: cohortSections.map((s) => ({ ...s, period_index: periodOf[s.report_id] })),
   }
 }
 

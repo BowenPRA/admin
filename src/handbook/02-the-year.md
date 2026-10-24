@@ -82,7 +82,7 @@ One progress report per student per quarter. Quarter 1 of 2026-2027 went like th
 
 ### Class references and publishing
 
-1. When every review score of a year group is in, the head presses **Class references** on that year group's card in [Reports](#/reports). It averages the year group's review scores into every report as the class reference printed beside each student's score. The button shows only for year groups with review scores (Years 4 to 6 and Lower Secondary); it can be pressed again after a late score.
+1. Check that every review score of the year group is in before printing. The class reference printed beside each student's score is the average of all the scores entered so far, worked out when the report is printed, so a missing score changes it. Nothing needs pressing (the **Class references** button was removed on 24 October 2026).
 2. A teacher sets a finished report to **Ready to review**. The head reads it and publishes it. Only the head can publish, and once a report is published only the head can change it.
 3. **Print all** on the year group's card makes one PDF of the year group in English; **Tiếng Việt** makes the Vietnamese pages of the reports set to both languages.
 4. The super admin runs **Export to a folder** in [Settings](#/settings) (in Chrome or Edge). The published reports land in the Drive-synced folder under `Reports/2026-2027/Quarter 1/` and then the year group.

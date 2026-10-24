@@ -373,7 +373,7 @@ async function measure(pdfMake, missing, cache) {
  */
 function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signatures = [] }) {
   const { bundle, settings, teachers = [], schedule = null, lang = 'en', photoKey } = item
-  const { report, sections = [], student, history = [], cohortAvg = {}, summativeAvg = {}, courseNotes = [] } = bundle
+  const { report, sections = [], student, history = [], cohort = [], courseNotes = [] } = bundle
   const vi = lang === 'vi'
   const t = reportStrings(lang)
   const pick = (en, v) => pickText(lang, en, v)
@@ -846,7 +846,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   // A card's text height at comment size `s` (vocational cards keep their own size).
   const cardText = (c, s) => M.height(boxNode(c, c.body ? s : c.base), c.w)
 
-  const reviews = reviewRows(settings, { report, sections, history, cohortAvg, summativeAvg })
+  const reviews = reviewRows(settings, { report, sections, history, cohort })
   const periods = (settings.periods || []).map((p) => ({ ...p, short: p.label.replace(/Quarter\s*/i, 'Q').replace(/Semester\s*/i, 'S').replace(/Term\s*/i, 'T') }))
   const groups = skillGroupsFor(settings, report)
   const maxItems = Math.max(0, ...groups.map((g) => g.items.length))

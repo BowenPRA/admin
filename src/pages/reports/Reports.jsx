@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Plus, Printer, Trash2, RefreshCw, ExternalLink, Settings, ArrowRight, Languages, Check } from 'lucide-react'
+import { Plus, Printer, Trash2, ExternalLink, Settings, ArrowRight, Languages, Check } from 'lucide-react'
 import { useData } from '../../lib/DataContext'
 import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
 import { LEVELS } from '../../lib/fees'
 import { loadPreviousSections } from '../../lib/report/loaders'
-import { buildReport, buildSections, buildSection, completion, sectionDone, homeroomDone, descriptionTasks, writingFor, missingAreas, studentSections, cohortAverages, templateForYearGroup, fmtDate, subjectByKey, currentPeriod, scheduledHomeroom, hasReviewScores } from '../../lib/report/utils'
+import { buildReport, buildSections, buildSection, completion, sectionDone, homeroomDone, descriptionTasks, writingFor, missingAreas, studentSections, templateForYearGroup, fmtDate, subjectByKey, currentPeriod, scheduledHomeroom } from '../../lib/report/utils'
 import { photoSrc } from '../../lib/report/photo'
 import { isEnrolled } from '../../lib/studentRecords'
 import { Card, Field, Select, Checkbox, Modal, Empty, Spinner, ReportStatusChip } from '../../components/ui'
@@ -141,20 +141,6 @@ function ReportsList({ settings }) {
       for (const s of sections.filter((x) => x.report_id === r.id)) await db.sections.remove(s.id).catch(() => {})
     } catch (e) { alert(e.message) }
     load()
-  }
-  const updateRefs = async (yg, list) => {
-    setBusy(yg)
-    try {
-      // Work from what is saved now, not from when this page opened, and change only the class reference:
-      // teachers may have been writing comments in the meantime.
-      const ids = list.map((r) => r.id)
-      const cohort = (await fetchPeriod(settings, period)).ss.filter((s) => ids.includes(s.report_id))
-      const avgs = cohortAverages(cohort)
-      const changed = cohort.filter((s) => avgs[s.subject_key] != null && Number(s.class_avg) !== avgs[s.subject_key])
-      if (!changed.length) { alert('Nothing to update: no review scores entered yet, or the references already match.'); return }
-      for (const s of changed) await db.sections.patch(s.id, { class_avg: avgs[s.subject_key] })
-      load(); alert(`Class references for ${yg}: ${Object.entries(avgs).map(([k, v]) => `${subjectByKey(settings, k).name} ${v}%`).join(', ')}`)
-    } catch (e) { alert(e.message) } finally { setBusy('') }
   }
   // Reports created before an area was added to their year group (e.g. Movement for Year 7).
   const missingFor = (list) => list.flatMap((r) => missingAreas(settings, r, shown.filter((s) => s.report_id === r.id), studentOf(r)).map((key) => ({ r, key })))
@@ -293,7 +279,6 @@ function ReportsList({ settings }) {
               actions={(
                 <div className="flex flex-wrap justify-end gap-2">
                   {gaps.length > 0 && <button className="btn-secondary text-xs" disabled={busy === yg} onClick={() => addMissing(yg, gaps)} title="These reports were created before the area was added to this year group"><Plus size={14} /> Add {[...new Set(gaps.map((g) => subjectByKey(settings, g.key).name))].join(', ')} to {new Set(gaps.map((g) => g.r.id)).size} report{new Set(gaps.map((g) => g.r.id)).size === 1 ? '' : 's'}</button>}
-                  {isHead && hasReviewScores(settings, list[0]) && <button className="btn-secondary text-xs" disabled={busy === yg} onClick={() => updateRefs(yg, list)} title="Average this year group's review scores into every report's class reference"><RefreshCw size={14} /> Class references</button>}
                   <Link className="btn-secondary text-xs" to={printUrl('')} target="_blank"><Printer size={14} /> Print all{bi ? ' (English)' : ''}</Link>
                   {bi > 0 && <Link className="btn-secondary text-xs" to={printUrl('vi')} target="_blank" title="Only the reports set to English and Vietnamese"><Printer size={14} /> Tiếng Việt ({bi})</Link>}
                 </div>

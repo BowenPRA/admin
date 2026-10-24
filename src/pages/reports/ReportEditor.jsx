@@ -7,7 +7,7 @@ import { partialFrom } from '../../lib/studentRecords'
 import { useAuth } from '../../lib/AuthContext'
 import { db, genId } from '../../lib/db'
 import { loadReportBundle } from '../../lib/report/loaders'
-import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor, fixedDescription } from '../../lib/report/utils'
+import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor, fixedDescription, classScores, avg } from '../../lib/report/utils'
 import { TIERS } from '../../lib/report/defaults'
 import { reportTitle } from '../../lib/report/strings'
 import { Card, Field, TextInput, TextArea, NumberInput, Select, Spinner, LevelPicker, SaveState, ReportStatusChip } from '../../components/ui'
@@ -403,7 +403,7 @@ export default function ReportEditor() {
             <div className="space-y-4">
               {tiers[tier.key].map((s) => (
                 <SubjectCard key={s.id} tier={tier.key} section={s} editable={subjectOk(s.subject_key)} onPatch={(p) => patchSection(s.id, p)}
-                  cohortAvg={bundle.cohortAvg[s.subject_key]} note={notes[s.subject_key]} onNote={(p) => patchNote(s.subject_key, p)} {...cardProps} />
+                  classList={classScores(bundle.cohort, Number(report.period_index), s.subject_key, s)} note={notes[s.subject_key]} onNote={(p) => patchNote(s.subject_key, p)} {...cardProps} />
               ))}
             </div>
           </div>
@@ -458,7 +458,7 @@ export default function ReportEditor() {
   )
 }
 
-function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, teachers, isHead, editable, onPatch, cohortAvg, note, onNote, signName, yearGroup, isLastPeriod, lastLabel, name, viAll, limits, minimums }) {
+function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, teachers, isHead, editable, onPatch, classList, note, onNote, signName, yearGroup, isLastPeriod, lastLabel, name, viAll, limits, minimums }) {
   const sub = subjectByKey(settings, s.subject_key, yearGroup)
   // The teacher comes from the Teachers page; a typed name is only used while nobody is linked.
   const linkedTeacher = teacherNameFor(teachers, s.subject_key, yearGroup)
@@ -503,7 +503,6 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
     const pct = pctFromRaw(raw)
     if (pct != null) patch[pctKey] = pct
     else if (isNA(raw) || !String(raw || '').trim() || (hasNum(s[pctKey]) && Number(s[pctKey]) === pctFromRaw(s[rawKey]))) patch[pctKey] = null
-    if (rawKey === 'score_raw' && patch.score_pct != null && cohortAvg != null && !hasNum(s.class_avg)) patch.class_avg = cohortAvg
     onPatch(patch)
   }
   const commentMax = tier === 'academic' ? limits.academic_comment : limits.specialist_comment
@@ -531,9 +530,11 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
                   <Field label="Raw score"><TextInput value={s.score_raw} onChange={(v) => rawPatch(v, 'score_raw', 'score_pct')} placeholder="45/50" /></Field>
                   <Field label="%" hint="Auto from raw"><NumberInput value={s.score_pct} onChange={(v) => onPatch({ score_pct: v })} disabled={isNA(s.score_raw)} min={0} max={100} /></Field>
                 </div>
-                <Field label="Class average %" hint={cohortAvg != null ? `Cohort: ${cohortAvg}%` : 'No cohort scores yet'}>
-                  <NumberInput value={s.class_avg ?? ''} placeholder={cohortAvg ?? ''} onChange={(v) => onPatch({ class_avg: v === '' ? null : v })} min={0} max={100} />
-                </Field>
+                <p className="max-w-[16rem] text-xs text-slate-500">
+                  {classList.length
+                    ? <>Class average <b className="font-semibold text-slate-700">{avg(classList)}%</b>, from {classList.length} score{classList.length === 1 ? '' : 's'} in {yearGroup} so far. It updates by itself as scores are entered.</>
+                    : 'The class average appears here once scores are entered.'}
+                </p>
                 {isLastPeriod ? (
                   <div className="border-t border-slate-200 pt-2">
                     <div className="label !mb-1">Summative (end-of-year assessment)</div>
