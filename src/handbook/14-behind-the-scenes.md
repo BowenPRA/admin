@@ -268,6 +268,7 @@ Claude checks changes to The Current on a copy that runs on the laptop, before a
 - `supabase/functions/facebook-post` is, today, the one program of PRA's own that runs on a server: it posts to the Facebook Page for the Photos tab. It is deployed in Supabase → **Edge Functions**. Its secrets, the Page's ID and key, are in **Edge Functions** → **Secrets**, never in the code.
 - Bowen set it up; there is no other written owner. The setup steps are in `supabase/functions/facebook-post/README.md`. See [Photos and Facebook](#/handbook/photos).
 - A second function, `newsletter-build`, is written to rebuild the website when a newsletter is published, or when a scheduled one goes up. It needs a GitHub key in its secrets and is deployed with **Verify JWT** off, because it checks its callers itself (an office login, or the mailer's key). Set up on 22 October 2026: the key is the fine-grained GitHub token "The Current: rebuild website" (BowenPRA account, Actions read and write on BowenPRA/website only), saved as the `GH_TOKEN` secret. When it expires, GitHub emails Bowen; make a new one the same way (`supabase/functions/newsletter-build/README.md`) and replace the secret. Until then, published and scheduled issues wait for the nightly build at 02:30.
+- A third function, `web-stats`, reads the website's visitor numbers from Cloudflare for the **Website** page (see [The website](#/handbook/website?s=visitor-numbers)). Its secret `CF_API_TOKEN` is a Cloudflare key named "The Current: website numbers", made on 24 October 2026 under admin@palmriveracademy.edu.vn's Cloudflare account, that can only read analytics and does not expire. It is deployed with **Verify JWT** off and checks itself that the caller is an office account. Setup: `supabase/functions/web-stats/README.md`.
 
 ### The mailer in admin@
 
@@ -298,6 +299,7 @@ No credential is written here. Each login is handed over in person or through a 
 | P.A Vietnam | The pra.edu.vn domain and its address records | A PRA account; who logs in is not recorded |
 | Wix | The old website, the palmriveracademy.edu.vn address records (the office mail depends on them), the palmriveracademy.com domain | A PRA account; renewals paid by Hien |
 | Netlify | The redirect from palmriveracademy.edu.vn | Bowen |
+| Cloudflare | Visitor numbers for pra.edu.vn (Web Analytics only; the domain is not on Cloudflare) | admin@palmriveracademy.edu.vn |
 | Facebook Page and the Meta app "The Current" | Posts, and posting from the Photos tab | Page: the staff member who manages it (Bowen's notes name Mr. David). App: Bowen |
 | Claude (Pro plan) | Sessions on the laptop, the five triage routines in the cloud, artifacts | Bowen's own Claude account. Never paid API billing |
 | Canva ("Marketing PRA") | Yearbook, guidebook, flyers | Marketing and communications |

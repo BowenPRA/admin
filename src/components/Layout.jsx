@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronsUpDown, Eye, Images, Sprout, FileSignature, FileCheck, BookMarked, ListTodo, Newspaper, Shapes, Menu, X, ChevronsLeft, ChevronsRight, Mail, Signature } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronsUpDown, Eye, Images, Sprout, FileSignature, FileCheck, BookMarked, ListTodo, Newspaper, Shapes, Menu, X, ChevronsLeft, ChevronsRight, Mail, Signature, ChartColumn } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -42,6 +42,8 @@ const NAV = [
   { id: 'outreach', label: 'navOutreach', pages: [
     { to: '/photos', icon: Images, label: 'photos', who: 'office' },
     { to: '/newsletter', icon: Newspaper, label: 'nlNav', who: 'office' },
+    // Visitors to pra.edu.vn, from Cloudflare Web Analytics (supabase/functions/web-stats).
+    { to: '/website', icon: ChartColumn, label: 'webNav', who: 'office' },
   ] },
   { id: 'setup', label: 'navSetup', foot: true, pages: [
     { to: '/settings', icon: Settings, label: 'settings', who: 'office' },

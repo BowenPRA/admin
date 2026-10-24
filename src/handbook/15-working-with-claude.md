@@ -333,6 +333,7 @@ When the admin role changes hands, these must change too. Work through the list 
 - [ ] **Claude.** Your own Claude Pro plan, signed in to the desktop app on the admin laptop. The routines and the "PRA triage" cloud environment belong to Bowen's Claude account: recreate them under yours (the triage repository's `PLAN.md` and `routine\` folder hold the prompts and settings), connect GitHub at https://claude.ai/code, and connect Gmail as admin@palmriveracademy.edu.vn.
 - [ ] **GitHub.** The account BowenPRA holds all four repositories. Take over the account, or have the repositories moved to one you hold. Sign in the `gh` command-line tool on the laptop.
 - [ ] **Netlify.** The redirect for the old domain sits in a team under bowen@pra.edu.vn.
+- [ ] **Cloudflare.** The website's visitor numbers, in an account under admin@palmriveracademy.edu.vn. Whoever holds the admin@ mailbox can sign in.
 - [ ] **Supabase.** The project belongs to admin@palmriveracademy.edu.vn. You need that sign-in and the secret key, which is typed into scripts and never saved.
 - [ ] **Google Workspace.** admin@palmriveracademy.edu.vn is the only super admin. Make a second one, your own account.
 - [ ] **The Current.** Give your account the super admin role (`scripts/create-staff-accounts.mjs`, run with the secret key), and keep a second super admin so no one person is the only one.

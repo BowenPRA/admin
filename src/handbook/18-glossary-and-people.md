@@ -154,6 +154,7 @@ Each entry is one or two sentences. Where a word has a chapter of its own, the e
 | Push | Sending commits to GitHub. For the website, a push is what puts a change live. |
 | Deploy | Putting a new version of The Current live: `npm run deploy` builds it and publishes it, and the site shows it a minute or two later. Claude deploys without asking. |
 | GitHub Pages | GitHub's free hosting, which serves https://current.pra.edu.vn and https://pra.edu.vn. |
+| Cloudflare | The service that counts visits to pra.edu.vn (Web Analytics). The Current's Website page shows its numbers. |
 | CNAME | Two things with one name: a one-line file in a repo that tells GitHub Pages which address the site answers to, and a DNS record that points one name at another. Leave both alone. |
 | DNS | The internet's address book for a domain: where its website is and where its email goes (the MX records). The DNS of pra.edu.vn is at P.A Vietnam; that of palmriveracademy.edu.vn is at Wix. |
 | Netlify | A hosting service used only to forward the old address palmriveracademy.edu.vn to pra.edu.vn. |

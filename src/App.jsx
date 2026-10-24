@@ -28,6 +28,7 @@ import Photos from './pages/photos/Photos'
 import Leads from './pages/Leads'
 import Enrollments from './pages/Enrollments'
 import Emails from './pages/Emails'
+import WebsiteStats from './pages/WebsiteStats'
 import Todos from './pages/Todos'
 import PhotoEvent from './pages/photos/PhotoEvent'
 import Handbook from './pages/Handbook'
@@ -87,6 +88,7 @@ export default function App() {
           <Route path="/assessments" element={<Assessments />} />
           <Route path="/photos" element={<Office><Photos /></Office>} />
           <Route path="/photos/:id" element={<Office><PhotoEvent /></Office>} />
+          <Route path="/website" element={<Office><WebsiteStats /></Office>} />
           <Route path="/settings" element={<Office><SettingsPage /></Office>} />
           <Route path="/newsletter" element={<Newsletters />} />
           <Route path="/newsletter/:id" element={<NewsletterEditor />} />

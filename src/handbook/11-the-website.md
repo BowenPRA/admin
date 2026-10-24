@@ -238,6 +238,18 @@ The site has no server of its own. Each form sends its answers from the visitor'
 
 > **Ask Claude:** "The enrollment form on the website shows 'That did not send'. Check The Current is up, probe the two form functions, compare the live table's columns with what the functions write, and tell me what is wrong before you change anything."
 
+## Visitor numbers
+
+Since 24 October 2026 the website counts its visitors with **Cloudflare Web Analytics**, a free service. A small script from Cloudflare is on every page; it sets no cookies and cannot tell who anyone is. The privacy page says so in both languages.
+
+- **Where to read them:** in The Current, **Outreach** → [Website](#/website) (office accounts). Or in Cloudflare itself: https://dash.cloudflare.com, signed in as admin@palmriveracademy.edu.vn, then **Observability** → **Analytics** → **Web analytics** → pra.edu.vn.
+- **What the words mean:** a **visit** is someone arriving from somewhere else (a search, Facebook, a link in a message, or typing the address). Going on to other pages adds **page views**, not visits. The same parent on two days is two visits. People who block trackers are not counted, so the real numbers are a little higher.
+- **Where the script is set:** `analytics.cloudflareToken` in `src/_data/site.json`; `src/_includes/layouts/base.njk` adds it to every page except the ones marked `noindex` (the photo album and the newsletter preview). An empty token turns the counting off.
+- **How The Current gets the numbers:** the `web-stats` function in Supabase asks Cloudflare with a read-only key, the `CF_API_TOKEN` secret (see [Behind the scenes](#/handbook/behind?s=the-facebook-function)). If the Website page says the key was not accepted, make a new key and replace the secret; the steps are in `supabase/functions/web-stats/README.md` in the admin folder.
+- Cloudflare keeps about six months, which is why the page offers 90 days at most.
+
+> **Ask Claude:** "How many people visited pra.edu.vn in the last 30 days, which pages did they read most and where did they come from? Compare it with the 30 days before."
+
 ## Domains and DNS
 
 | Domain | What it does | DNS is managed at | Records that matter |

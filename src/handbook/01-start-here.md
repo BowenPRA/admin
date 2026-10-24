@@ -58,7 +58,7 @@ Only confirmed email addresses are written out in [Glossary and who is who](#/ha
 - **The laptop, or what is on it.** The three code folders, the `.env` files that hold the keys, GAM and its configuration, the photo library, and Claude's memory folder for the Admin Email session folder. [Behind the scenes](#/handbook/behind) lists all of it; a fresh laptop can be set up with Claude's help, but the keys have to be carried over by a person.
 - **The GitHub account BowenPRA** (with its mirror sbowen209), or your own account added as an owner of the three repositories.
 - **A Claude Pro plan** with the Claude desktop app, the Admin Email folder open in the Code tab, and the Gmail connector signed in as admin@. The triage routines live in the Claude account that made them, so they are re-created under yours (see the handover list below).
-- **The rest of the logins** in the table in [Behind the scenes](#/handbook/behind): Netlify, P.A Vietnam (DNS), Wix, the Facebook Page, Google Cloud, Canva, Acellus, Cambridge GO, Twinkl.
+- **The rest of the logins** in the table in [Behind the scenes](#/handbook/behind): Netlify, Cloudflare (website visitor numbers), P.A Vietnam (DNS), Wix, the Facebook Page, Google Cloud, Canva, Acellus, Cambridge GO, Twinkl.
 
 ## Your first week
 
@@ -92,7 +92,7 @@ For Bowen and the new admin to go through together, in this order. Claude does t
 5. GitHub: the new admin added as an owner of BowenPRA/admin, BowenPRA/website and BowenPRA/triage, or the account itself handed over. Decide the two money items in [Known problems and open items](#/handbook/open) at the same time: making the admin repository private and paying for Supabase backups.
 6. Supabase: the account email and the secret key. The key is typed by the admin only, so Bowen hands it over in person or through a password manager, never in a chat or an email.
 7. The laptop: the three code folders, the `.env` files, GAM (`C:\GAM7` and `C:\GAMConfig`), the photo library `PRA Photos`, and the Claude memory folder for the Admin Email session folder, which holds every rule and decision Claude remembers. If the laptop changes hands, nothing else is needed. If it does not, Claude can set up a new one; the keys and GAM's sign-in have to be redone by a person. Copy the admin folder's `.env` before the first deploy ([Behind the scenes](#/handbook/behind?s=on-a-new-laptop) has the steps): on 19 October 2026 a deploy from a new laptop without it put the live Current in offline mode.
-8. Netlify, P.A Vietnam, Wix, the Facebook Page (Bowen is not its manager; find who is), Google Cloud project "PRA Admin", Canva, Acellus, Cambridge GO, Twinkl: each login moved or shared.
+8. Netlify, Cloudflare (under admin@palmriveracademy.edu.vn), P.A Vietnam, Wix, the Facebook Page (Bowen is not its manager; find who is), Google Cloud project "PRA Admin", Canva, Acellus, Cambridge GO, Twinkl: each login moved or shared.
 9. Read this handbook together, chapter by chapter, against the real screens, and set every "Last gone through" date. (Claude updates the chapters as you go.)
 
 > **Ask Claude:** "We are doing the handover from Bowen to me. Go through the handover list in the Start here chapter of the handbook with us, one item at a time, and tell us which ones you can do and what you need from us for each."

@@ -63,7 +63,7 @@ Every page you can open is listed in the menu down the left side of the screen, 
 | None, at the top | **Home**, **Students**, **Attendance**, **ECAs**, **To-Do** | Everyone; ECAs for office accounts and for teachers who run an ECA this term; To-Do for office accounts only |
 | **Teaching** | Reports, Schedule, Assessments; for teachers also Newsletter | Everyone |
 | **Office** | Invoices, Leads, Enrollments | Office accounts |
-| **Outreach** | Photos, Newsletter | Office accounts |
+| **Outreach** | Photos, Newsletter, Website | Office accounts |
 | **Setup**, at the foot | Settings, Signatures, Teachers (Super Admin and Head Teacher only), Handbook | Office accounts; Signatures for everyone on the Teachers page too |
 
 - A heading with no page you may open is left out. A teacher sees no Office or Outreach, and under Setup only Signatures.
@@ -205,6 +205,15 @@ Under **Outreach**.
 - **Main things you do:** **Upload event** from the laptop; check each photo against the no-photo list; choose a look and write captions; prepare posts and send them with **Post to Facebook…**; choose photos for the website; **Finish event** when it is done.
 - **Who sees it:** office accounts.
 - Deeper: [Photos and Facebook](#/handbook/photos).
+
+### Website
+
+Under **Outreach**.
+
+- **What it is for:** how many people visit pra.edu.vn, counted by Cloudflare Web Analytics on the website. Added on 24 October 2026; nothing is counted before that day.
+- **Main things you do:** choose **Last 7 days**, **Last 30 days** or **Last 90 days**. The four numbers at the top are visits, page views, pages per visit and the share read in Vietnamese, with the change on the same number of days before them. Below: visits (or page views) per day, with a table under **Day by day as a table**; the most-read pages (VI marks a Vietnamese page); where visitors came from (Facebook, Google, Zalo, typed in); countries; devices. **Cloudflare** opens Cloudflare's own page for more detail.
+- **Who sees it:** office accounts.
+- Deeper: [The website](#/handbook/website?s=visitor-numbers).
 
 ### Settings
 
