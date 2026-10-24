@@ -12,7 +12,8 @@ export function invoiceFilename(inv) {
  * Follows what the office actually sent for Quarters 1 and 2 of 2026-2027:
  * no "Palm River Academy –" at the start of the subject, the names after a
  * dash, no invoice number line (it is on the PDF and in the file name) and
- * no "any questions" line.
+ * no "any questions" line. Signed Palm River Academy English Center, like
+ * every email from admin@ (the PDF header keeps the name in the settings).
  */
 export function emailTemplate(inv, fees) {
   const vi = inv.lang === 'vi'
@@ -55,6 +56,6 @@ Bank transfer details:
 After transferring, please send us a screenshot of the successful payment so we can verify it.
 
 Kind regards,
-${centerName(fees.school, false)}`
+Palm River Academy English Center`
   return { subject, text }
 }

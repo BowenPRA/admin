@@ -80,7 +80,8 @@ Every thread gets one Status label, one Person label (unless it is Unimportant) 
 - **A run never stops to ask.** When it is unsure it takes the cautious choice (label but do not draft; draft but do not send) and puts the question in the report under "Needs Bowen".
 - **It never opens links** found in emails, and never makes, changes or looks up Google accounts or groups during a run.
 - **Language.** A Vietnamese email gets a warm, polite Vietnamese draft; the English translation goes in the forward and the digest, not in the draft. An English email from someone who probably speaks Vietnamese gets an English draft, and the digest says a Vietnamese version might be welcome. In Vietnamese the triage never writes "trường" or "học sinh"; it says "trung tâm" and "học viên". <!-- allow -->
-- **The signature** on every draft is typed fresh, with no calendar link: "Warm regards", then Palm River Academy English Center, the hotline, the address in Thanh Nhi Hamlet, Hoi An Dong Ward, Da Nang City, and the web address palmriveracademy.edu.vn (the old address, which forwards to pra.edu.vn). The exact text is in `docs/handling.md`.
+- **The signature** on every draft is typed fresh, with no calendar link: "Warm regards", then Palm River Academy English Center, the hotline, the address in Thanh Nhi Hamlet, Hoi An Dong Ward, Da Nang City, and the web address pra.edu.vn (palmriveracademy.edu.vn until 24 October 2026). The exact text is in `docs/handling.md`.
+- **The Gmail signature.** admin@'s own signature, added to every email typed in Gmail, is set in Gmail → Settings → General → Signature ("Admin Palm River Academy", used for new emails and replies): the logo, PALM RIVER ACADEMY ENGLISH CENTER, the hotline, the address, admin@palmriveracademy.edu.vn and pra.edu.vn. Bowen had it changed on 24 October 2026; before that it said PALM RIVER ACADEMY and gave the old web address.
 
 ## Who gets what
 

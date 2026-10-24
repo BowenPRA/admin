@@ -54,7 +54,7 @@ export const DEFAULT_TEMPLATES = {
     on: true,
     subject: { en: 'Enrollment form received: {child}', vi: 'PRA đã nhận được đơn đăng ký học của {child}' },
     body: {
-      en: 'Dear {parent},\n\nThank you for sending the enrollment form for {child}. We received it on {date}.\n\nOur admissions team will read it and contact you about the next step.\n\nIf you have a question in the meantime, reply to this email or call us on 0968 49 42 45.\n\nThe Admissions Team\nPalm River Academy',
+      en: 'Dear {parent},\n\nThank you for sending the enrollment form for {child}. We received it on {date}.\n\nOur admissions team will read it and contact you about the next step.\n\nIf you have a question in the meantime, reply to this email or call us on 0968 49 42 45.\n\nThe Admissions Team\nPalm River Academy English Center',
       vi: 'Kính gửi ba mẹ của {child},\n\nCảm ơn ba mẹ đã gửi đơn đăng ký học cho {child}. PRA đã nhận được đơn vào {date}.\n\nBộ phận tuyển sinh sẽ xem đơn và liên hệ với ba mẹ về bước tiếp theo.\n\nNếu ba mẹ có câu hỏi, vui lòng trả lời email này hoặc gọi cho PRA theo số 0968 49 42 45.\n\nBộ phận tuyển sinh\nTrung tâm Anh ngữ Palm River Academy',
     },
   },
@@ -62,7 +62,7 @@ export const DEFAULT_TEMPLATES = {
     on: true,
     subject: { en: 'We have your message', vi: 'PRA đã nhận được tin nhắn của ba mẹ' },
     body: {
-      en: 'Dear {name},\n\nThank you for contacting Palm River Academy. {request}\n\nSomeone from the office will reply by email or phone.\n\nIf it is urgent, call us on 0968 49 42 45.\n\nThe Admissions Team\nPalm River Academy',
+      en: 'Dear {name},\n\nThank you for contacting Palm River Academy. {request}\n\nSomeone from the office will reply by email or phone.\n\nIf it is urgent, call us on 0968 49 42 45.\n\nThe Admissions Team\nPalm River Academy English Center',
       vi: 'Kính gửi ba mẹ,\n\nCảm ơn ba mẹ đã liên hệ với Palm River Academy. {request}\n\nVăn phòng sẽ liên hệ lại với ba mẹ qua email hoặc điện thoại.\n\nNếu cần gấp, ba mẹ vui lòng gọi cho PRA theo số 0968 49 42 45.\n\nBộ phận tuyển sinh\nTrung tâm Anh ngữ Palm River Academy',
     },
   },
