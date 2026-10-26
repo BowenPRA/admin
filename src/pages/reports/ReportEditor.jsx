@@ -7,7 +7,7 @@ import { partialFrom } from '../../lib/studentRecords'
 import { useAuth } from '../../lib/AuthContext'
 import { db, genId } from '../../lib/db'
 import { loadReportBundle } from '../../lib/report/loaders'
-import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor, fixedDescription, classScores, avg } from '../../lib/report/utils'
+import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor, fixedDescription, classScores, avg, isPublished } from '../../lib/report/utils'
 import { TIERS } from '../../lib/report/defaults'
 import { reportTitle } from '../../lib/report/strings'
 import { Card, Field, TextInput, TextArea, NumberInput, Select, Spinner, LevelPicker, SaveState, ReportStatusChip } from '../../components/ui'
@@ -269,7 +269,7 @@ export default function ReportEditor() {
   if (!bundle || !report || !settings) return <Spinner />
 
   const student = bundle.student
-  const published = report.status === 'published'
+  const published = isPublished(report)
   const homeroomOk = canHomeroom(report) && (!published || isHead)
   const subjectOk = (key) => canSubject(key, report.year_group) && (!published || isHead)
   const levels = settings.levels || []
@@ -325,7 +325,7 @@ export default function ReportEditor() {
             <SaveState state={saveState} />
             {homeroomOk ? (
               <select className="input w-auto" value={report.status} onChange={(e) => patchReport({ status: e.target.value })}>
-                <option value="draft">Draft</option><option value="ready">Ready to review</option>{(isHead || published) && <option value="published">Published</option>}
+                <option value="draft">Draft</option><option value="ready">Ready to review</option>{(isHead || published) && <option value="published">Published</option>}{(isHead || report.status === 'sent') && <option value="sent">Sent</option>}
               </select>
             ) : <ReportStatusChip status={report.status} />}
             {bi && <button className="btn-secondary" onClick={() => setViAll((v) => ({ open: !v?.open }))} title="Open or close every Vietnamese version"><Languages size={16} /> {viAll?.open ? 'Hide' : 'Show'} Tiếng Việt</button>}
@@ -333,7 +333,7 @@ export default function ReportEditor() {
             <Link to={`/print/report/${id}`} target="_blank" className="btn-primary" title="Open the PDF to print or save" onClick={(e) => openPdf(e, '')}><Printer size={16} /> {bi ? 'English PDF' : 'PDF'}</Link>
             {bi && <Link to={`/print/report/${id}?lang=vi`} target="_blank" className="btn-primary" title="Open the PDF to print or save" onClick={(e) => openPdf(e, 'vi')}><Printer size={16} /> Tiếng Việt PDF</Link>}
           </div>
-          {published && !isHead && <div className="mt-1 text-xs font-semibold text-amber-700">This report is published. Only the head teacher can change it now.</div>}
+          {published && !isHead && <div className="mt-1 text-xs font-semibold text-amber-700">This report is {report.status === 'sent' ? 'sent' : 'published'}. Only the head teacher can change it now.</div>}
           {preview && <ReportCheckNotes check={check} lang={shownLang} className="mt-1 hidden xl:block" />}
         </div>
 

@@ -17,7 +17,7 @@ export const CHAPTERS = [
   { id: 'fees', file: '04-fees-and-invoices', title: 'Fees, invoices and receipts', blurb: 'The fee rules, how an invoice is made and sent, payments, receipts, proof and exports.', updated: '2026-10-20' },
   { id: 'students', file: '05-students-and-enrollment', title: 'Students, families and enrollment', blurb: 'From an enquiry to a complete student record: leads, forms, statuses, IDs, documents, the checklist.', updated: '2026-10-22' },
   { id: 'attendance', file: '06-attendance-and-schedule', title: 'Attendance and the schedule', blurb: 'Taking the register, partial-day and traveling students, ECAs, summaries and printouts.', updated: '2026-10-21' },
-  { id: 'reports', file: '07-progress-reports', title: 'Progress reports', blurb: 'The five levels, the templates, who writes what, the writing rules, translation and printing.', updated: '2026-10-24' },
+  { id: 'reports', file: '07-progress-reports', title: 'Progress reports', blurb: 'The five levels, the templates, who writes what, the writing rules, translation and printing.', updated: '2026-10-26' },
   { id: 'photos', file: '08-photos-and-facebook', title: 'Photos and Facebook', blurb: 'The photo library, albums, the Photos tab and posts.', updated: '2026-10-16' },
   { id: 'assessments', file: '09-assessments', title: 'Assessments library', blurb: 'The assessment papers on the shared drive and the Assessments tab.', updated: '2026-10-16' },
   { id: 'todo', file: '10-to-do-and-claude', title: 'The To-Do tab', blurb: 'Tasks for the team and for Claude, and how staff ask for things.', updated: '2026-10-20' },

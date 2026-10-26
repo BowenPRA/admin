@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Plus, Printer, Trash2, ExternalLink, Settings, ArrowRight, Languages, Check } from 'lucide-react'
+import { Plus, Printer, Trash2, ExternalLink, Settings, ArrowRight, Languages, Check, Mail, X } from 'lucide-react'
 import { useData } from '../../lib/DataContext'
 import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
 import { LEVELS } from '../../lib/fees'
 import { loadPreviousSections } from '../../lib/report/loaders'
-import { buildReport, buildSections, buildSection, completion, sectionDone, homeroomDone, descriptionTasks, writingFor, missingAreas, studentSections, templateForYearGroup, fmtDate, subjectByKey, currentPeriod, scheduledHomeroom } from '../../lib/report/utils'
+import { buildReport, buildSections, buildSection, completion, sectionDone, homeroomDone, descriptionTasks, writingFor, missingAreas, studentSections, templateForYearGroup, fmtDate, subjectByKey, currentPeriod, scheduledHomeroom, isPublished, REPORT_STATUSES } from '../../lib/report/utils'
 import { photoSrc } from '../../lib/report/photo'
 import { isEnrolled } from '../../lib/studentRecords'
 import { Card, Field, Select, Checkbox, Modal, Empty, Spinner, ReportStatusChip } from '../../components/ui'
@@ -25,6 +25,13 @@ function studentAge(dob) {
   let age = now.getFullYear() - d.getFullYear()
   if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age--
   return age
+}
+
+// A tick box for choosing reports; `some` shows the dash of a partly ticked list.
+function Tick({ checked, some, onChange, label }) {
+  const ref = useRef(null)
+  useEffect(() => { if (ref.current) ref.current.indeterminate = !checked && !!some }, [checked, some])
+  return <input ref={ref} type="checkbox" aria-label={label} title={label} className="h-4 w-4 cursor-pointer rounded border-slate-300 text-pra-blue focus:ring-pra-sky" checked={!!checked} onChange={(e) => onChange(e.target.checked)} />
 }
 
 /** A figure for the summary row: label, big number, optional bar and hint. */
@@ -70,6 +77,8 @@ function ReportsList({ settings }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [failed, setFailed] = useState(false) // the reports could not be fetched
   const [translating, setTranslating] = useState(false)
+  const [picked, setPicked] = useState(() => new Set()) // the head's ticked reports, for one status change
+  const [bulk, setBulk] = useState('') // progress while that change saves
   // Translation files write every teacher's parts, so only head teachers and super admins get them.
   const canTranslate = ['super_admin', 'head'].includes(me?.access)
 
@@ -122,7 +131,7 @@ function ReportsList({ settings }) {
   const todo = useMemo(() => {
     const out = []
     for (const r of reports || []) {
-      if (r.status === 'published') continue
+      if (isPublished(r)) continue
       const mine = shown.filter((s) => s.report_id === r.id && ownSubject(s.subject_key, r.year_group) && !sectionDone(settings, s, r))
       const overview = ownHomeroom(r) && !homeroomDone(settings, r)
       if (mine.length || overview) out.push({ report: r, parts: [...mine.map((s) => subjectByKey(settings, s.subject_key).name), overview ? 'homeroom comment' : null].filter(Boolean) })
@@ -142,6 +151,27 @@ function ReportsList({ settings }) {
     } catch (e) { alert(e.message) }
     load()
   }
+  const pick = (ids, on) => setPicked((cur) => { const next = new Set(cur); for (const id of ids) { if (on) next.add(id); else next.delete(id) } return next })
+  // Head: one status on every ticked report on screen. What the database refuses stays as it was.
+  const setStatusOf = async (list, status) => {
+    const label = REPORT_STATUSES.find(([v]) => v === status)[1]
+    const changing = list.filter((r) => r.status !== status)
+    if (!changing.length) return
+    const reopening = isPublished({ status }) ? 0 : changing.filter(isPublished).length
+    const early = status === 'sent' ? changing.filter((r) => !isPublished(r)).length : 0
+    const them = (n) => (n === 1 ? 'it' : 'them')
+    if (reopening && !confirm(`${reopening} of these report${reopening === 1 ? ' is' : 's are'} published or sent. Set to ${label}, teachers can change ${them(reopening)} again. Go ahead?`)) return
+    if (early && !confirm(`${early} of these report${early === 1 ? ' is' : 's are'} not published yet. Mark ${them(early)} sent anyway?`)) return
+    let done = 0
+    setBulk(`Saving 0 of ${changing.length}…`)
+    const results = await Promise.allSettled(changing.map((r) => db.reports.patch(r.id, { status }).then((row) => { setBulk(`Saving ${++done} of ${changing.length}…`); return row })))
+    const saved = new Map(results.filter((x) => x.status === 'fulfilled').map((x) => [x.value.id, x.value]))
+    setReports((rs) => rs.map((r) => saved.get(r.id) || r))
+    setBulk('')
+    const failed = results.filter((x) => x.status === 'rejected')
+    if (failed.length) alert(`${failed.length} of ${changing.length} report${changing.length === 1 ? '' : 's'} could not be changed: ${failed[0].reason?.message || failed[0].reason}`)
+    else setPicked(new Set())
+  }
   // Reports created before an area was added to their year group (e.g. Movement for Year 7).
   const missingFor = (list) => list.flatMap((r) => missingAreas(settings, r, shown.filter((s) => s.report_id === r.id), studentOf(r)).map((key) => ({ r, key })))
   const addMissing = async (yg, gaps) => {
@@ -155,7 +185,9 @@ function ReportsList({ settings }) {
   const homeroomGroups = me?.homeroom_groups || []
   // Figures for the reports on screen (the chosen period, year group and class filter).
   const visible = byGroup.flatMap(([, list]) => list)
+  const pickedHere = isHead ? visible.filter((r) => picked.has(r.id)) : [] // a hidden year group's ticks do not count
   const count = (status) => visible.filter((r) => r.status === status).length
+  const finished = visible.filter(isPublished).length
   const pctOf = (r) => completion(r, shown.filter((s) => s.report_id === r.id), settings).pct
   const avgPct = visible.length ? Math.round(visible.reduce((n, r) => n + pctOf(r), 0) / visible.length) : 0
   const stillToWrite = todo.length + todoDescriptions.length
@@ -191,7 +223,7 @@ function ReportsList({ settings }) {
       {/* Which quarter, which year group, whose classes. */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="seg" role="group" aria-label="Period">
-          {periods.map((p) => <button key={p.label} type="button" aria-pressed={p.label === period} title={`${shortDate(p.start)} – ${shortDate(p.end)}`} onClick={() => { setGroup(''); if (p.label !== period) { setPeriod(p.label); setReports(null); setFailed(false) } }}>{p.label}</button>)}
+          {periods.map((p) => <button key={p.label} type="button" aria-pressed={p.label === period} title={`${shortDate(p.start)} – ${shortDate(p.end)}`} onClick={() => { setGroup(''); if (p.label !== period) { setPeriod(p.label); setReports(null); setFailed(false); setPicked(new Set()) } }}>{p.label}</button>)}
         </div>
         <select className="input w-auto" value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Year group">
           <option value="">All year groups</option>
@@ -202,6 +234,12 @@ function ReportsList({ settings }) {
             <button type="button" aria-pressed={mineOnly} onClick={() => setMineOnly(true)}>My classes</button>
             <button type="button" aria-pressed={!mineOnly} onClick={() => setMineOnly(false)}>All reports</button>
           </div>
+        )}
+        {isHead && reports && visible.length > 0 && (
+          <label className="inline-flex cursor-pointer select-none items-center gap-2 px-1 text-sm text-slate-600">
+            <Tick checked={pickedHere.length === visible.length} some={pickedHere.length > 0} onChange={(on) => pick(visible.map((r) => r.id), on)} />
+            Select all ({visible.length})
+          </label>
         )}
         {periodInfo?.start && <span className="ml-auto text-xs text-slate-500">{period}: {shortDate(periodInfo.start)} – {shortDate(periodInfo.end)}</span>}
       </div>
@@ -218,7 +256,7 @@ function ReportsList({ settings }) {
           {isHead
             ? <Tile label="Ready to review" value={count('ready')} hint={`${count('draft')} still in draft`} tone={count('ready') ? 'text-sky-700' : 'text-slate-800'} />
             : <Tile label="Still to write" value={stillToWrite} hint={stillToWrite ? `${todoDescriptions.length} course description${todoDescriptions.length === 1 ? '' : 's'} · ${todo.length} student${todo.length === 1 ? '' : 's'}` : 'All your parts are written'} tone={stillToWrite ? 'text-amber-700' : 'text-green-700'} />}
-          <Tile label="Published" value={count('published')} hint={visible.length ? `${Math.round((count('published') / visible.length) * 100)}% of reports` : ''} tone={count('published') ? 'text-green-700' : 'text-slate-800'} />
+          <Tile label="Published" value={finished} hint={[visible.length && `${Math.round((finished / visible.length) * 100)}% of reports`, count('sent') && `${count('sent')} sent`].filter(Boolean).join(' · ')} tone={finished ? 'text-green-700' : 'text-slate-800'} />
         </div>
 
         {/* This person's unfinished parts: course descriptions on the left, students on the right. */}
@@ -266,12 +304,13 @@ function ReportsList({ settings }) {
 
         {/* One card per year group. */}
         {byGroup.map(([yg, list]) => {
-          const gaps = isHead ? missingFor(list.filter((r) => r.status !== 'published')) : []
+          const gaps = isHead ? missingFor(list.filter((r) => !isPublished(r))) : []
           const n = (status) => list.filter((r) => r.status === status).length
           const groupPct = Math.round(list.reduce((a, r) => a + pctOf(r), 0) / list.length)
           const bi = list.filter((r) => r.lang === 'bi').length
           const printUrl = (lang) => `/print/reports?year=${encodeURIComponent(settings.schoolYear)}&period=${encodeURIComponent(period)}&group=${encodeURIComponent(yg)}${lang ? `&lang=${lang}` : ''}`
-          const summary = [n('published') && `${n('published')} published`, n('ready') && `${n('ready')} ready to review`, n('draft') && `${n('draft')} in draft`].filter(Boolean).join(' · ')
+          const ticked = list.filter((r) => picked.has(r.id)).length
+          const summary = [n('sent') && `${n('sent')} sent`, n('published') && `${n('published')} published`, n('ready') && `${n('ready')} ready to review`, n('draft') && `${n('draft')} in draft`].filter(Boolean).join(' · ')
           return (
             <Card key={yg} className="!p-0 overflow-hidden [&>div:first-child]:mb-0 [&>div:first-child]:px-5 [&>div:first-child]:pt-4 [&>div:first-child]:pb-3"
               title={<span className="flex items-baseline gap-2">{yg}<span className="text-sm font-normal text-slate-500">{list.length} report{list.length === 1 ? '' : 's'}</span></span>}
@@ -287,7 +326,8 @@ function ReportsList({ settings }) {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50/70">
                     <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      <th className="py-2 pl-5 pr-3">Student</th>
+                      {isHead && <th className="w-px py-2 pl-5 pr-1"><Tick checked={ticked === list.length} some={ticked > 0} onChange={(on) => pick(list.map((r) => r.id), on)} label={`Tick every ${yg} report`} /></th>}
+                      <th className={`py-2 pr-3 ${isHead ? 'pl-2' : 'pl-5'}`}>Student</th>
                       {!isHead && <th className="py-2 pr-3"><span className="flex flex-wrap items-center gap-x-3">Your part <WritingLegend className="font-normal normal-case tracking-normal" /></span></th>}
                       <th className="py-2 pr-3">Completion</th>
                       <th className="py-2 pr-3">Status</th>
@@ -305,8 +345,9 @@ function ReportsList({ settings }) {
                       const moved = student?.level && student.level !== r.year_group
                       const meta = [student?.nickname && `“${student.nickname}”`, age != null && `${age} yrs`, moved && `now ${student.level}`].filter(Boolean).join(' · ')
                       return (
-                        <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/70">
-                          <td className="py-2 pl-5 pr-3">
+                        <tr key={r.id} className={`border-t border-slate-100 ${picked.has(r.id) && isHead ? 'bg-sky-50' : 'hover:bg-slate-50/70'}`}>
+                          {isHead && <td className="py-2 pl-5 pr-1"><Tick checked={picked.has(r.id)} onChange={(on) => pick([r.id], on)} label={`Tick ${student?.full_name || r.student_name}`} /></td>}
+                          <td className={`py-2 pr-3 ${isHead ? 'pl-2' : 'pl-5'}`}>
                             <Link to={`/reports/${r.id}`} className="flex items-center gap-2.5 hover:text-pra-blue">
                               {photo ? <img src={photo} alt="" className="h-8 w-8 flex-none rounded-full object-cover" /> : <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">{(student?.nickname || r.student_name || '?')[0]}</span>}
                               <span className="min-w-0">
@@ -348,6 +389,28 @@ function ReportsList({ settings }) {
         })}
       </>)}
 
+      {/* The head's status bar, while reports are ticked. */}
+      {pickedHere.length > 0 && (
+        <div className="sticky bottom-4 z-30 flex justify-center">
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-lg">
+            <span className="text-sm font-semibold text-slate-800">{pickedHere.length} report{pickedHere.length === 1 ? '' : 's'} ticked</span>
+            <span className="text-xs text-slate-500">Set status to</span>
+            {REPORT_STATUSES.map(([v, l]) => {
+              const n = pickedHere.filter((r) => r.status !== v).length
+              return (
+                <button key={v} type="button" className={`${v === 'sent' ? 'btn-primary' : 'btn-secondary'} !py-1 text-xs`} disabled={!!bulk || !n} onClick={() => setStatusOf(pickedHere, v)}
+                  title={n ? `${n} report${n === 1 ? '' : 's'} will change` : `All ${pickedHere.length} are ${l} already`}>
+                  {v === 'sent' && <Mail size={14} />}{l}
+                </button>
+              )
+            })}
+            {bulk ? <span className="text-xs text-slate-500">{bulk}</span>
+              : <button type="button" className="btn-ghost !py-1 text-xs" onClick={() => setPicked(new Set())}><X size={14} /> Clear</button>}
+          </div>
+        </div>
+      )}
+
+      {translating && <TranslationModal settings={settings} students={students} defaultPeriod={period} defaultGroup={group} onClose={() => setTranslating(false)} onDone={load} />}
       {translating && <TranslationModal settings={settings} students={students} defaultPeriod={period} defaultGroup={group} onClose={() => setTranslating(false)} onDone={load} />}
 
       <Modal open={creating} onClose={() => setCreating(false)} title="Create progress reports">

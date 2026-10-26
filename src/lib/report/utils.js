@@ -11,6 +11,11 @@ export const fmtDate = (d, opts) => {
   return dt.toLocaleDateString('en-GB', opts || { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+// A report's statuses in order. Sent = published and emailed to the family (since 26 October 2026).
+export const REPORT_STATUSES = [['draft', 'Draft'], ['ready', 'Ready to review'], ['published', 'Published'], ['sent', 'Sent']]
+/** Published or sent: finished, and locked for everyone but the head. */
+export const isPublished = (r) => r?.status === 'published' || r?.status === 'sent'
+
 /**
  * A learning area from Report settings. With `yearGroup`, as that year group has
  * it: an area with `specialistIn` (Movement: Year 7, since 22 October 2026) is a
@@ -295,8 +300,8 @@ export function descriptionTasks(settings, reports, sections, { subjects = [], n
     for (const key of keys) {
       if (!subjects.includes(`${key}:${yearGroup}`) || !writingFor(settings, key, yearGroup).description) continue
       const note = notes.find((n) => n.year_group === yearGroup && n.subject_key === key) || null
-      const done = rs.every((r) => r.status === 'published') || descriptionDone(settings, note || { subject_key: key }, yearGroup)
-      const open = rs.filter((r) => r.status !== 'published')
+      const done = rs.every(isPublished) || descriptionDone(settings, note || { subject_key: key }, yearGroup)
+      const open = rs.filter((r) => !isPublished(r))
       const report = open.find((r) => sections.some((s) => s.report_id === r.id && s.subject_key === key)) || open[0] || rs[0]
       out.push({ yearGroup, key, name: subjectByKey(settings, key).name, note, done, report })
     }
@@ -335,7 +340,7 @@ export function reportWork(settings, reports, sections, { subjects = [], homeroo
     if (done) { a.done++; g.done++ }
   }
   for (const r of reports) {
-    const published = r.status === 'published'
+    const published = isPublished(r)
     for (const s of byReport.get(r.id) || []) {
       if (subjects.includes(`${s.subject_key}:${r.year_group}`)) tally(r.year_group, s.subject_key, published || sectionDone(settings, s, r))
     }

@@ -239,8 +239,8 @@ export function Chip({ tone = 'slate', children }) {
 }
 
 export function ReportStatusChip({ status }) {
-  const tone = { draft: 'slate', ready: 'sky', published: 'green' }[status] || 'slate'
-  const label = { draft: 'Draft', ready: 'Ready to review', published: 'Published' }[status] || status
+  const tone = { draft: 'slate', ready: 'sky', published: 'green', sent: 'navy' }[status] || 'slate'
+  const label = { draft: 'Draft', ready: 'Ready to review', published: 'Published', sent: 'Sent' }[status] || status
   return <Chip tone={tone}>{label}</Chip>
 }
 

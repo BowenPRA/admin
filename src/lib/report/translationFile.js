@@ -2,7 +2,7 @@
 // one JSON file, has Claude (desktop app) fill in the Vietnamese, then uploads
 // the file Claude returns. Nothing is sent anywhere by the app itself.
 
-import { subjectByKey, sectionsByTier, studentSections, TIER_KEYS, templateForYearGroup, textLimits, writingFor, sectionTeacher, reportHomeroom, printedTeacher } from './utils'
+import { subjectByKey, sectionsByTier, studentSections, TIER_KEYS, templateForYearGroup, textLimits, writingFor, sectionTeacher, reportHomeroom, printedTeacher, isPublished } from './utils'
 import { legalFirstName } from '../names'
 import { wordingIssues } from './wording'
 
@@ -168,7 +168,7 @@ export function planTranslationImport(data, { reports, sections, notes, students
     changes.push({
       id: part.id, kind, rowId, field, vi, current: current || '', where, who: n.who,
       englishChanged: (english || '').trim() !== String(part.english || '').trim(),
-      over: vi.length > max, max, published: report?.status === 'published',
+      over: vi.length > max, max, published: isPublished(report),
       issues: wordingIssues(vi, { lang: 'vi', legalName: n.legal, nickname: n.nickname, messages: 'en' }),
     })
   }

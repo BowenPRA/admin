@@ -154,7 +154,7 @@ There is no Upper Secondary template, so Upper Secondary students get no report 
 - A teacher's rights come from their row on **Setup** → **Teachers** (head only). The database enforces them, so a part a teacher may not edit cannot be saved, whatever the screen shows.
 - The homeroom teacher's name on the report comes from the Schedule. The right to write the homeroom parts comes from the Teachers row. The two must agree: "Who teaches what" on the Teachers page flags a homeroom teacher on the Schedule who cannot yet write the homeroom parts.
 - A teacher with no row sees "You are not linked to any classes yet, so reports are read-only."
-- Statuses: **Draft**, **Ready to review**, **Published**. The homeroom teacher moves a report to Ready to review. Only the head publishes, and once a report is published only the head can change it.
+- Statuses: **Draft**, **Ready to review**, **Published**, **Sent**. The homeroom teacher moves a report to Ready to review. Only the head publishes and marks reports sent, and once a report is published or sent only the head can change it. Sent (since 26 October 2026) means published and emailed to the family.
 
 ## The cycle each quarter
 
@@ -185,10 +185,22 @@ There is no Upper Secondary template, so Upper Secondary students get no report 
 2. The head reads each report in the editor with **Preview** open and corrects what needs it.
 3. On each year group that has review scores, the head checks that every score is in. The class reference beside each score is the average of all the scores entered for that area in the year group that quarter, the student's own included. The Current works it out each time a report is shown or printed, so a late or corrected score changes every report's class reference at once, and the editor shows it under the score ("Class average 82%, from 10 scores in Year 7 so far"). There is nothing to press. Until 24 October 2026 the head pressed a **Class references** button and the figure was saved on each report; the saved figures are no longer used, which is why the Quarter 1 English figures printed before that date differ from report to report.
 4. Reports set to English and Vietnamese get their Vietnamese now (see [Vietnamese reports](#/handbook/reports?s=vietnamese-reports) below).
-5. The head sets each report's status to **Published**. A published report is locked for everyone but the head.
+5. The head sets the reports to **Published**, one at a time in the editor or many at once on the Reports page (see [Changing many statuses at once](#/handbook/reports?s=changing-many-statuses-at-once) below). A published report is locked for everyone but the head.
 6. **Print all** on each year group card opens one PDF with every report of that year group, one page per student, in English. When some reports are set to English and Vietnamese, the button reads **Print all (English)** and a second button, **Tiếng Việt (n)**, makes the Vietnamese PDF for those n reports.
 7. Save each PDF from the print page. The Super Admin's **Setup** → **Settings** → **Export to a folder** also writes every published report as a PDF into `Reports/2026-2027/Quarter 1/Year 3/` and so on, inside the export folder. That is the off-site copy (see [Behind the scenes](#/handbook/behind)).
-8. The PDFs go to the families. The sources do not record whether Quarter 1 2026 went out printed, by email or both (not checked since 15 October 2026). Ask Seth how he wants it done.
+8. The PDFs go to the families. Quarter 1 2026-2027 went out by email from admin@ on 23 October 2026.
+9. Once the emails have gone, the head ticks those reports on the Reports page and sets them to **Sent** (below).
+
+### Changing many statuses at once
+
+The head (Seth, and Bowen as Super Admin) sees a tick box at the start of every row on **Reports** (since 26 October 2026):
+
+- Tick single reports, the box in a year group's header row for that whole year group, or **Select all (N)** beside the year group menu for every report on screen. The year group menu narrows what is on screen; a ticked report in a year group that is filtered out is not changed.
+- A bar appears at the bottom of the page: "N reports ticked", then **Draft**, **Ready to review**, **Published** and **Sent**. Press one and every ticked report takes that status. A button is greyed out when every ticked report already has that status. **Clear** unticks them all.
+- Two cases ask first: marking **Sent** on reports that are not published yet, and setting published or sent reports back to Draft or Ready to review (that opens them to the teachers again).
+- The ticks clear when the change is saved. If the database refuses some reports, a message says how many and why, and the ticks stay so the button can be pressed again.
+- **Sent** works like Published: the report is locked for everyone but the head, its parts count as written, and **Export to a folder** treats it as published. The **Published** tile counts published and sent reports together and adds "n sent"; each year group's line adds "n sent".
+- The database lock for Sent comes with `supabase/updates-2026-10-26-report-sent.sql`. Until that file is run, The Current already locks sent reports on screen.
 
 ## Writing a report
 
@@ -336,7 +348,7 @@ Bowen asked on 23 October 2026, the day the English reports went out, for every 
 
 | What you see | Why | What to do |
 |---|---|---|
-| A teacher cannot type in a box | Their Teachers row does not tick that area for that year group, or the report is published | The head ticks it on **Setup** → **Teachers**, or sets the report back from Published |
+| A teacher cannot type in a box | Their Teachers row does not tick that area for that year group, or the report is published or sent | The head ticks it on **Setup** → **Teachers**, or sets the report back from Published or Sent |
 | "You are not linked to any classes yet" | The teacher has no Teachers row, or it has no ticks | The head adds or fixes the row |
 | The wrong homeroom teacher prints | The Schedule names someone else for that class | Correct the class on **Teaching** → **Schedule**; reports follow it |
 | A comment is written but still listed under Still to write | It is shorter than its minimum | Write more, up to the limit |
