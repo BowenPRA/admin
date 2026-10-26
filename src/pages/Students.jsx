@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet, Printer, Copy, Utensils, FolderOpen } from 'lucide-react'
+import { UserPlus, Users, ClipboardList, ChevronUp, ChevronDown, MoreHorizontal, BadgeCheck, Mail, Phone, Pencil, AlertTriangle, IdCard, FileSpreadsheet, Printer, Copy, Utensils, FolderOpen, Footprints } from 'lucide-react'
 import { db } from '../lib/db'
 import { exportStudentList } from '../lib/exportExcel'
 import { useT } from '../lib/i18n'
@@ -17,6 +17,7 @@ import FamilyModal from '../components/students/FamilyModal'
 import DriveDocsModal from '../components/students/DriveDocsModal'
 import { blankStudent, ageOf, blankFamily, contactsOf, familyMissingContact, isEnrolled, isPending, isPast, statusOf, familyStatus, partialFrom, endDateOf, startsLater } from '../lib/studentRecords'
 import { finishingThisQuarter, dayText } from '../lib/studentDates'
+import { isTrial, trialOf, trialLine, trialShort, nextSchoolDay } from '../lib/trial'
 import { todayIso } from '../lib/attendanceSummary'
 import { withOpenSteps, startedBy, parentEmails } from '../lib/onboarding'
 import { emailIssues } from '../lib/emailCheck'
@@ -78,7 +79,7 @@ export default function Students() {
   const [q, setQ] = useState('')
   // Home's "new students with steps to finish" opens this page as /students?steps=1: pending and enrolled together.
   const [steps, setSteps] = useState(() => params.get('steps') === '1')
-  const [status, setStatus] = useState(() => (params.get('steps') === '1' ? 'all' : 'active'))
+  const [status, setStatus] = useState(() => (params.get('steps') === '1' ? 'all' : params.get('trial') === '1' ? 'pending' : 'active'))
   const [level, setLevel] = useState('')
   const [program, setProgram] = useState('')
   const [noFamily, setNoFamily] = useState(false)
@@ -87,8 +88,11 @@ export default function Students() {
   const [missingContact, setMissingContact] = useState(false)
   // Students still to be answered for meals at PRA (blank until someone says), with Yes/No on each row.
   const [noMeals, setNoMeals] = useState(false)
+  // Trial students (lib/trial.js); Home's trial card opens this page as /students?trial=1.
+  const [trialOnly, setTrialOnly] = useState(() => params.get('trial') === '1')
   const [sort, setSort] = useState({ col: 'level', dir: 'asc' })
   const [editing, setEditing] = useState(null)
+  const [focusTrial, setFocusTrial] = useState(false) // opened with Make trial: the window scrolls to the trial days
   const [editingFam, setEditingFam] = useState(null)
   const [docsOpen, setDocsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -99,7 +103,7 @@ export default function Students() {
   const linked = useMemo(() => { const s = wanted ? students.find((x) => x.id === wanted) : null; return s ? { ...blankStudent(), ...s } : null }, [wanted, students])
   const shown = editing || linked
   const newFamily = useRef(null) // a family made for a student whose own save then failed: used again, not made twice
-  const closeStudent = () => { newFamily.current = null; setEditing(null); if (wanted) setParams({}, { replace: true }) }
+  const closeStudent = () => { newFamily.current = null; setEditing(null); setFocusTrial(false); if (wanted) setParams({}, { replace: true }) }
 
   const famById = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families])
   const kidsByFamily = useMemo(() => {
@@ -138,6 +142,13 @@ export default function Students() {
   const toConvert = useMemo(() => students.filter(needsCodeUpdate), [students])
   const withoutId = useMemo(() => students.filter((s) => !isPast(s) && !s.student_code), [students])
   const mealsOpen = useMemo(() => students.filter((s) => !isPast(s) && s.meals == null).length, [students])
+  const trialCount = useMemo(() => students.filter(isTrial).length, [students])
+  // Trial students are Pending, so the filter opens the Pending tab.
+  const toggleTrial = (on) => {
+    setTrialOnly(on)
+    if (on && status !== 'all') setStatus('pending')
+    if (!on && params.get('trial')) setParams(Object.fromEntries([...params].filter(([k]) => k !== 'trial')), { replace: true })
+  }
 
   // The 'past' tab is the 'inactive' status; the other two match it by name.
   const inStatus = (s) => status === 'all' || statusOf(s) === (status === 'past' ? 'inactive' : status)
@@ -151,6 +162,7 @@ export default function Students() {
       .filter((s) => !ending || finishingIds.has(s.id))
       .filter((s) => !steps || openSteps.has(s.id))
       .filter((s) => !noMeals || s.meals == null)
+      .filter((s) => !trialOnly || isTrial(s))
       .filter((s) => !needle || norm(`${s.full_name} ${s.nickname} ${famById[s.family_id]?.name || ''} ${s.level} ${s.student_code} ${normalizeCode(s.student_code)} ${s.class_group}`).includes(needle))
     const dir = sort.dir === 'asc' ? 1 : -1
     const byName = (a, b) => (a.full_name || '').localeCompare(b.full_name || '')
@@ -164,7 +176,7 @@ export default function Students() {
       meals: (a, b) => mealsRank(a) - mealsRank(b) || byName(a, b),
     }[sort.col] || byName
     return [...list].sort((a, b) => cmp(a, b) * dir)
-  }, [students, q, status, level, program, noFamily, ending, finishingIds, steps, openSteps, noMeals, famById, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [students, q, status, level, program, noFamily, ending, finishingIds, steps, openSteps, noMeals, trialOnly, famById, sort]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const famRows = useMemo(() => {
     const needle = norm(q)
@@ -175,8 +187,8 @@ export default function Students() {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [families, kidsByFamily, q, status, missingContact])
 
-  const filtersOn = !!(q || level || program || noFamily || ending || steps || missingContact || noMeals)
-  const clearFilters = () => { setQ(''); setLevel(''); setProgram(''); setNoFamily(false); toggleEnding(false); toggleSteps(false); setMissingContact(false); setNoMeals(false) }
+  const filtersOn = !!(q || level || program || noFamily || ending || steps || missingContact || noMeals || trialOnly)
+  const clearFilters = () => { setQ(''); setLevel(''); setProgram(''); setNoFamily(false); toggleEnding(false); toggleSteps(false); setMissingContact(false); setNoMeals(false); toggleTrial(false) }
   const onSort = (col) => setSort((s) => (s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' }))
 
   const run = async (fn) => {
@@ -227,7 +239,7 @@ export default function Students() {
         const error = leadError.message || String(leadError)
         toast.error(lead ? t('leadEnrolledFailed', { name: lead.family, error }) : t('leadEnrolledUnread', { name: s.nickname || s.full_name, error }))
       }
-    } catch (e) { toast.error(/partial_from/.test(e.message || '') ? t('partialDaySetup') : /end_date/.test(e.message || '') ? t('endDateSetup') : /'meals'/.test(e.message || '') ? t('mealsSetup') : e.message) }
+    } catch (e) { toast.error(/trial_(from|to)/.test(e.message || '') ? t('trialSetup') : /partial_from/.test(e.message || '') ? t('partialDaySetup') : /end_date/.test(e.message || '') ? t('endDateSetup') : /'meals'/.test(e.message || '') ? t('mealsSetup') : e.message) }
   }
   const removeStudent = async (s) => {
     if (!confirm(t('confirmDeleteStudent', { name: s.full_name }))) return
@@ -316,7 +328,7 @@ export default function Students() {
 
   // The students listed right now (status tab, filters, search and sort) as an Excel file.
   const exportList = () => run(async () => {
-    const label = [status === 'all' ? 'All students' : status === 'active' ? 'Enrolled' : status === 'pending' ? 'Pending' : 'Past', level, program && programName(program), ending && 'Finishing this quarter'].filter(Boolean).join(' · ')
+    const label = [status === 'all' ? 'All students' : status === 'active' ? 'Enrolled' : status === 'pending' ? 'Pending' : 'Past', level, program && programName(program), ending && 'Finishing this quarter', trialOnly && 'Trial students'].filter(Boolean).join(' · ')
     await exportStudentList({ list: rows, students, families, label, schoolYear: fees?.schoolYear })
     toast(t('exportStudentListDone', { n: rows.length }))
   })
@@ -380,6 +392,7 @@ export default function Students() {
         )}
         {canEdit && <input ref={rosterInput} type="file" accept=".json,application/json" className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) loadRoster(f) }} />}
+        {canEdit && <button className="btn-secondary" title={t('addTrialStudentHint')} onClick={() => setEditing({ ...blankStudent(students), trial_from: nextSchoolDay(), trial_to: nextSchoolDay() })}><Footprints size={16} /> {t('addTrialStudent')}</button>}
         {canEdit && <button className="btn-primary" onClick={() => setEditing(blankStudent(students))}><UserPlus size={16} /> {t('addStudent')}</button>}
       </PageHeader>
 
@@ -424,6 +437,7 @@ export default function Students() {
             {canEdit && <Checkbox checked={noFamily} onChange={setNoFamily} label={t('withoutFamily')} className="px-1" />}
             {(finishing.students.length > 0 || ending) && <Checkbox checked={ending} onChange={toggleEnding} label={`${t('endingFilter')} (${finishing.students.length})`} className="px-1" />}
             {canEdit && (openSteps.size > 0 || steps) && <Checkbox checked={steps} onChange={toggleSteps} label={`${t('stepsFilter')} (${openSteps.size})`} className="px-1" />}
+            {(trialCount > 0 || trialOnly) && <Checkbox checked={trialOnly} onChange={toggleTrial} label={`${t('trialFilter')} (${trialCount})`} className="px-1" />}
             {canEdit && (mealsOpen > 0 || noMeals) && <Checkbox checked={noMeals} onChange={setNoMeals} label={`${t('mealsFilter')} (${mealsOpen})`} className="px-1" />}
           </>) : (
             <Checkbox checked={missingContact} onChange={setMissingContact} label={t('missingContact')} className="px-1" />
@@ -479,6 +493,7 @@ export default function Students() {
                                 {s.nickname && <span>“{s.nickname}”</span>}
                                 {s.allergies && <span className="rounded bg-red-50 px-1 text-[10px] font-semibold text-red-700" title={s.allergies}>{lang === 'vi' ? 'dị ứng' : 'allergy'}</span>}
                                 {partialFrom(s) && <span className="rounded bg-amber-50 px-1 text-[10px] font-semibold text-amber-700" title={t('partialDay')}>{t('fromTime', { time: partialFrom(s) })}</span>}
+                                {isTrial(s) && <span className="whitespace-nowrap rounded bg-teal-50 px-1 text-[10px] font-semibold text-teal-800" title={`${t('trialRow')}: ${trialLine(trialOf(s), lang)}`}>{t('trialChip', { dates: trialShort(trialOf(s), lang) })}</span>}
                                 {finishingIds.has(s.id) && <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-800" title={t('endDate')}>{t(endDateOf(s) < today ? 'endedOnShort' : 'endsOnShort', { date: dayText(endDateOf(s), lang) })}</span>}
                                 <span className="md:hidden">{age != null ? `${age}y` : ''}</span>
                               </div>
@@ -504,6 +519,12 @@ export default function Students() {
                         <td className="td hidden whitespace-nowrap pr-4 text-right text-xs sm:table-cell">
                           {openSteps.has(s.id) && <span className="chip mr-1 bg-sky-100 text-sky-800" title={t('obTitle')}>{t(openSteps.get(s.id) === 1 ? 'stepsOpenOne' : 'stepsOpen', { n: openSteps.get(s.id) })}</span>}
                           {isPending(s) && <span className="chip mr-1 bg-amber-100 text-amber-700">{t('pending').toLowerCase()}</span>}
+                          {canEdit && isPending(s) && !isTrial(s) && (
+                            <button type="button" className="chip mr-1 gap-1 bg-teal-50 text-teal-800 ring-1 ring-teal-200 hover:bg-teal-100" title={t('makeTrialHint')}
+                              onClick={(e) => { e.stopPropagation(); setFocusTrial(true); setEditing({ ...blankStudent(), ...s, trial_from: nextSchoolDay(), trial_to: nextSchoolDay() }) }}>
+                              <Footprints size={11} /> {t('makeTrial')}
+                            </button>
+                          )}
                           {s.is_new && <span className="chip mr-1 bg-green-100 text-green-800">{lang === 'vi' ? 'mới' : 'new'}</span>}
                           {s.legacy && <span className="chip mr-1 bg-purple-100 text-purple-800">legacy</span>}
                           {s.q4_full && <span className="chip bg-slate-100 text-slate-600" title={t('q4Full')}>Q4</span>}
@@ -568,7 +589,7 @@ export default function Students() {
       {shown && (
         <StudentModal key={shown.id || 'new'} value={shown} onClose={closeStudent} onSave={saveStudent} onDelete={removeStudent}
           students={students} families={families} schoolYear={fees?.schoolYear} calendar={calendar} canEdit={canEdit} t={t} lang={lang}
-          checklist={canEdit ? { ctx: checklistCtx, me, onChanged: reloadAll } : null} onError={(m) => toast.error(m)} />
+          checklist={canEdit ? { ctx: checklistCtx, me, onChanged: reloadAll } : null} onError={(m) => toast.error(m)} focusTrial={focusTrial} />
       )}
       {docsOpen && <DriveDocsModal onClose={() => setDocsOpen(false)} onOpenStudent={(s) => { setDocsOpen(false); setEditing({ ...blankStudent(), ...s }) }} />}
       {editingFam && (

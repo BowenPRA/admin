@@ -3,7 +3,7 @@ This chapter follows a child from the first enquiry to a complete student record
 ## From an enquiry to the first day
 
 1. **A family gets in touch.** An email to admin@ is added to [Leads](#/leads) by the inbox triage. The website's contact or Book a tour form adds the family to Leads by itself and leaves the message in the "From the website" panel. A walk-in, a WhatsApp or Zalo message or a Facebook message is added by hand with **Add family**.
-2. **Reply, tour, trial.** The office replies and moves the family's stage along: Contacted, Tour/call booked, Tour/call done, Trial. A trial day is billed with the **Trial day only** plan (see [Fees, invoices and receipts](#/handbook/fees)).
+2. **Reply, tour, trial.** The office replies and moves the family's stage along: Contacted, Tour/call booked, Tour/call done, Trial. A trial day is billed with the **Trial day only** plan (see [Fees, invoices and receipts](#/handbook/fees)). To put the child on the register for their trial days, add them with **Students** → **Trial student** (see [Trial students](#/handbook/students?s=trial-students)).
 3. **The enrollment form.** The family fills in the form at https://pra.edu.vn/admissions/enroll/ (Vietnamese: https://pra.edu.vn/vi/admissions/enroll/). It arrives on [Enrollments](#/enrollments), adds the child as a **Pending** student with a family, and moves the lead to Enrolled. If the family agreed before sending the form, the office can make the records from the lead first with **Make the student records**.
 4. **Check the record.** Open the form, press **Mark checked**, then open the student and work through the **New-student checklist**: ID, year group, start date, family and parent email, the lead link, the admission fee, the first invoice, the form.
 5. **The steps outside The Current.** The **Supply check** email to the class teachers and Hien, the parent mailing lists, the no-photo list if the family chose private photos, the student's Google account (see [Google Workspace and domains](#/handbook/google)), and a word to the homeroom teacher.
@@ -111,12 +111,41 @@ The status is at the top of the student window. It never changes by itself: not 
 | Status (screen) | Meaning | Register | Progress reports | Invoices | Counts and mailing lists |
 |---|---|---|---|---|---|
 | Enrolled | In class now | Yes | Yes | Yes | Counted; parents on the mailing lists |
-| Pending | Coming, not in class yet | No | No | Yes, can be invoiced | Not counted; parents not added to the lists |
+| Pending | Coming, not in class yet | No, apart from a trial student's trial days | No | Yes, can be invoiced | Not counted; parents not added to the lists |
 | Past | Has left | No | No | No; picking one with **Include inactive** in the builder brings them back as Pending | Not counted; parents taken off the lists |
 
 - A new student starts as Pending, whether added by hand, from a lead or by a form. Students loaded from the roster file come in as Enrolled.
 - A past student picked in the invoice builder comes back as Pending after a confirm, with the year group suggested from the birthday. Their new-student checklist starts again. If they still have an old end date, the window asks whether to **Keep it** or **Clear it**.
 - A family's status follows its children: active if any child is enrolled, pending if any is waiting, past once none is left.
+
+## Trial students
+
+A trial student is a Pending student booked to try some days in class before the family decides. Added 26 October 2026.
+
+1. Start the trial in one of three ways:
+   - A Pending student already on the list: on **Students** → **Pending**, press **Make trial** on their row. The window opens at the trial days.
+   - Or open the student and set **Status** to **Trial (Pending)**.
+   - A child not on the list yet: **Students** → **Trial student** opens a new student set to Trial.
+2. Set the **First trial day** and the **Last trial day**, or press **1 day**, **2 days**, **3 days** or **5 days**. These count school days, Monday to Friday. The line under the boxes says how many school days the trial is.
+3. Check the year group, the family and any allergies, and press **Save**.
+
+To take a trial off before it starts, set **Status** back to **Pending**: the trial days are removed.
+
+What the trial days change:
+
+- **Register:** on each trial day the student is at the top of their year group, with a teal **Trial** tag and a line such as "Trial day 2 of 3 · until Wed 28 Oct". They are marked like everyone else, and **Mark everyone else present** includes them. On other days they are not on the register.
+- **Home:** the teachers of that year group see a **Trial students** card: who is on trial today and who starts later, with allergies and partial-day times. Office accounts see every trial, and also trials that ended in the last two weeks and are still Pending. The greeting band says "On trial today:" with the names.
+- **Students:** a teal tag such as "trial 26–28 Oct" beside the name, and a **Trial students** filter, which opens the Pending tab.
+- Nothing else changes. A trial student gets no progress report, is not in the enrolled count, and is invoiced with the **Trial day only** plan as before. Like every Pending student they have a new-student checklist; its steps can wait until the family decides.
+
+When the trial ends:
+
+- The family joins: set the status to **Enrolled** on the first day. The trial dates stay on the record and no longer do anything.
+- The family does not join: set the status to **Past**.
+
+> **Rule:** a trial never changes the status by itself. A finished trial stays Pending, and on the office's Home card, until someone sets the status.
+
+Trial days need a database update: the file in `supabase/` dated 2026-10-26 with "trial-students" in its name, run once in Supabase. Until then, saving trial days shows a message that names the file, and everything else saves as before.
 
 ## Student IDs
 

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Camera, RotateCcw, Trash2, AlertTriangle, Mail, Phone, ClipboardCheck, Sprout, History } from 'lucide-react'
+import { Camera, RotateCcw, Trash2, AlertTriangle, Mail, Phone, ClipboardCheck, Sprout, History, Footprints } from 'lucide-react'
 import { LEVELS, PROGRAMS } from '../../lib/fees'
 import { suggestClass } from '../../lib/placement'
 import { guessFirstName } from '../../lib/names'
@@ -8,6 +8,7 @@ import { resizeImage, photoSrc } from '../../lib/report/photo'
 import { nextStudentCode, codeTakenBy, normalizeCode } from '../../lib/studentIds'
 import { ageOf, STATUSES, statusOf, withStatus, partialFrom, DEFAULT_PARTIAL_FROM, endDateOf, startsLater } from '../../lib/studentRecords'
 import { quartersOf, currentQuarter, dayText } from '../../lib/studentDates'
+import { trialOf, isTrial, nextSchoolDay, addSchoolDays, schoolDays, trialLine } from '../../lib/trial'
 import { onChecklist, onboardingOf, startedBy, startChecklist, ChecklistSetupError } from '../../lib/onboarding'
 import { todayIso } from '../../lib/leads'
 import { db } from '../../lib/db'
@@ -30,8 +31,9 @@ function Section({ title, children }) {
  * Add / edit a student (office accounts), or a read-only summary for teachers.
  * `onSave(row)` and `onDelete(row)` return promises; the modal stays open on error.
  * `checklist` = { ctx, me, onChanged } shows the new-student checklist (office accounts).
+ * `focusTrial` scrolls to the trial days on opening (Students > Make trial), past the checklist.
  */
-export default function StudentModal({ value, onClose, onSave, onDelete, students, families, schoolYear, calendar, canEdit, checklist, onError, t, lang }) {
+export default function StudentModal({ value, onClose, onSave, onDelete, students, families, schoolYear, calendar, canEdit, checklist, onError, focusTrial, t, lang }) {
   const [s, setS] = useState(value)
   // The row as saved: ticks on the checklist are written straight away, apart from Save.
   const [saved, setSaved] = useState(value)
@@ -59,6 +61,19 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
   const startTracking = async () => {
     try { onChecklistSaved(await startChecklist(db, saved, me?.email)); await checklist?.onChanged?.() } catch (e) { onError?.(e instanceof ChecklistSetupError ? t('checklistSetup') : e.message) }
   }
+  // Trial days (lib/trial.js): a Pending student booked to try some days in class. The Status menu
+  // offers Trial beside Pending: it stays 'pending' in the database, with trial days. Choosing Trial
+  // books one school day from today; choosing Pending takes the trial days off; Enrolled and Past keep
+  // them as a record. Moving the first day keeps the trial's length.
+  const trialLength = (cur) => { const tr = trialOf(cur); return tr ? schoolDays(tr.from, tr.to) : 1 }
+  const trialRef = useRef(null)
+  useEffect(() => { if (focusTrial) trialRef.current?.scrollIntoView({ block: 'center' }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const pickStatus = (v) => {
+    changeStatus(v === 'trial' ? 'pending' : v)
+    if (v === 'trial') setS((cur) => (cur.trial_from ? cur : { ...cur, trial_from: nextSchoolDay(), trial_to: nextSchoolDay() }))
+    if (v === 'pending') setS((cur) => ({ ...cur, trial_from: '', trial_to: '' }))
+  }
+  const setTrialFrom = (v) => setS((cur) => ({ ...cur, trial_from: v, trial_to: v ? addSchoolDays(v, trialLength(cur)) : '' }))
   // New students: the class follows the birthday until someone picks a class by hand.
   const [levelTouched, setLevelTouched] = useState(false)
   const [levelAuto, setLevelAuto] = useState(false)
@@ -84,16 +99,20 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
   const codeNotS = !!s.student_code && !/^S\d+$/.test(normalizeCode(s.student_code)) && (isNew || (status === 'pending' && !onboardingOf(s)?.returning))
   const showChecklist = canEdit && !isNew && !!checklist && onChecklist(s)
   const lead = s.lead_id ? (checklist?.ctx?.leads || []).find((l) => l.id === s.lead_id) : null
+  const trial = trialOf(s)
+  const trialBad = !!s.trial_from && !!s.trial_to && s.trial_to < s.trial_from
 
   const save = async (e) => {
     e?.preventDefault()
-    if (!s.full_name.trim() || taken) return
+    if (!s.full_name.trim() || taken || trialBad) return
     setBusy(true)
     const row = { ...s, full_name: s.full_name.trim(), student_code: normalizeCode(s.student_code) || null }
     // first_name needs supabase/updates-2026-09-15-legal-names.sql; leave it out until someone types one.
     if (!(row.first_name || '').trim() && !('first_name' in value)) delete row.first_name
     // Likewise partial_from (supabase/updates-2026-09-22-partial-day.sql): only sent once someone sets it.
     if (!partialFrom(row) && !('partial_from' in value)) delete row.partial_from
+    // And the trial days (supabase/updates-2026-10-26-trial-students.sql).
+    if (!trialOf(row) && !('trial_from' in value)) { delete row.trial_from; delete row.trial_to }
     try { await onSave(row) } finally { setBusy(false) }
   }
   const pickPhoto = async (file) => { try { set('photo')(await resizeImage(file)) } catch (err) { alert(err.message) } }
@@ -115,6 +134,7 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
           {row(t('legalFirstName'), (s.first_name || '').trim() || guessFirstName(s.full_name, s.nickname))}
           {row(t('classGroup'), s.class_group)}
           {row(t('allergies'), s.allergies && <span className="font-semibold text-red-700">{s.allergies}</span>)}
+          {row(t('trialRow'), isTrial(s) && <span className="font-semibold text-teal-800">{trialLine(trialOf(s), lang)}</span>)}
           {row(t('arrivesAt'), partialFrom(s) && <span className="font-semibold text-amber-700">{partialFrom(s)} · {t('partialDay')}</span>)}
           {row(t('endDate'), end && <span className={endsThisQuarter ? 'font-semibold text-sky-800' : ''}>{dayText(end, lang)}{endsThisQuarter ? ` · ${t('endsThisQuarter')}` : ''}</span>)}
           {row(t('dob'), s.dob)}
@@ -133,12 +153,12 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
   }
 
   return (
-    <Modal open onClose={onClose} wide title={isNew ? t('addStudent') : s.full_name || t('edit')}
+    <Modal open onClose={onClose} wide title={isNew ? t(value.trial_from ? 'addTrialStudentTitle' : 'addStudent') : s.full_name || t('edit')}
       subtitle={!isNew && [s.student_code, s.level, fam?.name].filter(Boolean).join(' · ')}
       footer={(<>
         {!isNew && onDelete && <button type="button" className="btn-ghost mr-auto text-red-600 hover:bg-red-50" onClick={() => onDelete(s)}><Trash2 size={16} /> {t('delete')}</button>}
         <button type="button" className="btn-secondary" onClick={onClose}>{t('cancel')}</button>
-        <button type="submit" form="student-form" className="btn-primary" disabled={busy || !s.full_name.trim() || !!taken}>{busy ? t('saving') : t('save')}</button>
+        <button type="submit" form="student-form" className="btn-primary" disabled={busy || !s.full_name.trim() || !!taken || trialBad}>{busy ? t('saving') : t('save')}</button>
       </>)}>
       <form id="student-form" onSubmit={save} className="space-y-5">
         {showChecklist && (
@@ -173,9 +193,9 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
                   : codeNotS ? <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-amber-700"><AlertTriangle size={13} /> {t('idNotS', { next: nextStudentCode(students.filter((x) => x.id !== s.id)) })}</span>
                   : isNew && <span className="mt-1 block text-xs text-slate-400">{t('idAutoHint')}</span>}
               </div>
-              <Field label={t('status')} className="sm:col-span-3" hint={status === 'pending' ? t('pendingHint') : undefined}>
-                <Select value={status} onChange={changeStatus}
-                  options={STATUSES.map((v) => ({ value: v, label: t(v === 'active' ? 'enrolled' : v === 'pending' ? 'pending' : 'past') }))} />
+              <Field label={t('status')} className="sm:col-span-3" hint={status === 'pending' && !s.trial_from ? t('pendingHint') : undefined}>
+                <Select value={status === 'pending' && s.trial_from ? 'trial' : status} onChange={pickStatus}
+                  options={STATUSES.flatMap((v) => (v === 'pending' ? ['pending', 'trial'] : [v])).map((v) => ({ value: v, label: t(v === 'active' ? 'enrolled' : v === 'pending' ? 'pending' : v === 'trial' ? 'statusTrial' : 'past') }))} />
               </Field>
               {backFromPast && (
                 <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 sm:col-span-6">
@@ -185,6 +205,35 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
                     {end && end >= todayIso() && <div>{t('returnEndAsk', { date: dayText(end, lang) })} <button type="button" className="font-semibold text-pra-blue underline" onClick={() => set('end_date')('')}>{t('returnClearEnd')}</button></div>}
                     {end && end < todayIso() && <div className="font-semibold text-amber-800">{t('returnEndPast', { date: dayText(end, lang) })} <button type="button" className="font-semibold text-pra-blue underline" onClick={() => set('end_date')('')}>{t('returnClearEnd')}</button></div>}
                     <div className="text-xs text-sky-800">{t('returnChecklist')}</div>
+                  </div>
+                </div>
+              )}
+              {status === 'pending' && !!s.trial_from && (
+                <div ref={trialRef} className="rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2.5 sm:col-span-6">
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-teal-900"><Footprints size={15} className="text-teal-600" /> {t('trialCheck')}</div>
+                  <div className="mt-2.5 grid gap-3 sm:grid-cols-6">
+                    <Field label={t('trialFrom')} className="sm:col-span-2"><TextInput type="date" value={s.trial_from} onChange={setTrialFrom} /></Field>
+                    <Field label={t('trialTo')} className="sm:col-span-2"><TextInput type="date" value={s.trial_to || ''} min={s.trial_from} onChange={set('trial_to')} /></Field>
+                    {/* Buttons sit outside the Field: a click inside its label would land on the date box. */}
+                    <div className="sm:col-span-2">
+                      <span className="label">{t('trialLength')}</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[1, 2, 3, 5].map((n) => {
+                          const on = !trialBad && trialLength(s) === n
+                          return (
+                            <button key={n} type="button" aria-pressed={on} onClick={() => set('trial_to')(addSchoolDays(s.trial_from, n))}
+                              className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${on ? 'border-teal-600 bg-teal-600 text-white' : 'border-slate-300 bg-white text-slate-600 hover:border-teal-600 hover:text-teal-700'}`}>
+                              {n === 1 ? t('trialOneDay') : t('trialNDays', { n })}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    <div className="space-y-0.5 text-xs sm:col-span-6">
+                      {trialBad ? <p className="font-semibold text-red-600">{t('trialEndBeforeStart')}</p>
+                        : trial && <p className="font-semibold text-teal-800">{t(trialLength(s) === 1 ? 'trialOneSchoolDay' : 'trialSchoolDays', { n: trialLength(s), dates: trialLine(trial, lang) })}</p>}
+                      <p className="text-slate-500">{t('trialHint')}</p>
+                    </div>
                   </div>
                 </div>
               )}

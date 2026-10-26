@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PlusCircle, Users, CalendarCheck, CalendarDays, CalendarX, ClipboardList, ClipboardCheck, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane, Shapes, ShieldCheck, MailWarning } from 'lucide-react'
+import { PlusCircle, Users, CalendarCheck, CalendarDays, CalendarX, ClipboardList, ClipboardCheck, ArrowRight, Check, Sun, Sprout, FileSignature, ListTodo, Plane, Shapes, ShieldCheck, MailWarning, Footprints } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
@@ -8,7 +8,9 @@ import { useAuth } from '../lib/AuthContext'
 import { fmt, fmtDate } from '../lib/money'
 import { LEVELS } from '../lib/fees'
 import { splitSubjectKey } from '../data/staff'
-import { isEnrolled, activeFamilies, afterEnd } from '../lib/studentRecords'
+import { isEnrolled, activeFamilies, afterEnd, partialFrom } from '../lib/studentRecords'
+import { onTrial, trialsFor, trialDay, trialLine, trialDayLabel } from '../lib/trial'
+import { photoSrc } from '../lib/report/photo'
 import { finishingThisQuarter } from '../lib/studentDates'
 import { withOpenSteps } from '../lib/onboarding'
 import { summarize } from '../lib/leads'
@@ -18,7 +20,7 @@ import { tripOn, statusOn, travelingOn, tripLine, TRAVEL } from '../lib/travel'
 import { useOffDays, sessionsToday, sameEmail, activityName, timeText, currentTerm } from '../lib/eca'
 import { teacherDay, todayIndex, isNow, subjectTone } from '../lib/schedule'
 import { currentPeriod, reportWork, studentSections, HOMEROOM_PART, WRITING } from '../lib/report/utils'
-import { Card, StatusChip, Empty, Spinner } from '../components/ui'
+import { Card, StatusChip, Empty, Spinner, Avatar } from '../components/ui'
 import { WritingTags, WRITING_PARTS } from '../components/report/WritingTags'
 import CornerReminder from '../components/newsletter/CornerReminder'
 
@@ -36,7 +38,10 @@ const DescriptionIcon = WRITING_PARTS[1].Icon
 // ---------------------------------------------------------------------------
 // Data
 
-/** Today's attendance progress for the given year groups. A student who is traveling today is A(T) already: marked, and one of the absent. */
+/**
+ * Today's attendance progress for the given year groups. A student who is traveling today is A(T) already: marked, and one of the absent.
+ * A trial student on a trial day is in class, so on the register (lib/trial.js).
+ */
 function useTodayAttendance(students, trips) {
   const [marks, setMarks] = useState(null)
   useEffect(() => { db.attendance.list({ date: todayIso() }).then(setMarks).catch(() => setMarks([])) }, [])
@@ -44,7 +49,7 @@ function useTodayAttendance(students, trips) {
     const day = todayIso()
     const markOf = (k) => (marks || []).find((m) => m.student_id === k.id)
     // After an expected end date a student is not expected, unless someone marked them (as on the register).
-    const kids = students.filter((s) => isEnrolled(s) && s.level === g && (!afterEnd(s, day) || markOf(s)))
+    const kids = students.filter((s) => (isEnrolled(s) || onTrial(s, day)) && s.level === g && (!afterEnd(s, day) || markOf(s)))
     const states = kids.map((k) => statusOn(markOf(k), tripOn(trips, k.id, day))).filter(Boolean)
     return { g, total: kids.length, marked: states.length, absent: states.filter((st) => st === 'absent' || st === TRAVEL).length, travel: states.filter((st) => st === TRAVEL).length, loaded: !!marks }
   })
@@ -58,6 +63,13 @@ function travelFact(trips, students, t, lang) {
   if (!away.length) return null
   const names = away.slice(0, 4).map((x) => `${x.s.nickname || x.s.full_name} (${tripLine(x.trip, lang)})`).join(', ')
   return { icon: Plane, to: '/attendance', text: t('travelingNow', { names: away.length > 4 ? `${names} +${away.length - 4}` : names }) }
+}
+
+/** 'On trial today: Mai (Year 3)' for the greeting band, or nothing when no trial student is in class today. */
+function trialFact(trials, t) {
+  if (!trials.today.length) return null
+  const names = trials.today.slice(0, 4).map(({ s }) => `${s.nickname || s.full_name} (${s.level})`).join(', ')
+  return { icon: Footprints, to: '/attendance', text: t('trialHomeToday', { names: trials.today.length > 4 ? `${names} +${trials.today.length - 4}` : names }) }
 }
 
 /**
@@ -188,6 +200,46 @@ function TodayCard({ items, onSchedule }) {
           ))}
         </ul>
       )}
+    </Section>
+  )
+}
+
+/**
+ * Trial students (lib/trial.js) in these classes: in class today, starting later, and for the office
+ * those whose trial ended in the last two weeks and who are still Pending. Hidden when there are none.
+ */
+function TrialCard({ trials, office }) {
+  const { t, lang } = useT()
+  const today = todayIso()
+  const rows = [...trials.today.map((x) => ({ ...x, when: 'today' })), ...trials.coming.map((x) => ({ ...x, when: 'coming' })), ...trials.ended.map((x) => ({ ...x, when: 'ended' }))]
+  if (!rows.length) return null
+  return (
+    <Section icon={Footprints} tone="bg-teal-100 text-teal-700" title={t('trialCardTitle')} subtitle={t(office ? 'trialCardHintOffice' : 'trialCardHint')}
+      action={<Link to={office ? '/students?trial=1' : '/attendance'} className="btn-ghost text-xs">{office ? t('students') : t('takeAttendance')} <ArrowRight size={14} /></Link>}>
+      <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {rows.map(({ s, tr, when }) => {
+          const day = trialDay(tr, today)
+          const chip = when === 'today' ? { text: day.of > 1 ? t('trialToday', day) : t('trialTodayOne'), tone: 'bg-teal-600 text-white' }
+            : when === 'coming' ? { text: t('trialStarts', { date: trialDayLabel(tr.from, lang) }), tone: 'bg-slate-100 text-slate-600' }
+            : { text: t('trialEnded', { date: trialDayLabel(tr.to, lang) }), tone: 'bg-amber-100 text-amber-800' }
+          return (
+            <li key={s.id}>
+              <Link to={`/students?student=${s.id}`} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors hover:border-pra-blue ${when === 'today' ? 'border-teal-300 bg-teal-50/50' : 'border-slate-200'}`}>
+                <Avatar src={photoSrc(s.photo)} name={s.full_name} size={40} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline gap-1.5"><span className="truncate font-semibold text-slate-800">{s.nickname || s.full_name}</span><span className="flex-none text-xs text-slate-500">{s.level}</span></span>
+                  <span className="block truncate text-xs text-slate-500">{trialLine(tr, lang)}</span>
+                  <span className="mt-1 flex flex-wrap gap-1">
+                    <span className={`chip !text-[11px] ${chip.tone}`}>{chip.text}</span>
+                    {s.allergies && <span className="chip max-w-full truncate bg-red-50 !text-[11px] text-red-700" title={s.allergies}>{lang === 'vi' ? 'dị ứng' : 'allergy'}: {s.allergies}</span>}
+                    {partialFrom(s) && <span className="chip bg-amber-50 !text-[11px] text-amber-700" title={t('partialDay')}>{t('fromTime', { time: partialFrom(s) })}</span>}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
     </Section>
   )
 }
@@ -418,8 +470,10 @@ function OfficeHome() {
   const outstanding = invoiced - collected
   const recent = [...live].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 8)
   const enrolled = data.students.filter(isEnrolled)
-  const groups = [...new Set(enrolled.map((s) => s.level).filter(Boolean))].sort(byLevel)
+  // A class with only a trial student in it today still has a register to take.
+  const groups = [...new Set([...enrolled, ...data.students.filter((s) => onTrial(s, todayIso()))].map((s) => s.level).filter(Boolean))].sort(byLevel)
   const att = today(groups)
+  const trials = trialsFor(data.students, { withEnded: true })
   const toRegister = att.filter((x) => x.total && x.marked < x.total).length
   // Enrolled students expected to finish by the end of this quarter: the chip opens them on the Students page.
   const finishing = finishingThisQuarter(data.students, data.calendar).students.length
@@ -437,6 +491,7 @@ function OfficeHome() {
           att[0]?.loaded && { icon: CalendarCheck, text: toRegister ? t(toRegister === 1 ? 'classToRegister' : 'classesToRegister', { n: toRegister }) : t('allRegistered') },
           !reports.hidden && reports.work && !reports.work.error && reports.work.total > 0 && { icon: ClipboardList, text: `${reports.period.label}: ${reports.work.total - reports.work.done ? t('nLeft', { n: reports.work.total - reports.work.done }) : t('reportsAllDone')}` },
           leads && (leads.new || leads.due || webWaiting) && { icon: Sprout, to: '/leads', text: `${t('leadsNav')}: ${[leads.new && t('ldNewShort', { n: leads.new }), leads.due && t('ldDueShort', { n: leads.due }), webWaiting && t('ldWebShort', { n: webWaiting })].filter(Boolean).join(' · ')}` },
+          trialFact(trials, t),
           travelFact(data.travel, data.students, t, lang),
           ecaFact(data.eca, offDays, { email: me?.email, office: true }, t, lang),
           finishing > 0 && { icon: CalendarX, to: '/students?ending=1', text: t('endingHome', { n: finishing }) },
@@ -455,6 +510,8 @@ function OfficeHome() {
       </div>
 
       <TodayCard items={lessons.items} onSchedule={lessons.onSchedule} />
+
+      <TrialCard trials={trials} office />
 
       <div className={`grid gap-6 ${reports.hidden ? '' : 'xl:grid-cols-2'}`}>
         {groups.length > 0 && <AttendanceCard rows={att} />}
@@ -496,7 +553,7 @@ function OfficeHome() {
 function TeacherHome() {
   const { t, lang } = useT()
   const data = useData()
-  const { me, displayName, isHead } = useAuth()
+  const { me, displayName, isHead, myYearGroups } = useAuth()
   const offDays = useOffDays()
   const today = useTodayAttendance(data.students, data.travel)
   const reports = useReportWork()
@@ -513,6 +570,8 @@ function TeacherHome() {
   const toRegister = att.filter((x) => x.total && x.marked < x.total).length
   const work = reports.work && !reports.work.error ? reports.work : null
   const partsLeft = work ? work.total - work.done : null
+  // Trial students in this person's classes (every class for the head teacher).
+  const trials = trialsFor(data.students, { groups: myYearGroups })
 
   return (
     <div className="space-y-6">
@@ -521,12 +580,15 @@ function TeacherHome() {
         facts={[
           lessons.onSchedule && { icon: CalendarDays, text: lessons.items.length === 1 ? t('lessonToday') : lessons.items.length ? t('lessonsToday', { n: lessons.items.length }) : t('noLessonsToday') },
           groups.length > 0 && att[0]?.loaded && { icon: CalendarCheck, text: toRegister ? t(toRegister === 1 ? 'classToRegister' : 'classesToRegister', { n: toRegister }) : t('allRegistered') },
+          trialFact(trials, t),
           travelFact(data.travel, data.students.filter((s) => groups.includes(s.level)), t, lang),
           ecaFact(data.eca, offDays, { email: me?.email, office: false }, t, lang),
           !reports.hidden && work && { icon: ClipboardList, text: work.total ? `${reports.period.label}: ${partsLeft ? t('nLeft', { n: partsLeft }) : t('reportsAllDone')}` : t('noReportsYet') },
         ]} />
 
       <TodayCard items={lessons.items} onSchedule={lessons.onSchedule} />
+
+      <TrialCard trials={trials} />
 
       <CornerReminder />
 

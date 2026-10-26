@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Calendar, Check, ChevronLeft, ChevronRight, CheckCheck, MessageSquare, Plane, Printer, TrendingDown } from 'lucide-react'
+import { Calendar, Check, ChevronLeft, ChevronRight, CheckCheck, Footprints, MessageSquare, Plane, Printer, TrendingDown } from 'lucide-react'
 import { db } from '../lib/db'
 import { useT } from '../lib/i18n'
 import { useData } from '../lib/DataContext'
@@ -9,6 +9,7 @@ import { useToast } from '../lib/toast'
 import { photoSrc } from '../lib/report/photo'
 import { isEnrolled, partialFrom, afterEnd, endDateOf } from '../lib/studentRecords'
 import { dayText } from '../lib/studentDates'
+import { isTrial, onTrial, trialOf, trialDay, trialDayLabel } from '../lib/trial'
 import { iso, todayIso, parseIso as parse, levelIndex, asMarked, attendancePeriods, defaultPeriod, summarizeAttendance, LOW_RATE } from '../lib/attendanceSummary'
 import { TRAVEL, tripOn, statusOn, tripLine, blankTrip } from '../lib/travel'
 import { Card, Empty, Spinner, Avatar, Segmented, PageHeader } from '../components/ui'
@@ -41,7 +42,10 @@ export default function Attendance() {
   const scoped = !isOffice && !!myYearGroups
 
   const enrolled = useMemo(() => students.filter(isEnrolled), [students])
-  const groups = useMemo(() => [...new Set(enrolled.map((s) => s.level).filter(Boolean))].sort((a, b) => levelIndex(a) - levelIndex(b)), [enrolled])
+  // Trial students (lib/trial.js) join the register on their trial days. Their year group is
+  // offered while a trial is still to come, even when nobody in it is enrolled yet.
+  const register = useMemo(() => students.filter((s) => isEnrolled(s) || isTrial(s)), [students])
+  const groups = useMemo(() => [...new Set([...enrolled, ...register.filter((s) => isTrial(s) && trialOf(s).to >= todayIso())].map((s) => s.level).filter(Boolean))].sort((a, b) => levelIndex(a) - levelIndex(b)), [enrolled, register])
   const myGroups = useMemo(() => {
     const allowed = groups.filter(canAttendance)
     // Homeroom year groups first for teachers.
@@ -61,12 +65,12 @@ export default function Attendance() {
       <Segmented className="flex w-full sm:hidden [&>button]:flex-1 [&>button]:py-2" value={tab} onChange={setTab} options={tabs} />
       {!myGroups.length && tab === 'take'
         ? <Empty text={groups.length ? t('noClassesToTake') : t('noData')} />
-        : tab === 'take' ? <TakeAttendance students={enrolled} groups={myGroups} /> : <Summary students={students} groups={scoped ? myGroups : groups} />}
+        : tab === 'take' ? <TakeAttendance students={register} groups={myGroups} /> : <Summary students={students} groups={scoped ? myGroups : groups} />}
     </div>
   )
 }
 
-function TakeAttendance({ students, groups }) {
+function TakeAttendance({ students: register, groups }) {
   const { t, lang } = useT()
   const toast = useToast()
   const { displayName } = useAuth()
@@ -78,6 +82,9 @@ function TakeAttendance({ students, groups }) {
   // Marks for the loaded date: student_id -> row. `null` while another date loads.
   const [loaded, setLoaded] = useState({ date: null, map: {} })
   const marks = loaded.date === date ? loaded.map : null
+  // Who is in class on the day: the enrolled students, and trial students on a trial day (or
+  // marked on that day already, should the trial days have moved since).
+  const students = useMemo(() => register.filter((s) => isEnrolled(s) || onTrial(s, date) || !!marks?.[s.id]), [register, date, marks])
   const [noteOpen, setNoteOpen] = useState({})
   const [noteDraft, setNoteDraft] = useState({})
   const [tripOpen, setTripOpen] = useState({}) // student_id -> the trip boxes are showing
@@ -112,9 +119,10 @@ function TakeAttendance({ students, groups }) {
     return () => { alive = false; document.removeEventListener('visibilitychange', onShow) }
   }, [date]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Students past their expected end date come last.
+  // Trial students come first, so the teacher sees who is new today; students past their expected end date come last.
+  const place = (s) => (isTrial(s) ? 0 : afterEnd(s, date) ? 2 : 1)
   const kids = useMemo(() => students.filter((s) => s.level === activeGroup)
-    .sort((a, b) => afterEnd(a, date) - afterEnd(b, date) || (a.nickname || a.full_name).localeCompare(b.nickname || b.full_name)), [students, activeGroup, date])
+    .sort((a, b) => place(a) - place(b) || (a.nickname || a.full_name).localeCompare(b.nickname || b.full_name)), [students, activeGroup, date]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Changes apply to the day they were made on: a slow reply never lands in another day's list.
   const applyTo = (day, fn) => setLoaded((cur) => (cur.date === day ? { date: day, map: fn(cur.map) } : cur))
@@ -286,6 +294,8 @@ function TakeAttendance({ students, groups }) {
               const away = state === TRAVEL
               const ended = finished(s) && !m
               const showNote = noteOpen[s.id] || !!m?.note
+              const trial = isTrial(s) ? trialOf(s) : null
+              const tday = trial && onTrial(s, date) ? trialDay(trial, date) : null
               return (
                 <li key={s.id} className={`px-3 py-3 sm:px-4 sm:py-2.5 ${state ? STATUS[state]?.stripe || '' : ended ? 'bg-slate-50' : 'bg-amber-50/40'}`}>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
@@ -293,10 +303,12 @@ function TakeAttendance({ students, groups }) {
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <span className={`truncate font-semibold ${ended ? 'text-slate-500' : 'text-slate-800'}`}>{s.nickname || s.full_name}</span>
+                        {trial && <span className="inline-flex flex-none items-center gap-0.5 rounded bg-teal-100 px-1.5 text-[11px] font-semibold text-teal-800"><Footprints size={11} />{t('trialTag')}</span>}
                         {partialFrom(s) && <span className="flex-none rounded bg-amber-50 px-1.5 text-[11px] font-semibold text-amber-700" title={t('partialDay')}>{t('fromTime', { time: partialFrom(s) })}</span>}
                       </div>
                       <div className="truncate text-xs text-slate-500">{s.nickname ? s.full_name : ''} {s.student_code && <span className="font-mono">{s.student_code}</span>}</div>
                       {finished(s) && <div className="text-xs font-semibold text-slate-500">{t('endedRegister', { date: dayText(endDateOf(s), lang) })}</div>}
+                      {tday && <div className="truncate text-xs font-semibold text-teal-700">{tday.of > 1 ? t('trialDayOf', tday) : t('trialDayOne')}{trial.to > date ? ` · ${t('trialUntil', { date: trialDayLabel(trial.to, lang) })}` : ''}</div>}
                       {trip && <div className={`flex items-center gap-1 truncate text-xs font-semibold ${away ? 'text-violet-700' : 'text-slate-400'}`}><Plane size={12} className="flex-none" /><span className="truncate">{t('traveling')}: {tripLine(trip, lang)}</span></div>}
                     </div>
                     <button type="button" aria-pressed={showNote} className={`relative grid h-11 w-11 flex-none place-items-center rounded-lg sm:order-last sm:h-9 sm:w-9 ${showNote ? 'text-pra-blue' : 'text-slate-400 hover:text-slate-600'} active:bg-slate-100`} title={t('addNote')} aria-label={t('addNote')}

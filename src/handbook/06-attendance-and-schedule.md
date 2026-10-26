@@ -26,7 +26,7 @@ This chapter covers the daily register in The Current, the students it treats di
 6. The speech bubble beside a student opens a **Note**. It saves when you leave the box. A note on its own does not mark anyone.
 
 - The morning register is due by 8:45. From 8:00 to 9:00 on a class day, **Attendance** in the menu turns amber with a pulse and a "by 8:45" tag, and the menu button on a phone shows an amber dot. A class day here means Monday to Friday and not a day off ("no classes") on the academic calendar the website publishes. It goes by the clock of the computer or phone. It does not check whether the registers are already done.
-- Only Enrolled students of that year group are on the register. Pending students are not, until their status is set to Enrolled.
+- Only Enrolled students of that year group are on the register, plus trial students on their trial days. Trial students come first, with a teal **Trial** tag and "Trial day n of n" (see [Trial students](#/handbook/students?s=trial-students)). Other Pending students are not on it until their status is set to Enrolled.
 - The counts at the top show Present, Late, Absent, A(T) and **Not marked**, with a coloured bar.
 
 ### The marks
@@ -114,6 +114,8 @@ From the student window: **Travel** → **Add a trip**, with the same boxes.
 ## The Home page card
 
 **Attendance today** on Home has one row per year group with its bar, "n/n students" and how many are absent, and a status: **Done**, **In progress** or **Not taken yet**. A homeroom year group is labelled as yours. The card's link and each row open **Attendance**. Office accounts see every year group; teachers see their own. The greeting band at the top also counts the classes still to register.
+
+A trial student on a trial day counts in their year group's numbers, and a year group whose only student that day is on trial gets a row too. Above it, the **Trial students** card lists who is on trial today and who starts later in your year groups (every year group for the office).
 
 ## The summary
 
