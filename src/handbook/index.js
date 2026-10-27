@@ -24,10 +24,10 @@ export const CHAPTERS = [
   { id: 'website', file: '11-the-website', title: 'The website', blurb: 'pra.edu.vn in English and Vietnamese: where the text lives, how a change goes live, the forms.', updated: '2026-10-24' },
   { id: 'inbox', file: '12-inbox-and-triage', title: 'The inbox and the triage', blurb: 'The shared admin@ inbox, the automatic sorting that runs each weekday, and its rules.', updated: '2026-10-24' },
   { id: 'google', file: '13-google-workspace', title: 'Google Workspace and domains', blurb: 'Staff and student accounts, parent groups, the admin addresses, the domains.', updated: '2026-10-16' },
-  { id: 'behind', file: '14-behind-the-scenes', title: 'Behind the scenes', blurb: 'Where the code and the data live, how a change is deployed, database updates, backups, local testing.', updated: '2026-10-24' },
+  { id: 'behind', file: '14-behind-the-scenes', title: 'Behind the scenes', blurb: 'Where the code and the data live, how a change is deployed, database updates, backups, local testing.', updated: '2026-10-27' },
   { id: 'claude', file: '15-working-with-claude', title: 'Working with Claude', blurb: 'How the work gets done: sessions, skills, memory, agents and routines; what Claude may and may not do.', updated: '2026-10-24' },
   { id: 'rules', file: '16-rules-and-wording', title: 'Rules and wording', blurb: 'The standing rules: never "school", one-page reports, plain copy, natural Vietnamese, and the rest.', updated: '2026-10-24' },
-  { id: 'open', file: '17-known-problems', title: 'Known problems and open items', blurb: 'What is fragile, what is unfinished, and what to watch.', updated: '2026-10-22' },
+  { id: 'open', file: '17-known-problems', title: 'Known problems and open items', blurb: 'What is fragile, what is unfinished, and what to watch.', updated: '2026-10-27' },
   { id: 'glossary', file: '18-glossary-and-people', title: 'Glossary and who is who', blurb: 'The words used here and the people behind the names.', updated: '2026-10-24' },
   { id: 'updating', file: '19-keeping-this-handbook', title: 'Keeping this handbook up to date', blurb: 'How a chapter is changed and when to go through it.', updated: '2026-10-20' },
 ]

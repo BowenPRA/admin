@@ -27,11 +27,12 @@ This chapter lists what is fragile, what is unfinished and what is waiting for a
 
 ### The database has no backups
 
-- **Found:** 29 September 2026. **Status:** open.
+- **Found:** 29 September 2026. **Status on 27 October 2026:** partly closed. The laptop now makes a full copy of the database every day; Supabase itself still keeps none.
 - The Current's database is Supabase on the free plan: no backups, 1 GB for files (about twenty photo events), 500 MB for data, and the project pauses after a week with no use.
-- The only copy outside Supabase is the folder export, which only the super admin can run and which runs only when clicked. It holds invoices, proof of payment, progress reports, enrollment documents (since 5 October 2026) and two spreadsheets. It does not hold attendance, leads, to-dos, newsletters or event photos.
+- The database copy (since 27 October 2026, see [Backups](#/handbook/behind?s=backups)) has every table and login but no files. It runs every day at 12:00 while someone is signed in to the laptop, and the copies stay on the laptop.
+- The folder export, which only the super admin can run, holds invoices, proof of payment, progress reports, enrollment documents (since 5 October 2026) and two spreadsheets. Nothing copies event photos, newsletter photos or files attached to tasks.
 - **Plan:** Supabase Pro at USD 25 a month (daily backups kept for 7 days, never pauses). An email to Seth and Hien proposing it was drafted on 2 October 2026 (To-Do #40), with a storage figure still to fill in. It had not been sent (not checked since 15 October 2026).
-- **Until then:** run the folder export after every invoice batch and every report period. See [Behind the scenes](#/handbook/behind).
+- **Until then:** run the folder export after every invoice batch and every report period, and look at the database copy's `backup-log.txt` now and then. See [Behind the scenes](#/handbook/behind?s=backups).
 
 ### Anyone can create a login
 

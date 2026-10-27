@@ -146,6 +146,8 @@ Files are kept in "buckets". The app opens a private file through a link that la
 
 > **Rule:** the secret key is typed only by the admin, into the script that asks for it. Claude never types it, never sees it, and never asks for it in a chat. If a script needs it, Claude gives you the command and you run it.
 
+The **database password** is a third secret, with the same power as the secret key. Only the database copy uses it (see [Backups](#/handbook/behind?s=backups)), and the same rule applies.
+
 ## Changing the database
 
 Nothing in the database changes until a person runs a file. This is the routine for every new column, table or rule.
@@ -227,9 +229,37 @@ The accounts behind the triage are listed in [The inbox and the triage](#/handbo
 
 ## Backups
 
-> **Careful:** whether the database is backed up has not been checked (not checked since 15 October 2026). Bowen's notes record Supabase's free plan. On the free plan there are no backups, the project pauses after a week with no use, and storage is 1 GB. Paying for a plan with backups is a decision in [Known problems and open items](#/handbook/open).
+> **Careful:** Supabase itself keeps no backups. Bowen's notes record Supabase's free plan, which has none, pauses the project after a week with no use, and has 1 GB for files. Paying for a plan with backups is a decision in [Known problems and open items](#/handbook/open).
 
-The backups you make yourself:
+### The database copy
+
+Since 27 October 2026 a script on the laptop makes a full copy of the database: every table, every login and the database's own rules. It does not copy the files in the storage buckets (photos, proof of payment, documents). The folder export below has some of those.
+
+To make an extra copy by hand, for example before a big change, run this in PowerShell:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\sbowe\admin\scripts\backup-database.ps1"
+```
+
+- Each copy is one file, `the-current-<date>-<time>.dump`, in `C:\Users\sbowe\PRA Backups\Database`. The first, on 27 October 2026, was 2.2 MB and took under a minute. The script checks that the file can be read back and writes one line per run in `backup-log.txt` in the same folder.
+- **It runs by itself every day at 12:00** (Task Scheduler → **PRA** → **The Current database backup**, since 27 October 2026). If the laptop was off or asleep at noon, it runs as soon as it is back on. It needs you signed in to Windows. A day with no line in the log, or a line starting FAILED, means it did not make a copy.
+- Every copy is kept (Bowen, 27 October 2026), about 800 MB a year at today's size. To keep only the newest ones, add ` -Keep 30` to the task's arguments; deleting old copies is a decision to make later.
+- The folder is on the laptop only and is not synced (Bowen's choice, 27 October 2026). Copy the newest file to an external disk now and then, or the copies are lost along with the laptop.
+- A copy holds every child's details, the parents' contacts, every invoice and the staff logins (with passwords scrambled). Treat it like the roster: never email it, never put it in a shared folder or a repository.
+- A copy is never loaded straight into the live database. To see what a table held on the day of a copy, ask Claude. Rebuilding the whole database from a copy, in a new Supabase project, is a job to plan with Claude.
+
+> **Ask Claude:** "Take the adm_invoices table out of the newest database backup as readable text and tell me how it differs from the live one."
+
+**Setting it up on a laptop** (once):
+
+1. Install PostgreSQL's command-line tools, without a database server: `winget install --id PostgreSQL.PostgreSQL.18 --exact --override "--mode unattended --unattendedmodeui none --disable-components server,pgAdmin,stackbuilder"`. Windows asks to allow it once.
+2. In Supabase, open the project and click **Connect** at the top. Choose **Direct** ("Connection string"), then **Session pooler**, and copy the string.
+3. Run the command above with ` -SetUp` added at the end. Paste the string as it is, with `[YOUR-PASSWORD]` still in it, then type the database password when asked. The script tries the password against the database and says "Password accepted" or "Wrong password", with three tries.
+4. Run the command without ` -SetUp` and check that it ends with "Done".
+
+Supabase never shows the database password; it can only be reset, on the database settings page (`https://supabase.com/dashboard/project/gpfycuxltrjeeyxnnktu/database/settings`) → **Reset database password**. Nothing else uses it, so a reset breaks nothing. Keep the new one with the other PRA logins. After several wrong passwords Supabase blocks the computer for a while; **Network Bans** on the same page lifts it. The script saves the password encrypted, readable only by that Windows user, in `%APPDATA%\PRA\the-current-database.json`.
+
+### The copies you make in The Current
 
 | What | How | What it covers |
 |---|---|---|
@@ -239,8 +269,9 @@ The backups you make yourself:
 | **Leads** | **Leads** → **More** → **Export** | Active and archived families |
 
 - Bowen's export folder was `C:\Users\bowen\Desktop\PRA Admin` (2 October 2026), synced by Google Drive for desktop.
-- None of these copies the registers, the tasks, the report settings, the photo tab or the newsletter. Nothing in the sources makes a full copy of the database.
-- Run the folder export at least at the end of every quarter, after reports are published and invoices sent.
+- None of these copies the registers, the tasks, the report settings, the photo tab or the newsletter. The database copy above has all of those, but no files.
+- No copy, the database copy included, has the files in adm-event-photos, adm-newsletter, newsletter or adm-todo.
+- Run the folder export at least at the end of every quarter, after reports are published and invoices sent. The database copy runs by itself.
 - The code is backed up on GitHub only once it is pushed. Uncommitted work exists only on the laptop.
 - The `private` folder, the `.env` file, the photo library and Claude's memory notes exist only on the laptop. Copy them to the shared drive or an external disk regularly.
 
