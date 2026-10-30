@@ -94,25 +94,61 @@ function issueEntries(payload, lang) {
   return out
 }
 
-/** Photos for the full email: one across, or two side by side, each with its caption. */
+// The width photos have in the card, the gap between two side by side, and between two stacked.
+const PHOTO_W = 552
+const PHOTO_GAP = 12
+const STACK_GAP = 10
+/** A photo's height over its width. A photo with no size counts as a landscape. */
+const ratio = (p) => (p.w && p.h ? p.h / p.w : 0.75)
+
+/**
+ * A section's photos in rows, portraits with portraits and landscapes with landscapes,
+ * keeping their order as far as that allows. A row is a list of columns and a column a
+ * list of photos, so [[a], [b]] is two side by side. What does not pair up: a spare
+ * landscape goes full width; a spare portrait stands beside two stacked landscapes, or
+ * makes three portraits across; a lone portrait and a lone landscape share a row.
+ */
+export function photoRows(photos) {
+  const tall = [], wide = [], rows = []
+  photos.forEach((p, at) => (ratio(p) > 1.05 ? tall : wide).push({ p, at }))
+  if (tall.length % 2) {
+    if (wide.length >= 2) rows.push([[tall.pop()], wide.splice(0, 2)])
+    else if (tall.length >= 3) rows.push(tall.splice(-3).map((x) => [x]))
+    else if (wide.length) rows.push([...tall.splice(0), ...wide.splice(0)].sort((a, b) => a.at - b.at).map((x) => [x]))
+  }
+  if (wide.length % 2) rows.push([wide.splice(0, 1)])
+  for (const set of [tall, wide]) while (set.length) rows.push(set.splice(0, 2).map((x) => [x]))
+  const first = (row) => Math.min(...row.flat().map((x) => x.at))
+  return rows.sort((a, b) => first(a) - first(b)).map((row) => row.map((col) => col.map((x) => x.p)))
+}
+
+/** Photos for the full email: rows from photoRows(), every column in a row the same height, each photo with its caption. */
 function photoGrid(photos, L) {
   const list = (photos || []).filter((p) => publicSrc(p))
   if (!list.length) return ''
   const one = (p, w) => {
-    const r = p.w && p.h ? p.h / p.w : 0.75
     const alt = t(p.alt, L)
-    return `<img src="${esc(publicSrc(p))}" width="${w}" height="${Math.round(w * r)}" alt="${esc(alt)}" style="display:block;width:100%;max-width:${w}px;height:auto;border:0;border-radius:10px;">`
+    return `<img src="${esc(publicSrc(p))}" width="${w}" height="${Math.round(w * ratio(p))}" alt="${esc(alt)}" style="display:block;width:100%;max-width:${w}px;height:auto;border:0;border-radius:10px;">`
       + `${alt && SHOW_CAPTIONS ? `<p style="margin:6px 0 0;${font(12, 17, { color: INK_SOFT })}">${esc(alt)}</p>` : ''}`
   }
-  if (list.length === 1) return `<div style="margin:6px 0 4px;">${one(list[0], 552)}</div>`
-  let out = ''
-  for (let i = 0; i < list.length; i += 2) {
-    const a = list[i], b = list[i + 1]
-    out += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 4px;"><tr>`
-      + `<td width="50%" valign="top" style="padding-right:6px;">${one(a, 270)}</td>`
-      + `<td width="50%" valign="top" style="padding-left:6px;">${b ? one(b, 270) : ''}</td></tr></table>`
-  }
-  return out
+  return photoRows(list).map((row) => {
+    if (row.length === 1) return `<div style="margin:6px 0 4px;">${one(row[0][0], PHOTO_W)}</div>`
+    // Each column's height for 1 px of width, then the one height that makes the columns fill the row.
+    const room = PHOTO_W - PHOTO_GAP * (row.length - 1)
+    const perPx = row.map((col) => col.reduce((n, p) => n + ratio(p), 0))
+    const height = (room + STACK_GAP * row.reduce((n, col, i) => n + (col.length - 1) / perPx[i], 0)) / perPx.reduce((n, s) => n + 1 / s, 0)
+    // The gaps are columns too, so on a phone everything shrinks together and the row stays level.
+    const share = (px) => ((px / PHOTO_W) * 100).toFixed(2)
+    const gap = `<td width="${share(PHOTO_GAP)}%" style="font-size:0;line-height:0;">&nbsp;</td>`
+    let left = room
+    const cells = row.map((col, i) => {
+      const w = i === row.length - 1 ? left : Math.round((height - STACK_GAP * (col.length - 1)) / perPx[i])
+      left -= w
+      const pics = col.map((p) => one(p, w)).join(`<div class="pra-gap" style="height:${STACK_GAP}px;line-height:${STACK_GAP}px;font-size:0;">&nbsp;</div>`)
+      return `<td width="${share(w)}%" valign="top">${pics}</td>`
+    })
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 4px;table-layout:fixed;"><tr>${cells.join(gap)}</tr></table>`
+  }).join('')
 }
 
 // An emoji at the start of a heading: one picture, with its skin tone, joiners or flag pair.
@@ -322,6 +358,7 @@ function buildEmail(payload, { logoUrl = 'https://pra.edu.vn/assets/img/logo.png
     .pra-pad { padding-left: 18px !important; padding-right: 18px !important; }
     .pra-h1 { font-size: 24px !important; line-height: 30px !important; }
     .pra-h2 { font-size: 19px !important; line-height: 26px !important; }
+    .pra-gap { height: 6px !important; line-height: 6px !important; }
   }
 </style>
 </head>
