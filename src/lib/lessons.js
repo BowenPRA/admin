@@ -117,10 +117,21 @@ const GROUP_ORDER = ['Nursery', 'Kindergarten', 'Year 1', 'Year 2', 'Year 3', 'Y
 const groupRank = (g) => { const i = GROUP_ORDER.indexOf(g); return i < 0 ? 99 : i }
 export const byClass = (a, b) => groupRank(splitSubjectKey(a)[1]) - groupRank(splitSubjectKey(b)[1]) || a.localeCompare(b)
 
-/** The classes a person teaches, from the Teachers page ('english:Year 5'). */
-export const myClasses = (me) => [...new Set((me?.subjects || []).filter((k) => k.includes(':')))].sort(byClass)
-/** Every class someone teaches, for the office. */
-export const allClasses = (teachers = []) => [...new Set(teachers.filter((t) => t.active !== false).flatMap((t) => t.subjects || []).filter((k) => k.includes(':')))].sort(byClass)
+// The classes Lessons and PRA Learn are for (Bowen, 6 November 2026): English, Maths, Science
+// and Technology, from Year 1 up (Year 1 to Year 9 and Upper Secondary). Every other class
+// (Wellbeing, Movement, Cooking…, and all of Nursery and Kindergarten) gets no class card, is
+// not in the request form's class list and not in Student logins. PRA Learn has the same rule
+// (learn src/data/subjects.js isLearnClass): change both together.
+export const LESSON_SUBJECTS = ['english', 'math', 'science', 'technology']
+const YEAR_ONE_UP = /^(Year\s*([1-9]|1[0-3])|Upper Secondary)$/i
+export const isLessonClass = (k) => {
+  const [subject, group = ''] = String(k || '').split(':')
+  return LESSON_SUBJECTS.includes(subject) && YEAR_ONE_UP.test(group.trim())
+}
+/** The classes a person teaches, from the Teachers page ('english:Year 5'), in the lesson learning areas. */
+export const myClasses = (me) => [...new Set((me?.subjects || []).filter(isLessonClass))].sort(byClass)
+/** Every class someone teaches in the lesson learning areas, for the office. */
+export const allClasses = (teachers = []) => [...new Set(teachers.filter((t) => t.active !== false).flatMap((t) => t.subjects || []).filter(isLessonClass))].sort(byClass)
 /** The teachers of a class who sign in. */
 export const teachersOf = (classKey, teachers = []) => teachers.filter((t) => t.active !== false && String(t.email || '').includes('@') && (t.subjects || []).includes(classKey))
 
