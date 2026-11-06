@@ -23,6 +23,7 @@ import { currentPeriod, reportWork, studentSections, HOMEROOM_PART, WRITING } fr
 import { Card, StatusChip, Empty, Spinner, Avatar } from '../components/ui'
 import { WritingTags, WRITING_PARTS } from '../components/report/WritingTags'
 import CornerReminder from '../components/newsletter/CornerReminder'
+import HomeLessonsCard from '../components/lessons/HomeLessonsCard'
 
 // The home page. A teacher sees, in this order: today's lessons, then
 // attendance and report writing side by side (each its own card, nothing
@@ -509,6 +510,8 @@ function OfficeHome() {
         <QuickLink to="/reports" icon={ClipboardList} tone="bg-indigo-100 text-indigo-700" title={t('reports')} hint={data.reportSettings?.schoolYear || ''} />
       </div>
 
+      <HomeLessonsCard queue />
+
       <TodayCard items={lessons.items} onSchedule={lessons.onSchedule} />
 
       <TrialCard trials={trials} office />
@@ -585,6 +588,8 @@ function TeacherHome() {
           ecaFact(data.eca, offDays, { email: me?.email, office: false }, t, lang),
           !reports.hidden && work && { icon: ClipboardList, text: work.total ? `${reports.period.label}: ${partsLeft ? t('nLeft', { n: partsLeft }) : t('reportsAllDone')}` : t('noReportsYet') },
         ]} />
+
+      <HomeLessonsCard queue={isHead} />
 
       <TodayCard items={lessons.items} onSchedule={lessons.onSchedule} />
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronsUpDown, Eye, Images, Sprout, FileSignature, FileCheck, BookMarked, ListTodo, Newspaper, Shapes, Menu, X, ChevronsLeft, ChevronsRight, Mail, Signature, ChartColumn } from 'lucide-react'
+import { FileText, Users, Settings, LogOut, Home, Database, ClipboardList, GraduationCap, CalendarCheck, CalendarDays, KeyRound, ChevronsUpDown, Eye, Images, Sprout, FileSignature, FileCheck, BookMarked, ListTodo, Newspaper, Shapes, Menu, X, ChevronsLeft, ChevronsRight, Mail, Signature, ChartColumn, Presentation } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { auth, dbMode } from '../lib/db'
 import { useData } from '../lib/DataContext'
@@ -8,6 +8,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { academicCalendar } from '../lib/newsletter/calendarFeed'
 import { runsEca } from '../lib/eca'
+import { inLessonsPilot } from '../lib/lessons'
 import { ACCESS_ROLES, hasLogin } from '../data/staff'
 import { Avatar, Chip, Field, Modal, TextInput } from './ui'
 
@@ -29,6 +30,8 @@ const NAV = [
     { to: '/reports', icon: ClipboardList, label: 'reportsNav' },
     { to: '/schedule', icon: CalendarDays, label: 'schedule' },
     { to: '/assessments', icon: FileCheck, label: 'asNav' },
+    // Lesson requests: only the Lessons pilot for now (LESSONS_PILOT in lib/lessons.js).
+    { to: '/lessons', icon: Presentation, label: 'lessonsNav', who: 'lessons' },
     // Teachers write their class corner here; the office has the Newsletter under Outreach.
     { to: '/newsletter', icon: Newspaper, label: 'nlNav', who: 'teacher' },
   ] },
@@ -101,7 +104,7 @@ export default function Layout() {
   const closeRef = useRef(null)
   const openRef = useRef(null)
 
-  const can = { all: true, office: isOffice, head: isHead, teacher: !isOffice, eca: isOffice || isHead || runsEca(data.eca, me?.email), staff: isOffice || isHead || !!me?.linked }
+  const can = { all: true, office: isOffice, head: isHead, teacher: !isOffice, eca: isOffice || isHead || runsEca(data.eca, me?.email), staff: isOffice || isHead || !!me?.linked, lessons: inLessonsPilot(me?.email) }
   const nav = NAV.map((s) => ({ ...s, pages: s.pages.filter((p) => can[p.who || 'all']) })).filter((s) => s.pages.length)
   const current = nav.flatMap((s) => s.pages).find((p) => under(pathname, p.to))
   const narrow = narrowPref ?? !roomy

@@ -1612,6 +1612,8 @@ const STRINGS = {
   trialStarts: ['Starts {date}', 'Bắt đầu {date}'],
   trialEnded: ['Ended {date}: still Pending', 'Đã hết {date}: vẫn Chờ nhập học'],
   trialHomeToday: ['On trial today: {names}', 'Học thử hôm nay: {names}'],
+  // Lessons (2026-11-05): the page's own words are in lib/lessons.js (useL)
+  lessonsNav: ['Lessons', 'Bài giảng'],
 }
 
 const LangContext = createContext({ lang: 'en', setLang: () => {}, t: (k) => k })

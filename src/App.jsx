@@ -30,6 +30,7 @@ import Enrollments from './pages/Enrollments'
 import Emails from './pages/Emails'
 import WebsiteStats from './pages/WebsiteStats'
 import Todos from './pages/Todos'
+import Lessons from './pages/Lessons'
 import PhotoEvent from './pages/photos/PhotoEvent'
 import Handbook from './pages/Handbook'
 import Newsletters from './pages/newsletter/Newsletters'
@@ -82,6 +83,7 @@ export default function App() {
           <Route path="/enrollments" element={<Office><Enrollments /></Office>} />
           <Route path="/emails" element={<Office><Emails /></Office>} />
           <Route path="/todo" element={<Office><Todos /></Office>} />
+          <Route path="/lessons" element={<Lessons />} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/eca" element={<Ecas />} />
           <Route path="/schedule" element={<Schedule />} />

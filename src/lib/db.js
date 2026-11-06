@@ -49,6 +49,10 @@ const TABLES = {
   ecaAttendance: 'adm_eca_attendance',
   // Staff signatures, one per person, kept as a PNG in the row
   signatures: 'adm_signatures',
+  // Lessons: teachers' lesson requests, what the builder knows about each class, the book catalogue
+  lessonRequests: 'adm_lesson_requests',
+  classProfiles: 'adm_class_profiles',
+  sources: 'adm_sources',
 }
 
 // Rows that come straight from form inputs may hold '' where Postgres wants
@@ -499,6 +503,44 @@ export const db = {
     list: () => A.list(TABLES.signatures),
     save: (row) => A.upsertBy(TABLES.signatures, [row], ['person']).then((r) => r[0]),
     remove: (id) => A.removeStrict(TABLES.signatures, id),
+  },
+  // Lessons (supabase/updates-2026-11-05-lessons.sql). The database numbers a request, stamps
+  // done_at, notes each change of status and adds comments (adm_lesson_add_update); offline
+  // that is done here. `who` = { email, name } for the offline notes.
+  lessons: {
+    list: () => A.list(TABLES.lessonRequests),
+    save: async (row) => {
+      if (A.mode !== 'local') return A.upsert(TABLES.lessonRequests, row)
+      const all = await A.list(TABLES.lessonRequests)
+      return A.upsert(TABLES.lessonRequests, { ...row, number: row.number ?? Math.max(0, ...all.map((x) => x.number || 0)) + 1, needed_by: row.details?.teach_on || null, done_at: row.status === 'done' ? row.done_at || new Date().toISOString() : null })
+    },
+    patch: async (id, input, who) => {
+      const fields = A.mode === 'local' && 'details' in input ? { ...input, needed_by: input.details?.teach_on || null } : input
+      if (A.mode !== 'local' || !('status' in fields)) return A.patch(TABLES.lessonRequests, id, fields)
+      const cur = await A.get(TABLES.lessonRequests, id)
+      if (!cur || cur.status === fields.status) return A.patch(TABLES.lessonRequests, id, fields)
+      const note = { at: new Date().toISOString(), by: who?.email || '', name: who?.name || '', kind: 'status', text: fields.status }
+      return A.patch(TABLES.lessonRequests, id, { ...fields, updates: [...(fields.updates || cur.updates || []), note], done_at: fields.status === 'done' ? cur.done_at || new Date().toISOString() : null })
+    },
+    remove: (id) => A.removeStrict(TABLES.lessonRequests, id),
+    addUpdate: async (id, text, kind = 'comment', who) => {
+      if (A.mode !== 'local') return A.rpc('adm_lesson_add_update', { p_id: id, p_text: text, p_kind: kind })
+      const cur = await A.get(TABLES.lessonRequests, id)
+      if (!cur) throw new Error('This request no longer exists.')
+      const note = { at: new Date().toISOString(), by: who?.email || '', name: who?.name || '', kind, text: String(text).trim() }
+      const back = kind === 'answer' && cur.status === 'question' ? (cur.claimed_by ? 'building' : 'sent') : null
+      const updates = [...(cur.updates || []), note, ...(back ? [{ ...note, kind: 'status', text: back }] : [])]
+      return A.patch(TABLES.lessonRequests, id, { updates, ...(back ? { status: back } : {}) })
+    },
+    // Neither table has `created_at`, so they are read in their own order.
+    profiles: {
+      list: () => (A.mode === 'local' ? A.list(TABLES.classProfiles) : supabase.from(TABLES.classProfiles).select('*').order('class_key').then(({ data, error }) => { throwIf(error); return data || [] })),
+      save: (row) => A.upsertBy(TABLES.classProfiles, [row], ['class_key']).then((r) => r[0]),
+    },
+    sources: {
+      list: () => (A.mode === 'local' ? A.list(TABLES.sources) : supabase.from(TABLES.sources).select('*').order('id').then(({ data, error }) => { throwIf(error); return data || [] })),
+      saveMany: (rows) => A.upsertMany(TABLES.sources, rows),
+    },
   },
   /** When Drive was last read, by whom, and how many files it held. */
   getDriveCheck: () => A.getSetting('driveDocs'),

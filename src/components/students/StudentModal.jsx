@@ -17,6 +17,7 @@ import { StudentTrips } from '../attendance/Trips'
 import EmailSlip from '../EmailSlip'
 import NewStudentChecklist from './NewStudentChecklist'
 import StudentDocuments from './StudentDocuments'
+import LearnLoginLine from '../learn/LearnLoginLine'
 
 function Section({ title, children }) {
   return (
@@ -148,6 +149,8 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
           <div className="mb-2 text-xs font-bold uppercase tracking-wider text-pra-navy">{t('travelSection')}</div>
           <StudentTrips student={s} canEdit={false} />
         </div>
+        {/* The PRA Learn login, for the student's teachers (LearnLoginLine shows nothing to anyone else). */}
+        <LearnLoginLine student={s} framed />
       </Modal>
     )
   }
@@ -301,6 +304,13 @@ export default function StudentModal({ value, onClose, onSave, onDelete, student
         {!isNew && (
           <Section title={t('travelSection')}>
             <StudentTrips student={s} />
+          </Section>
+        )}
+
+        {/* The PRA Learn login (learn.pra.edu.vn): username, New PIN, Disable, and the card to print. */}
+        {!isNew && (
+          <Section title={lang === 'vi' ? 'Tài khoản PRA Learn' : 'PRA Learn login'}>
+            <LearnLoginLine student={saved} />
           </Section>
         )}
 

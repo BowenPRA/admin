@@ -17,6 +17,8 @@ export const MAIL_KINDS = {
   newsletter: { en: 'Newsletter', vi: 'Bản tin' },
   notice: { en: 'Note to Seth and Bowen', vi: 'Ghi chú cho Seth và Bowen' },
   test: { en: 'Newsletter test', vi: 'Bản tin gửi thử' },
+  lesson_teacher: { en: 'Lesson update to the teacher', vi: 'Cập nhật bài giảng cho giáo viên' },
+  lesson_office: { en: 'Lesson request to the builder', vi: 'Yêu cầu bài giảng gửi người soạn' },
 }
 export const MAIL_STATUS = {
   waiting: { en: 'Waiting for approval', vi: 'Chờ duyệt', tone: 'amber' },
