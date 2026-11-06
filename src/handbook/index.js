@@ -30,7 +30,7 @@ export const CHAPTERS = [
   { id: 'open', file: '17-known-problems', title: 'Known problems and open items', blurb: 'What is fragile, what is unfinished, and what to watch.', updated: '2026-10-27' },
   { id: 'glossary', file: '18-glossary-and-people', title: 'Glossary and who is who', blurb: 'The words used here and the people behind the names.', updated: '2026-10-24' },
   { id: 'updating', file: '19-keeping-this-handbook', title: 'Keeping this handbook up to date', blurb: 'How a chapter is changed and when to go through it.', updated: '2026-10-20' },
-  { id: 'lessons', file: '20-lessons', title: 'Lessons', blurb: 'How teachers ask for a lesson, what comes back, the statuses, and running the queue.', updated: '2026-11-05' },
+  { id: 'lessons', file: '20-lessons', title: 'Lessons', blurb: 'How teachers ask for a lesson, what comes back, the statuses, and running the queue.', updated: '2026-11-06' },
 ]
 
 // Every chapter file, read at build time; a chapter with no file yet shows as empty.

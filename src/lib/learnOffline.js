@@ -6,8 +6,9 @@
 // students in the offline database gets twelve made-up learners.
 //
 // It follows the function's rules where they matter for trying the page (make skips students
-// who have a login, at most 60 at once; reset needs a login; PINs are never easy), but it does
-// not check who is asking: the page's own buttons do that offline.
+// who have a login, at most 60 at once; reset needs a login; the login name is the folded
+// nickname and the code the student number, as on the old Dashboard), but it does not check
+// who is asking: the page's own buttons do that offline.
 
 import { db } from './db'
 import { splitSubjectKey } from '../data/staff'
@@ -19,26 +20,19 @@ const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') 
 const write = (d) => { try { localStorage.setItem(KEY, JSON.stringify(d)) } catch { /* ignore */ } }
 const wait = (ms = 350) => new Promise((r) => setTimeout(r, ms))
 
-const WORDS = ['otter', 'mango', 'rocket', 'panda', 'comet', 'kite', 'lemon', 'gecko', 'island', 'robin', 'lantern', 'turtle', 'cloud', 'melon', 'violin', 'anchor', 'koala', 'pepper', 'planet', 'shell']
-const DIGITS = '23456789'
-const pick = (s) => s[Math.floor(Math.random() * s.length)]
-function easyPin(pin) {
-  const d = [...pin].map(Number)
-  if (d.every((x) => x === d[0])) return true
-  if (d.every((x, i) => i === 0 || x === (d[i - 1] + 1) % 10) || d.every((x, i) => i === 0 || x === (d[i - 1] + 9) % 10)) return true
-  return d[0] === d[2] && d[1] === d[3]
-}
-function makePin() { for (;;) { const p = Array.from({ length: 4 }, () => String(Math.floor(Math.random() * 10))).join(''); if (!easyPin(p)) return p } }
-function makeUsername(taken) { for (;;) { const u = pick(WORDS) + pick(DIGITS) + pick(DIGITS); if (!taken.has(u)) return u } }
+// The same rules as the function's lib.js (C:\Users\sbowe\learn\supabase\functions\learn-accounts\lib.js).
+const foldName = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\u0111\u0110]/g, 'd').toLowerCase().replace(/[^a-z0-9]/g, '')
+const usernameFor = (s) => foldName([s.nickname, s.first_name, s.full_name].find((x) => String(x || '').trim()))
+const codeFor = (code) => { const d = String(code || '').replace(/\D/g, ''); return d ? String(Number(d)).padStart(3, '0') : null }
 
 // Twelve made-up learners for a class with nobody in the offline database (fixed ids, so logins stick).
-const MADE_UP = 'ABCDEFGHIJKL'.split('').map((c, i) => ({ id: `1ea70000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, name: `Learner ${c}`, full_name: `Learner ${c}` }))
+const MADE_UP = 'ABCDEFGHIJKL'.split('').map((c, i) => ({ id: `1ea70000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, name: `Learner ${c}`, full_name: `Learner ${c}`, nickname: `Learner ${c}`, student_code: `S09${String(i + 1).padStart(2, '0')}` }))
 
 async function classStudents(classKey) {
   const yg = splitSubjectKey(classKey)[1]
   const all = await db.students.list().catch(() => [])
   const mine = all.filter((s) => s.level === yg && statusOf(s) !== 'inactive')
-    .map((s) => ({ id: s.id, name: (s.nickname || '').trim() || (s.first_name || '').trim() || s.full_name, full_name: s.full_name }))
+    .map((s) => ({ id: s.id, name: (s.nickname || '').trim() || (s.first_name || '').trim() || s.full_name, full_name: s.full_name, nickname: s.nickname, first_name: s.first_name, student_code: s.student_code }))
     .sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)))
   return mine.length ? mine : MADE_UP
 }
@@ -76,23 +70,28 @@ export async function offlineAccounts(body) {
       const all = await db.students.list().catch(() => [])
       const known = new Set(students.map((s) => s.id))
       const extra = all.filter((s) => body.student_ids.includes(s.id) && !known.has(s.id) && !accounts[s.id])
-        .map((s) => ({ id: s.id, name: (s.nickname || '').trim() || (s.first_name || '').trim() || s.full_name }))
+        .map((s) => ({ id: s.id, name: (s.nickname || '').trim() || (s.first_name || '').trim() || s.full_name, full_name: s.full_name, nickname: s.nickname, first_name: s.first_name, student_code: s.student_code }))
       students = [...students, ...extra].filter((s) => body.student_ids.includes(s.id))
     }
     if (students.length > 60) throw new Error('At most 60 logins at a time; pick some students.')
     const taken = new Set(Object.values(accounts).map((a) => a.username))
-    const made = students.map((s) => {
-      const username = makeUsername(taken)
+    const made = [], failed = []
+    for (const s of students) {
+      const username = usernameFor(s)
+      const pin = codeFor(s.student_code)
+      if (!/^[a-z0-9]{2,20}$/.test(username)) { failed.push({ student_id: s.id, name: s.name, reason: 'No nickname that works as a login name. Add a nickname in The Current (Students), then try again.' }); continue }
+      if (!pin) { failed.push({ student_id: s.id, name: s.name, reason: 'No student number to make the secret code from. Check the student ID in The Current.' }); continue }
+      if (taken.has(username)) { failed.push({ student_id: s.id, name: s.name, reason: `"${username}" is already another student's login name. Give one of them a different nickname in The Current, then try again.` }); continue }
       taken.add(username)
-      accounts[s.id] = { username, active: true, created_at: now, created_by: by, pin_set_at: now, pin_set_by: by }
-      return { student_id: s.id, name: s.name, username, pin: makePin() }
-    })
+      accounts[s.id] = { username, active: true, created_at: now, created_by: by, pin_set_at: now, pin_set_by: by, code: pin }
+      made.push({ student_id: s.id, name: s.name, username, pin })
+    }
     write({ ...d, accounts })
-    return { made, failed: [] }
+    return { made, failed }
   }
   const a = accounts[body.student_id]
   if (!a) throw new Error('This student has no login yet. Make one first.')
-  // Signing the student out of other devices "fails" on every second New PIN or Disable, so the warning can be seen.
+  // Signing the student out of other devices "fails" on every second Reset code or Disable, so the warning can be seen.
   const signOut = () => {
     const n = (d.signOuts || 0) + 1
     return { n, out: n % 2 === 0 ? { signed_out: false, sessions_ended: 0, warning: 'Offline test: devices already signed in were not signed out.' } : { signed_out: true, sessions_ended: 1 } }
@@ -101,7 +100,7 @@ export async function offlineAccounts(body) {
     const so = signOut()
     accounts[body.student_id] = { ...a, pin_set_at: now, pin_set_by: by }
     write({ ...d, accounts, signOuts: so.n })
-    return { student_id: body.student_id, username: a.username, pin: makePin(), ...so.out }
+    return { student_id: body.student_id, username: a.username, pin: a.code || '000', ...so.out }
   }
   if (body.action === 'disable') {
     const so = signOut()

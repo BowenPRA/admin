@@ -103,7 +103,7 @@ export async function studentLogin(studentId) {
 /**
  * Makes logins for the class's students who have none (or only `studentIds`).
  * Returns { made: [{ student_id, name, username, pin }], failed: [{ student_id, name, reason }] }.
- * The PINs are in this answer only: print the cards from it.
+ * The secret codes (student numbers, 3 digits) come back here: print the cards from it.
  */
 export async function makeLogins(classKey, studentIds = null) {
   const body = { action: 'make', class_key: classKey, ...(studentIds ? { student_ids: studentIds } : {}) }
@@ -111,7 +111,7 @@ export async function makeLogins(classKey, studentIds = null) {
   return callFunction(body)
 }
 
-/** A new PIN, same username: { student_id, username, pin }. The PIN is in this answer only. */
+/** The secret code set back to the student number, same login name: { student_id, username, pin }. */
 export async function resetPin(studentId) {
   const body = { action: 'reset', student_id: studentId }
   if (!hasSupabase) return (await offline()).offlineAccounts(body)
@@ -119,13 +119,13 @@ export async function resetPin(studentId) {
 }
 
 /**
- * New PIN and Disable also sign the student out of devices already signed in. When that
+ * Reset code and Disable also sign the student out of devices already signed in. When that
  * step failed the function answers signed_out: false; this is the line to show then, or ''.
  */
 export function signOutWarning(res, action, L) {
   if (res?.signed_out !== false) return ''
   return action === 'reset'
-    ? L('New PIN set, but a device that was already signed in may keep working for up to an hour.', 'Đã cấp mã PIN mới, nhưng thiết bị đang đăng nhập có thể vẫn dùng được thêm tối đa một giờ.')
+    ? L('Code reset, but a device that was already signed in may keep working for up to an hour.', 'Đã đặt lại mã, nhưng thiết bị đang đăng nhập có thể vẫn dùng được thêm tối đa một giờ.')
     : L('Login disabled, but a device that was already signed in may keep working for up to an hour.', 'Đã khóa tài khoản, nhưng thiết bị đang đăng nhập có thể vẫn dùng được thêm tối đa một giờ.')
 }
 

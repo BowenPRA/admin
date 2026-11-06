@@ -2,16 +2,16 @@
 import { createPortal } from 'react-dom'
 import { LEARN_HOST, cardLayout } from '../../lib/learn'
 
-// Login cards for PRA Learn: one card per child with their name, username and PIN, the
-// address and two short instructions in English and Vietnamese. The PINs exist only in the
-// answer that made them, so the cards are printed from memory, straight away: <PrintCards>
+// Login cards for PRA Learn: one card per child with their name, login name and secret code
+// (their student number, 3 digits), the address and two short instructions in English and
+// Vietnamese. The cards are printed from the answer that made them: <PrintCards>
 // puts the sheets at the end of <body>, hidden on screen, and while it is there printing
 // shows only them (no route, nothing saved). One A4 sheet holds up to 24 cards; a small
 // class gets bigger cards (cardLayout in lib/learn.js).
 
 const INSTRUCTIONS = [
-  ['Open the website above. Type your username and PIN.', 'Mở trang web ở trên, nhập tên đăng nhập và mã PIN.'],
-  ['Keep your PIN secret. Forgot it? Ask your teacher.', 'Giữ kín mã PIN. Quên mã thì em hỏi thầy cô nhé.'],
+  ['Open the website above. Type your name and your secret code.', 'Mở trang web ở trên, nhập tên và mã bí mật của em.'],
+  ['Keep your code secret. Forgot it? Ask your teacher.', 'Giữ kín mã bí mật. Quên mã thì em hỏi thầy cô nhé.'],
 ]
 
 const FONT = 'LC Be Vietnam'
@@ -52,11 +52,11 @@ export function LoginCard({ card, group, w, h, s = 1, screen = false }) {
       <div style={{ fontSize: pt(14), fontWeight: 700, lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 }}>{card.name}</div>
       <div style={{ display: 'flex', gap: `${(1.6 * s).toFixed(2)}mm`, flexShrink: 0 }}>
         <div style={{ ...box, flex: 1.6 }}>
-          <div style={label}>Username · Tên đăng nhập</div>
+          <div style={label}>Name · Tên</div>
           <div className="lc-mono" style={{ fontSize: pt(13), color: '#0b4fb8', lineHeight: 1.15 }}>{card.username}</div>
         </div>
         <div style={{ ...box, background: '#f0fdf4' }}>
-          <div style={label}>PIN · Mã PIN</div>
+          <div style={label}>Secret code · Mã bí mật</div>
           <div className="lc-mono" style={{ fontSize: pt(13), letterSpacing: '0.18em', lineHeight: 1.15 }}>{card.pin}</div>
         </div>
       </div>

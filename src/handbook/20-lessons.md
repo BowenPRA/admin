@@ -63,7 +63,7 @@ The Current emails people when a request needs them, through the same outbox as 
 
 ## Student logins and results
 
-Students do the guided review and the practice on PRA Learn, learn.pra.edu.vn. Each student signs in with a username and a 4-digit PIN that their teacher prints on a login card. The Lessons tab is where logins are made and where a request shows how the class did.
+Students do the guided review and the practice on PRA Learn, learn.pra.edu.vn. Each student signs in the way they did on the old Dashboard: their nickname and a 3-digit secret code, which is their student number (S0024 signs in with 024). Their teacher prints both on a login card. The Lessons tab is where logins are made and where a request shows how the class did.
 
 ### Who can do it
 
@@ -76,13 +76,16 @@ Students do the guided review and the practice on PRA Learn, learn.pra.edu.vn. E
 - **Student logins** at the top of the Lessons tab opens the window for a class (pick it in the list). The same button is on each class card. For one student, the student window (Students, then the student) has a **PRA Learn login** line.
 - A login belongs to the student, not the class: one login works in every class of their year group. Enrolled and Pending (trial) students can have one; Past students are not listed.
 - **Make logins for the 3 without one** (or **Make logins for all 12** the first time) makes the missing ones. **Make login** on a row makes one.
-- The username is a word and two numbers, such as `otter27`, never the child's name. The PIN is 4 digits.
-- **A PIN is shown only once**, straight after the login is made or a new PIN is given. A yellow box then shows the cards: press **Print 12 cards** before doing anything else. **Done**, or closing the window, forgets the PINs for good. If they were not printed, the only way back is a new PIN.
-- One A4 page holds up to 24 cards; a smaller class gets bigger cards, and more than 24 print on more pages. Each card has the child's name (the nickname when there is one), the username, the PIN, the address learn.pra.edu.vn and two short instructions in English and Vietnamese. Cut along the dashed lines and keep the cards in class.
+- The login name is the student's nickname in The Current, without accents, spaces or capitals: Goku signs in as `goku`, and a child can type it with or without accents. With no nickname, the first name is used. The secret code is the student number with the S and the extra zeros taken off, kept to 3 digits: S0006 is `006`, S0140 is `140`.
+- Two students whose nicknames come out the same cannot both have it. The second is listed under the button with what to do: give one of them a different nickname (Students, then the student), then make the login again. A student with no nickname, first name or student number is listed the same way.
+- Straight after logins are made, a yellow box shows the cards: press **Print 12 cards**. A lost card can be printed again at any time with **Reset code**, because the code never changes.
+- One A4 page holds up to 24 cards; a smaller class gets bigger cards, and more than 24 print on more pages. Each card has the child's name, the login name, the secret code, the address learn.pra.edu.vn and two short instructions in English and Vietnamese. Cut along the dashed lines and keep the cards in class.
+- The code is not a real secret: it is the student number, which is on invoices and is part of the student's Google address. Anyone who knows a child's nickname and number can sign in as them. Bowen chose this on 6 November 2026 so logins match the old Dashboard; a student login only reaches that student's own lessons and results.
 
-### A lost card, a forgotten PIN, a student who leaves
+### A lost card, a forgotten code, a student who leaves
 
-- **New PIN** gives a new PIN with the same username, and the old PIN stops working at once. Print the new card.
+- **Reset code** sets the secret code back to the student number, signs the student out of every device, and shows the card to print again. Use it for a lost card, or when something is wrong with a login.
+- If a nickname changes in The Current, the login keeps the old name. To move it to the new one, ask Claude.
 - **Disable** signs the student out and stops the login from working; their work on PRA Learn is kept. **Enable** undoes it. Disable a login when a student leaves or a card has gone to someone it should not have.
 - The list also shows when each student last signed in, which is the quickest way to see who has not tried yet.
 
@@ -100,7 +103,13 @@ Until the teacher opens the lesson for the class on PRA Learn, it says "Not open
 
 ### Before it works
 
-None of this works until PRA Learn's database part (`C:\Users\sbowe\learn\supabase\learn-schema.sql`) has been run and the `learn-accounts` function has been deployed (its README is in `C:\Users\sbowe\learn\supabase\functions\learn-accounts\`). Until then the Student logins window says so. In offline testing the logins and the results are made up, so all of it can be tried there.
+PRA Learn's database part (`C:\Users\sbowe\learn\supabase\learn-schema.sql`) was run on 6 November 2026, and the `learn-accounts` function that makes the logins was deployed the same day (its README is in `C:\Users\sbowe\learn\supabase\functions\learn-accounts\`). Three things have to stay true for logins to work:
+
+- The function's **Verify JWT** switch (Supabase > Edge Functions > learn-accounts > Settings) is off. The function checks every caller itself; with the switch on, Supabase refuses every teacher.
+- learn.pra.edu.vn has its DNS record at P.A Vietnam: a `learn` CNAME pointing to `bowenpra.github.io.`, like `current`.
+- The site is on GitHub Pages (repo BowenPRA/learn, custom domain learn.pra.edu.vn). To put out a new version, run `npm run deploy` in `C:\Users\sbowe\learn`; it refuses to build without the `.env` file, so the site never falls back to its demo.
+
+If the Student logins window says logins cannot be made, check these first. In offline testing the logins and the results are made up, so all of it can be tried there.
 
 ## The statuses
 

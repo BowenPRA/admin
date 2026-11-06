@@ -4,8 +4,8 @@ import { useL } from '../../lib/lessons'
 import { CardPreview, PrintCards, printCards } from './LoginCards'
 
 /**
- * New PINs waiting to be printed: a warning that they are shown only now, the cards as
- * they will print, Print and Done. Done (or closing the window) forgets the PINs.
+ * Login cards waiting to be printed: the cards as they will print, Print and Done. The
+ * secret code is the student number, so a card can be printed again later (Reset code).
  * `printed` / `onPrinted` let the window know whether to warn on closing.
  */
 export default function CardsWaiting({ cards, printed, onPrinted, onDone, compact = false }) {
@@ -17,7 +17,7 @@ export default function CardsWaiting({ cards, printed, onPrinted, onDone, compac
   if (!cards.length) return null
   const n = cards.length
   const done = () => {
-    if (!printed && !confirm(L('These PINs have not been printed. After Done they cannot be shown again; you would need to give new PINs. Continue?', 'Các mã PIN này chưa được in. Sau khi bấm Xong sẽ không xem lại được nữa, thầy cô sẽ phải cấp mã PIN mới. Tiếp tục?'))) return
+    if (!printed && !confirm(L('These cards have not been printed. Close them? A card can be printed again later with Reset code.', 'Các thẻ này chưa được in. Vẫn đóng? Sau này thầy cô có thể in lại thẻ bằng nút Đặt lại mã.'))) return
     onDone()
   }
   const print = async () => { onPrinted?.(); await printCards() }
@@ -26,8 +26,8 @@ export default function CardsWaiting({ cards, printed, onPrinted, onDone, compac
       <div className="flex items-start gap-2.5">
         <KeyRound size={20} className="mt-0.5 flex-none text-amber-700" />
         <div className="min-w-0 text-[15px] text-amber-900">
-          <p className="font-bold">{n === 1 ? L('1 new PIN: print the card now.', '1 mã PIN mới: thầy cô in thẻ ngay bây giờ.') : L(`${n} new PINs: print the cards now.`, `${n} mã PIN mới: thầy cô in thẻ ngay bây giờ.`)}</p>
-          <p className="text-sm">{L('A PIN is shown only this once. Once you press Done or close this window it cannot be seen again; a lost PIN means giving a new one.', 'Mã PIN chỉ hiện một lần này. Khi bấm Xong hoặc đóng cửa sổ, mã sẽ không xem lại được nữa; nếu mất thẻ thì cấp mã PIN mới.')}</p>
+          <p className="font-bold">{n === 1 ? L('1 login card to print.', '1 thẻ đăng nhập để in.') : L(`${n} login cards to print.`, `${n} thẻ đăng nhập để in.`)}</p>
+          <p className="text-sm">{L('Each student signs in with their nickname and their student number as a 3-digit secret code. A lost card can be printed again: press Reset code for that student.', 'Mỗi em đăng nhập bằng tên thường gọi và mã bí mật là số học viên (3 chữ số). Mất thẻ thì in lại được: bấm Đặt lại mã cho em đó.')}</p>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">

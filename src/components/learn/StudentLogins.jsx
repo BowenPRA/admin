@@ -16,8 +16,8 @@ function LoginChip({ login }) {
 }
 
 /**
- * Student logins for PRA Learn, for one class: who has one, make the missing ones, a new PIN,
- * disable and enable, and the login cards, printed straight after (a PIN is shown once).
+ * Student logins for PRA Learn, for one class: who has one, make the missing ones, reset a
+ * code, disable and enable, and the login cards, printed straight after.
  * `classes`: the classes the person may pick from (their own; every class for the office).
  * Only office, head teachers and the class's teachers open it (the function checks again).
  */
@@ -43,7 +43,7 @@ export default function StudentLogins({ classKey, classes = [], onClose }) {
   }, [cls])
   const reload = () => load(cls).then(setGot)
 
-  // New cards join any still waiting; a second PIN for the same child replaces the first.
+  // New cards join any still waiting; a second card for the same child replaces the first.
   const addCards = (list) => {
     setCards((cur) => [...cur.filter((c) => !list.some((n) => n.student_id === c.student_id)), ...list.map((c) => ({ ...c, group }))])
     setPrinted(false)
@@ -61,7 +61,7 @@ export default function StudentLogins({ classKey, classes = [], onClose }) {
     await reload()
   })
   const reset = (r) => {
-    if (!confirm(L(`Give ${r.name} a new PIN? The old PIN stops working at once.`, `Cấp mã PIN mới cho ${r.name}? Mã PIN cũ sẽ không dùng được nữa.`))) return
+    if (!confirm(L(`Reset ${r.name}'s secret code to their student number and sign them out of every device?`, `Đặt lại mã bí mật của ${r.name} về số học viên và đăng xuất em khỏi mọi thiết bị?`))) return
     run(r.id, async () => {
       const res = await resetPin(r.id)
       addCards([{ student_id: r.id, name: r.name, username: res.username, pin: res.pin }])
@@ -79,7 +79,7 @@ export default function StudentLogins({ classKey, classes = [], onClose }) {
       toast(on ? L(`${r.name}: login enabled`, `${r.name}: đã mở khóa`) : L(`${r.name}: login disabled`, `${r.name}: đã khóa`)); await reload() })
   }
   const close = () => {
-    if (cards.length && !printed && !confirm(L('The new PINs have not been printed and will be lost when this window closes. Close anyway?', 'Các mã PIN mới chưa được in và sẽ mất khi đóng cửa sổ này. Vẫn đóng?'))) return
+    if (cards.length && !printed && !confirm(L('These cards have not been printed. Close anyway? A card can be printed again later with Reset code.', 'Các thẻ này chưa được in. Vẫn đóng? Sau này thầy cô có thể in lại thẻ bằng nút Đặt lại mã.'))) return
     onClose()
   }
   const has = (rows || []).filter((r) => r.login !== 'none').length
@@ -92,7 +92,7 @@ export default function StudentLogins({ classKey, classes = [], onClose }) {
         {classes.length > 1 && (
           <label className="block sm:max-w-xs">
             <span className="label">{L('Class', 'Lớp')}</span>
-            <Select value={cls} onChange={(v) => { if (!cards.length || printed || confirm(L('The new PINs have not been printed. Switch class and lose them?', 'Các mã PIN mới chưa được in. Đổi lớp và bỏ các mã này?'))) { setCls(v); setCards([]) } }}
+            <Select value={cls} onChange={(v) => { if (!cards.length || printed || confirm(L('These cards have not been printed. Switch class anyway?', 'Các thẻ này chưa được in. Vẫn đổi lớp?'))) { setCls(v); setCards([]) } }}
               options={classes.map((k) => ({ value: k, label: className(k, lang) }))} />
           </label>
         )}
@@ -100,8 +100,8 @@ export default function StudentLogins({ classKey, classes = [], onClose }) {
         <CardsWaiting cards={cards} printed={printed} onPrinted={() => setPrinted(true)} onDone={() => setCards([])} />
 
         <p className="text-sm text-slate-600">
-          {L(`Each student has one login for every class. A login made here works in all of ${group}'s classes. Students sign in with a username and a 4-digit PIN; the PIN is shown only when the login is made or a new PIN is given, so the cards are printed then.`,
-            `Mỗi học viên có một tài khoản dùng cho mọi lớp. Tài khoản tạo ở đây dùng được cho tất cả các lớp ${group}. Học viên đăng nhập bằng tên đăng nhập và mã PIN 4 số; mã PIN chỉ hiện khi vừa tạo tài khoản hoặc cấp mã mới, nên thầy cô in thẻ ngay lúc đó.`)}
+          {L(`Each student has one login for every class. A login made here works in all of ${group}'s classes. Students sign in with their nickname and their student number as a 3-digit secret code (S0024 → 024), as on the old Dashboard. Print the cards after making the logins; a lost card can be printed again with Reset code.`,
+            `Mỗi học viên có một tài khoản dùng cho mọi lớp. Tài khoản tạo ở đây dùng được cho tất cả các lớp ${group}. Học viên đăng nhập bằng tên thường gọi và mã bí mật là số học viên (3 chữ số, S0024 → 024), giống Dashboard cũ. Thầy cô in thẻ sau khi tạo tài khoản; mất thẻ thì in lại bằng nút Đặt lại mã.`)}
         </p>
 
         {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -137,7 +137,7 @@ export default function StudentLogins({ classKey, classes = [], onClose }) {
                       {r.login === 'none' ? (
                         <button type="button" className="btn-secondary px-2.5 py-1 text-xs" disabled={!!busy} onClick={() => make([r.id])}><UserPlus size={13} /> {busy === r.id ? L('Making…', 'Đang tạo…') : L('Make login', 'Tạo tài khoản')}</button>
                       ) : (<>
-                        <button type="button" className="btn-secondary px-2.5 py-1 text-xs" disabled={!!busy || r.login === 'off'} onClick={() => reset(r)} title={r.login === 'off' ? L('Enable the login first', 'Mở khóa tài khoản trước') : ''}><KeyRound size={13} /> {L('New PIN', 'Mã PIN mới')}</button>
+                        <button type="button" className="btn-secondary px-2.5 py-1 text-xs" disabled={!!busy || r.login === 'off'} onClick={() => reset(r)} title={r.login === 'off' ? L('Enable the login first', 'Mở khóa tài khoản trước') : ''}><KeyRound size={13} /> {L('Reset code', 'Đặt lại mã')}</button>
                         <button type="button" className="btn-ghost px-2.5 py-1 text-xs" disabled={!!busy} onClick={() => toggle(r)}>
                           {r.login === 'off' ? <><LockOpen size={13} /> {L('Enable', 'Mở khóa')}</> : <><Lock size={13} /> {L('Disable', 'Khóa')}</>}
                         </button>

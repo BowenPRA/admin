@@ -9,9 +9,9 @@ import { useToast } from '../../lib/toast'
 import CardsWaiting from './CardsWaiting'
 
 /**
- * The student's PRA Learn login, in the student window: the username and whether it works,
- * and New PIN / Disable / Enable, or Make login. Shown to office, head teachers and the
- * student's teachers only. A new PIN shows its card to print, once.
+ * The student's PRA Learn login, in the student window: the login name and whether it works,
+ * and Reset code / Disable / Enable, or Make login. Shown to office, head teachers and the
+ * student's teachers only. Make login and Reset code show the card to print.
  * `framed` adds its own rule and heading (the teachers' read-only student window).
  */
 export default function LearnLoginLine({ student, framed = false }) {
@@ -49,7 +49,7 @@ export default function LearnLoginLine({ student, framed = false }) {
     setAcc(await studentLogin(student.id))
   })
   const reset = () => {
-    if (!confirm(L(`Give ${name} a new PIN? The old PIN stops working at once.`, `Cấp mã PIN mới cho ${name}? Mã PIN cũ sẽ không dùng được nữa.`))) return
+    if (!confirm(L(`Reset ${name}'s secret code to their student number and sign them out of every device?`, `Đặt lại mã bí mật của ${name} về số học viên và đăng xuất em khỏi mọi thiết bị?`))) return
     run(async () => {
       const res = await resetPin(student.id)
       showCard(res.username, res.pin)
@@ -78,9 +78,9 @@ export default function LearnLoginLine({ student, framed = false }) {
             : acc ? (<>
               <span className="font-mono text-[15px] font-bold text-sky-800">{acc.username}</span>
               {acc.active ? <span className="chip bg-green-100 text-green-800">{L('Has a login', 'Đã có tài khoản')}</span> : <span className="chip bg-stone-200 text-stone-700">{L('Disabled', 'Đã khóa')}</span>}
-              <span className="text-xs text-slate-500">{L(`PIN given ${fmtDay(acc.pin_set_at, lang)}${acc.pin_set_by ? ` by ${acc.pin_set_by}` : ''}`, `Cấp mã PIN ngày ${fmtDay(acc.pin_set_at, lang)}${acc.pin_set_by ? `, bởi ${acc.pin_set_by}` : ''}`)}</span>
+              <span className="text-xs text-slate-500">{L(`Code set ${fmtDay(acc.pin_set_at, lang)}${acc.pin_set_by ? ` by ${acc.pin_set_by}` : ''}`, `Đặt mã ngày ${fmtDay(acc.pin_set_at, lang)}${acc.pin_set_by ? `, bởi ${acc.pin_set_by}` : ''}`)}</span>
               <span className="ml-auto flex gap-1.5">
-                <button type="button" className="btn-secondary px-2.5 py-1 text-xs" disabled={busy || !acc.active} onClick={reset}><KeyRound size={13} /> {L('New PIN', 'Mã PIN mới')}</button>
+                <button type="button" className="btn-secondary px-2.5 py-1 text-xs" disabled={busy || !acc.active} onClick={reset}><KeyRound size={13} /> {L('Reset code', 'Đặt lại mã')}</button>
                 <button type="button" className="btn-ghost px-2.5 py-1 text-xs" disabled={busy} onClick={toggle}>{acc.active ? <><Lock size={13} /> {L('Disable', 'Khóa')}</> : <><LockOpen size={13} /> {L('Enable', 'Mở khóa')}</>}</button>
               </span>
             </>) : (<>
