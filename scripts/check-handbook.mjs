@@ -6,8 +6,9 @@
 // - words the handbook never uses ("school", "report card", "grades", "trường", "học sinh")
 // - anything that looks like a secret (a key, a token, a password, a long random string)
 // A line that has to quote one of those words ends with <!-- allow -->, which is not shown on the page.
+// - FEATURES.md, the feature map at the root: every path in it exists, and every route in App.jsx has a line
 // Prints every problem with its file and line, and exits 1 if there is one.
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { headingSlug, scanSections } from '../src/handbook/markdown.js'
@@ -79,11 +80,32 @@ for (const c of chapters) {
   })
 }
 
+// FEATURES.md: a repo path in backticks (src/…, supabase/…, scripts/…, public/…) must exist. A path
+// outside the repo (C:/Users/sbowe/…) is checked only when its top folder is on this laptop. Every
+// route in App.jsx, and "/" for Home, must be written in backticks somewhere in the file.
+const root = join(dir, '..', '..')
+let features = ''
+try { features = readFileSync(join(root, 'FEATURES.md'), 'utf8') } catch { bad('FEATURES.md', 0, 'missing: the feature map at the root of the admin folder') }
+const ticked = (line) => [...line.matchAll(/`([^`]+)`/g)].map((m) => m[1])
+const outsideOk = (p) => { const top = p.split('/').slice(0, 4).join('/'); return !existsSync(top) || existsSync(p) }
+features.split('\n').forEach((line, i) => {
+  for (const t of ticked(line)) {
+    if (/^(src|supabase|scripts|public)\/\S+$/.test(t) && !existsSync(join(root, t))) bad('FEATURES.md', i + 1, `no such file: ${t}`)
+    if (/^C:\/Users\//.test(t) && !outsideOk(t)) bad('FEATURES.md', i + 1, `no such file: ${t}`)
+  }
+  for (const m of line.replace(/`[^`]*`/g, '').matchAll(/C:\/Users\/[^\s`,;|)]+/g)) {
+    const p = m[0].replace(/[.:]+$/, '')
+    if (!outsideOk(p)) bad('FEATURES.md', i + 1, `no such file: ${p}`)
+  }
+})
+const named = new Set(features.split('\n').flatMap(ticked))
+for (const r of ['/', ...routes]) if (features && r !== '*' && !named.has(r)) bad('FEATURES.md', 0, `the route ${r} in App.jsx has no line (write it in backticks)`)
+
 if (problems.length) {
   console.log(`${problems.length} problem(s):\n` + problems.join('\n'))
   process.exit(1)
 } else {
-  console.log(`Handbook OK: ${chapters.length} chapters, ${files.length} files, ${Object.values(sectionsOf).reduce((a, s) => a + s.size, 0)} sections.`)
+  console.log(`Handbook OK: ${chapters.length} chapters, ${files.length} files, ${Object.values(sectionsOf).reduce((a, s) => a + s.size, 0)} sections. FEATURES.md OK: ${routes.filter((r) => r !== '*').length + 1} routes named, every path found.`)
   // Unused: headingSlug is imported so a change to the slug rule breaks this script loudly.
   void headingSlug
 }
