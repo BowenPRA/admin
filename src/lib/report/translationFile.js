@@ -56,7 +56,11 @@ function reportParts(report, sections, settings, teachers, schedule) {
     for (const s of tiers[tier] || []) {
       const name = subjectByKey(settings, s.subject_key).name
       const writer = printedTeacher(sectionTeacher(teachers, s, report.year_group, settings.assistants))
-      if (writingFor(settings, s.subject_key, report.year_group).comment) add(`section:${s.id}:comment`, `${name}: individual teacher comment`, writer, s.comment, s.comment_vi, limits[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
+      if (writingFor(settings, s.subject_key, report.year_group, report).comment) {
+        add(`section:${s.id}:comment`, `${name}: individual teacher comment`, writer, s.comment, s.comment_vi, limits[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
+        // A Global Program report's next steps for the subject (since 18 November 2026).
+        if (limits.next_steps) add(`section:${s.id}:next_focus`, `${name}: next steps`, writer, s.next_focus, s.next_focus_vi, limits.next_steps)
+      }
     }
   }
   return parts
@@ -158,7 +162,9 @@ export function planTranslationImport(data, { reports, sections, notes, students
     } else if (kind === 'section' && (row = sectionById.get(rowId))) {
       report = reportById.get(row.report_id)
       const tier = subjectByKey(settings, row.subject_key, report?.year_group).kind
-      if (field === 'comment' && writingFor(settings, row.subject_key, report?.year_group).comment) { english = row.comment; current = row.comment_vi; max = textLimits(settings, report)[tier === 'academic' ? 'academic_comment' : 'specialist_comment'] }
+      if (field === 'comment' && writingFor(settings, row.subject_key, report?.year_group, report).comment) { english = row.comment; current = row.comment_vi; max = textLimits(settings, report)[tier === 'academic' ? 'academic_comment' : 'specialist_comment'] }
+      // Next steps print only on a Global Program report; elsewhere they count as not found, as before.
+      if (field === 'next_focus' && textLimits(settings, report).next_steps && writingFor(settings, row.subject_key, report?.year_group, report).comment) { english = row.next_focus; current = row.next_focus_vi; max = textLimits(settings, report).next_steps }
     } else if (kind === 'note' && field === 'description' && (row = noteById.get(rowId))) {
       english = row.description; current = row.description_vi; max = topicsLimit(settings, row.subject_key, row.year_group)
     }

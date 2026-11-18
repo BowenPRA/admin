@@ -7,7 +7,7 @@ import { partialFrom } from '../../lib/studentRecords'
 import { useAuth } from '../../lib/AuthContext'
 import { db, genId } from '../../lib/db'
 import { loadReportBundle } from '../../lib/report/loaders'
-import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor, fixedDescription, classScores, avg, isPublished, isProgramReport, stayLine, optionalPart } from '../../lib/report/utils'
+import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor, fixedDescription, classScores, avg, isPublished, isProgramReport, stayLine, optionalPart, ownLayout, tierOf } from '../../lib/report/utils'
 import { TIERS } from '../../lib/report/defaults'
 import { reportTitle } from '../../lib/report/strings'
 import { Card, Field, TextInput, TextArea, NumberInput, Select, Spinner, LevelPicker, SaveState, ReportStatusChip } from '../../components/ui'
@@ -127,6 +127,18 @@ function Count({ text, max, min }) {
       </span>
       <span>{n} / {max}{note ? ` · ${note}` : ''}</span>
     </span>
+  )
+}
+
+/** The questions a box answers (the Global Program's, from Seth), numbered from `start`. */
+function PromptList({ title, prompts, start = 1 }) {
+  return (
+    <div className="rounded-lg border border-teal-200 bg-teal-50/70 p-3 text-xs text-teal-900">
+      <div className="mb-1 font-semibold">{title}</div>
+      <ol className="list-decimal space-y-1 pl-4" start={start}>
+        {prompts.map((p, i) => <li key={i}><b className="font-semibold">{p.title}:</b> {p.question}</li>)}
+      </ol>
+    </div>
   )
 }
 
@@ -300,6 +312,21 @@ export default function ReportEditor() {
   const optionalHomeroom = optionalPart(settings, report, 'homeroom')
   const optionalSkills = optionalPart(settings, report, 'skills')
   const cardProps = { reviewScores, settings, levels, bi, teachers, isHead, signName: displayName, yearGroup: report.year_group, isLastPeriod, lastLabel, name, viAll, limits: L, minimums: MIN, report, prompts: programReport ? template?.prompts || [] : [] }
+  // The Global Program page (since the redesign): its areas in two groups as the page shows
+  // them, Subjects (a comment and next steps) and Also joined (a level only); else the tiers.
+  const ownPage = ownLayout(settings, report)
+  // A function, as tierHint below is defined after it.
+  const editorGroups = () => {
+    if (!ownPage) return TIERS.map((tier) => ({ key: tier.key, title: reportTitle(template, tier.key, 'en'), hint: tierHint(tier), sections: tiers[tier.key] }))
+    const all = [...tiers.academic, ...tiers.specialist, ...tiers.vocational]
+    const has = (s) => writingFor(settings, s.subject_key, report.year_group, report).comment
+    return [
+      { key: 'subjects', title: reportTitle(template, 'subjects', 'en'), sections: all.filter(has),
+        hint: `A level, a comment and next steps for each subject: the comment answers Seth's questions 1 to 3, the next steps question 4 (shown above each box). Up to ${L.academic_comment} characters for the comment on Math, Science and English, ${L.specialist_comment} on the others, and ${L.next_steps} for next steps.` },
+      { key: 'also', title: reportTitle(template, 'alsoJoined', 'en'), sections: all.filter((s) => !has(s)),
+        hint: 'A level only: these classes print in one strip with no comment.' },
+    ]
+  }
   // Reports without review scores (Early Years, Years 1 to 3) leave that part out of the hint,
   // and a vocational area with its own comment (Early Years Physical Development) or a fixed
   // description (Movement) is named.
@@ -389,7 +416,7 @@ export default function ReportEditor() {
               <Field label="Class name" hint="Optional, e.g. Secondary"><TextInput value={report.class_name} onChange={(v) => patchReport({ class_name: v })} disabled={!homeroomOk} /></Field>
               <Field label="Reports" hint={bi ? 'Vietnamese prints as its own page' : undefined}><Select value={report.lang || 'en'} onChange={(v) => patchReport({ lang: v })} disabled={!homeroomOk} options={[{ value: 'en', label: 'English only' }, { value: 'bi', label: 'English and Vietnamese' }]} /></Field>
             </div>
-            <Field label={optionalHomeroom ? 'Homeroom teacher comment (optional)' : 'Homeroom teacher comment'} className="mt-3" right={<Count text={report.homeroom_note} max={L.homeroom_note} min={optionalHomeroom ? 0 : MIN.homeroom_note} />}
+            <Field label={`${ownPage ? reportTitle(template, 'homeroom', 'en', { nickname: name.legal || 'the student' }) : 'Homeroom teacher comment'}${optionalHomeroom ? ' (optional)' : ''}`} className="mt-3" right={<Count text={report.homeroom_note} max={L.homeroom_note} min={optionalHomeroom ? 0 : MIN.homeroom_note} />}
               hint={optionalHomeroom && !(report.homeroom_note || '').trim() ? `Optional on ${template?.name || 'this'} reports: left empty, it is left off the page and the student's name takes the row.` : <Wording text={report.homeroom_note} name={name} />}>
               <TextArea {...EN} rows={4} value={report.homeroom_note} onChange={(v) => patchReport({ homeroom_note: v })} disabled={!homeroomOk} placeholder={`How has ${name.legal || 'the student'} settled in and approached learning ${programReport ? 'during their stay' : 'this quarter'}?`} />
             </Field>
@@ -407,13 +434,13 @@ export default function ReportEditor() {
           </Card>
         )}
 
-        {TIERS.map((tier) => tiers[tier.key].length > 0 && (
-          <div key={tier.key}>
-            <h2 className="text-lg font-bold">{reportTitle(template, tier.key, 'en')}</h2>
-            <p className="mb-2 text-xs text-slate-500">{tierHint(tier)}</p>
+        {editorGroups().map((grp) => grp.sections.length > 0 && (
+          <div key={grp.key}>
+            <h2 className="text-lg font-bold">{grp.title}</h2>
+            <p className="mb-2 text-xs text-slate-500">{grp.hint}</p>
             <div className="space-y-4">
-              {tiers[tier.key].map((s) => (
-                <SubjectCard key={s.id} tier={tier.key} section={s} editable={subjectOk(s.subject_key)} onPatch={(p) => patchSection(s.id, p)}
+              {grp.sections.map((s) => (
+                <SubjectCard key={s.id} tier={tierOf(settings, s, report.year_group)} section={s} editable={subjectOk(s.subject_key)} onPatch={(p) => patchSection(s.id, p)}
                   classList={classScores(bundle.cohort, Number(report.period_index), s.subject_key, s)} note={notes[s.subject_key]} onNote={(p) => patchNote(s.subject_key, p)} {...cardProps} />
               ))}
             </div>
@@ -421,8 +448,9 @@ export default function ReportEditor() {
         ))}
 
         {(homeroomOk || showHomeroom) && (<>
-          <Card title={optionalSkills ? 'How I learn (optional)' : 'How I learn'} locked={!homeroomOk}
-            subtitle={optionalSkills ? `Learner skills, printed as a level beside each skill. Optional on ${template?.name || 'these'} reports: with no level given, How I Learn is left off the page.` : 'Learner skills, printed as a level beside each skill.'}>
+          <Card title={`${ownPage ? reportTitle(template, 'skills', 'en') : 'How I learn'}${optionalSkills ? ' (optional)' : ''}`} locked={!homeroomOk}
+            subtitle={ownPage ? `Rated by the homeroom teacher with the five levels: Seth's questions 2 and 3 for the whole stay. Optional: with no level given, ${reportTitle(template, 'skills', 'en')} is left off the page. Click a level again to clear it.`
+              : optionalSkills ? `Learner skills, printed as a level beside each skill. Optional on ${template?.name || 'these'} reports: with no level given, How I Learn is left off the page.` : 'Learner skills, printed as a level beside each skill.'}>
             <div className="space-y-4">
               {skillGroupsFor(settings, report).map((g) => (
                 <div key={g.key}>
@@ -518,6 +546,10 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
     else if (isNA(raw) || !String(raw || '').trim() || (hasNum(s[pctKey]) && Number(s[pctKey]) === pctFromRaw(s[rawKey]))) patch[pctKey] = null
     onPatch(patch)
   }
+  // A Global Program report: Seth's questions 1 to 3 for the comment, question 4 for the next steps box.
+  const nextMax = limits.next_steps || 0
+  const commentPrompts = prompts.filter((p) => !nextMax || p.part !== 'next')
+  const nextPrompts = nextMax ? prompts.filter((p) => p.part === 'next') : []
   const commentMax = tier === 'academic' ? limits.academic_comment : limits.specialist_comment
   const commentMin = tier === 'academic' ? minimums.academic_comment : minimums.specialist_comment
   const topicsKey = tier === 'academic' ? 'academic_topics' : 'vocational_topics'
@@ -583,19 +615,20 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
                 </p>
               </div>
             )}
-            {writing.comment && prompts.length > 0 && (
-              <div className="rounded-lg border border-teal-200 bg-teal-50/70 p-3 text-xs text-teal-900">
-                <div className="mb-1 font-semibold">One comment that answers these questions</div>
-                <ol className="list-decimal space-y-1 pl-4">
-                  {prompts.map((p, i) => <li key={i}><b className="font-semibold">{p.title}:</b> {p.question}</li>)}
-                </ol>
-              </div>
+            {writing.comment && commentPrompts.length > 0 && (
+              <PromptList title={nextMax ? 'The comment answers these questions' : 'One comment that answers these questions'} prompts={commentPrompts} />
             )}
             {writing.comment && (<>
-              <Field label="Individual comment" right={<Count text={s.comment} max={commentMax} min={commentMin} />} hint={<Wording text={s.comment} name={name} />}>
-                <TextArea {...EN} rows={tier === 'academic' ? 6 : 5} value={s.comment} onChange={(v) => onPatch({ comment: v })} placeholder={prompts.length ? `${name?.legal || 'The student'}: understanding, English, communication and participation, progress and next steps…` : `${name?.legal ? `${name.legal}'s s` : 'S'}trengths, progress and evidence from this quarter…`} />
+              <Field label={nextMax ? 'Comment' : 'Individual comment'} right={<Count text={s.comment} max={commentMax} min={commentMin} />} hint={<Wording text={s.comment} name={name} />}>
+                <TextArea {...EN} rows={tier === 'academic' ? 6 : 5} value={s.comment} onChange={(v) => onPatch({ comment: v })} placeholder={prompts.length ? `${name?.legal || 'The student'}: understanding of the subject, English, communication and taking part…` : `${name?.legal ? `${name.legal}'s s` : 'S'}trengths, progress and evidence from this quarter…`} />
               </Field>
-              <NoLongerPrinted label="Next focus" text={s.next_focus || s.next_focus_vi} />
+              {/* A Global Program subject's next steps (Seth's question 4), in the section's next_focus column; it prints in a green box under the comment. */}
+              {nextMax ? (<>
+                {nextPrompts.length > 0 && <PromptList title="Next steps answer this question" prompts={nextPrompts} start={commentPrompts.length + 1} />}
+                <Field label="Next steps" right={<Count text={s.next_focus} max={nextMax} min={minimums.next_steps} />} hint={<Wording text={s.next_focus} name={name} />}>
+                  <TextArea {...EN} rows={2} value={s.next_focus || ''} onChange={(v) => onPatch({ next_focus: v })} placeholder={`${name?.legal || 'The student'}'s progress over the stay, strengths, and what to work on next…`} />
+                </Field>
+              </>) : <NoLongerPrinted label="Next focus" text={s.next_focus || s.next_focus_vi} />}
             </>)}
             <div className="grid gap-3 sm:max-w-xs">
               {linkedTeacher ? (
@@ -612,6 +645,7 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
               <ViPanel openAll={viAll} pairs={[
                 ...(writing.description ? [[note?.description, note?.description_vi]] : []),
                 ...(writing.comment ? [[s.comment, s.comment_vi]] : []),
+                ...(writing.comment && nextMax ? [[s.next_focus, s.next_focus_vi]] : []),
               ]}>
                 {writing.description && (
                   <Field label={<span className="inline-flex items-center gap-1">Course description <Users size={12} className="text-slate-400" /></span>} right={<Count text={note?.description_vi} max={limits[topicsKey]} min={minimums[topicsKey]} />} hint={<Wording lang="vi" text={note?.description_vi} />}>
@@ -619,8 +653,13 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
                   </Field>
                 )}
                 {writing.comment && (
-                  <Field label="Individual comment" right={<Count text={s.comment_vi} max={commentMax} min={commentMin} />} hint={<Wording lang="vi" text={s.comment_vi} name={name} />}>
+                  <Field label={nextMax ? 'Comment' : 'Individual comment'} right={<Count text={s.comment_vi} max={commentMax} min={commentMin} />} hint={<Wording lang="vi" text={s.comment_vi} name={name} />}>
                     <TextArea {...VI} rows={4} value={s.comment_vi} onChange={(v) => onPatch({ comment_vi: v })} />
+                  </Field>
+                )}
+                {writing.comment && nextMax > 0 && (
+                  <Field label="Next steps" right={<Count text={s.next_focus_vi} max={nextMax} min={minimums.next_steps} />} hint={<Wording lang="vi" text={s.next_focus_vi} name={name} />}>
+                    <TextArea {...VI} rows={2} value={s.next_focus_vi || ''} onChange={(v) => onPatch({ next_focus_vi: v })} />
                   </Field>
                 )}
               </ViPanel>

@@ -61,13 +61,38 @@ export function templateForYearGroup(settings, yg) {
  * the program's own name, program line, headings and teacher prompts, and no review scores.
  */
 export function programTemplate(own, base) {
+  // Since the redesign (`nextSteps`), a subject's comment limit gives `nextSteps` characters to
+  // the next steps box, so the subject has as many as on the year group's own report.
+  const lim = { ...TEXT_LIMITS, ...(base?.limits || {}) }
+  const split = Number(own.nextSteps) || 0
+  const limits = split ? { ...lim, academic_comment: lim.academic_comment - split, specialist_comment: lim.specialist_comment - split, next_steps: split } : lim
+  // The program's own ratings, the Early Years set for Nursery and Kindergarten; else the year group's learner skills.
+  const early = (base?.yearGroups || []).some((g) => g === 'Nursery' || g === 'Kindergarten')
+  const skillGroups = (early && own.skillGroupsEarly?.length ? own.skillGroupsEarly : own.skillGroups) || base?.skillGroups
   return {
     ...(base || {}), ...own,
     areas: templateAreas(base), yearGroups: [], scoreYearGroups: [],
-    ...(base?.skillGroups && { skillGroups: base.skillGroups }),
-    ...(base?.limits && { limits: base.limits }), ...(base?.minimums && { minimums: base.minimums }),
+    ...(skillGroups && { skillGroups }),
+    limits, minimums: { ...TEXT_MINIMUMS, ...(base?.minimums || {}), ...(own.minimums || {}) },
     titles: { ...(base?.titles || {}), ...(own.titles || {}) },
   }
+}
+
+/** Whether a report prints on the program's own page (the Global Program, since 18 November 2026). */
+export const ownLayout = (settings, report) => templateOf(settings, report)?.layout === 'global'
+
+/** "6 weeks", "1 week", "3 days" (Vietnamese "6 tuần", "3 ngày"): a stay's length from its weekdays, or ''. */
+export function stayLength(student, lang = 'en') {
+  const from = String(student?.start_date || '').slice(0, 10)
+  const to = String(student?.end_date || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) return ''
+  let days = 0
+  for (const d = new Date(`${from}T00:00:00`); d <= new Date(`${to}T00:00:00`); d.setDate(d.getDate() + 1)) if (d.getDay() % 6) days++
+  if (!days) return ''
+  const vi = lang === 'vi'
+  if (days < 5) return vi ? `${days} ngày` : `${days} day${days === 1 ? '' : 's'}`
+  const weeks = Math.round(days / 5)
+  return vi ? `${weeks} tuần` : `${weeks} week${weeks === 1 ? '' : 's'}`
 }
 
 /** The template a student's report is made from: their Program's (Global Program) when one serves it, else their year group's. */
@@ -319,7 +344,10 @@ export function sectionDone(settings, s, report = null) {
   if (!s.level) return false
   const tier = tierOf(settings, s, report?.year_group)
   if (!writingFor(settings, s.subject_key, report?.year_group, report).comment) return true
-  return written(s.comment, textMinimums(settings, report)[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
+  const min = textMinimums(settings, report)
+  // A Global Program subject also has its next steps (the next_focus column).
+  if (textLimits(settings, report).next_steps && !written(s.next_focus, min.next_steps)) return false
+  return written(s.comment, min[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
 }
 
 /** The homeroom teacher comment is done once it reaches its minimum; an optional one (Global Program) always counts as done. */

@@ -20,9 +20,11 @@ const STRINGS = {
     howILearn: 'How I Learn',
     levelsKey: 'Progress levels',
     // Headings a template may reword ({nickname}, {yearGroup} are filled in).
-    // academicNote: none on the standard page; the Global Program template has one (18 November 2026).
+    // academicNote: none on the standard page. homeroom to alsoJoinedNote: the Global Program
+    // page's headings (since 18 November 2026; its template words most of them itself).
     titles: {
       academic: 'Academic Learning', specialist: 'Specialist Learning', vocational: 'Vocational Learning', academicNote: '',
+      homeroom: 'Homeroom Teacher Comment', skills: 'How I Learn', subjects: 'Subjects', subjectsNote: '', nextSteps: 'Next steps', alsoJoined: 'Also Joined', alsoJoinedNote: '',
       specialistNote: "Individual comments on {nickname}'s progress",
       vocationalNote: 'Course descriptions: topics the {yearGroup} group covered this quarter',
     },
@@ -47,6 +49,7 @@ const STRINGS = {
     // "các lớp kỹ năng và thực hành"; "Hướng nghiệp" means careers guidance.
     titles: {
       academic: 'Học thuật', specialist: 'Các lớp kỹ năng', vocational: 'Các lớp thực hành', academicNote: '',
+      homeroom: 'Nhận xét của giáo viên chủ nhiệm', skills: 'Kỹ năng học tập', subjects: 'Các môn học', subjectsNote: '', nextSteps: 'Bước tiếp theo', alsoJoined: 'Các lớp khác', alsoJoinedNote: '',
       specialistNote: 'Nhận xét riêng về sự tiến bộ của {nickname}',
       vocationalNote: 'Mô tả khóa học: nội dung lớp {yearGroup} đã học trong quý này',
     },
@@ -62,6 +65,17 @@ export const TITLE_FIELDS = [
   { key: 'specialistNote', label: 'Specialist subtitle' },
   { key: 'vocational', label: 'Vocational tier heading' },
   { key: 'vocationalNote', label: 'Vocational subtitle' },
+]
+
+/** The Global Program page's headings (since 18 November 2026). */
+export const GLOBAL_TITLE_FIELDS = [
+  { key: 'homeroom', label: 'Homeroom comment heading' },
+  { key: 'skills', label: 'Ratings heading' },
+  { key: 'subjects', label: 'Subjects heading' },
+  { key: 'subjectsNote', label: 'Subjects subtitle' },
+  { key: 'nextSteps', label: 'Next steps label' },
+  { key: 'alsoJoined', label: 'Level-only classes heading' },
+  { key: 'alsoJoinedNote', label: 'Level-only classes subtitle' },
 ]
 
 const fill = (text, vars = {}) => String(text || '').replace(/\{(nickname|yearGroup)\}/g, (_, k) => vars[k] ?? '')

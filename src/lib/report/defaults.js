@@ -288,33 +288,74 @@ export const TEMPLATES = {
     yearGroups: ['Year 7', 'Year 8', 'Year 9'],
     areas: ['math', 'science', 'english', 'art_of_science', 'history', 'movement', 'executive_function', 'technology', 'wellbeing'],
   },
-  // The Global Program report (Seth, 6 November 2026: "the questions for the Global reports";
-  // shape chosen by Bowen, 18 November 2026). A template with `forProgram` is chosen by the
-  // student's Program on the Students page, not by year group: it covers no year groups of its
-  // own and takes the learning areas, learner skills, limits and headings of the template of the
-  // student's year group (programTemplate in utils.js). On these reports each area that takes a
-  // comment has one comment that answers the four questions in `prompts` (shown to teachers in
-  // the editor), the other areas a level only, and there are no review scores and no course
-  // descriptions. The page prints the stay's dates in place of the quarter.
-  // `optional` lists the parts a teacher may leave empty (Bowen, 18 November 2026): an empty
-  // homeroom comment or learner skills with no level counts as done and is left off the page.
+  // The Global Program report (Seth, 6 November 2026: "the questions for the Global reports").
+  // A template with `forProgram` is chosen by the student's Program on the Students page, not by
+  // year group: it covers no year groups of its own and takes the learning areas of the template
+  // of the student's year group (programTemplate in utils.js). Redesigned the same day around
+  // Seth's questions (Bowen, 18 November 2026: "it doesn't need to look so much like the main
+  // student templates"): `layout: 'global'` gives it a page of its own (globalBody in
+  // reportPdfLayout.js) with its own title and closing line, "English in Class" ratings (Seth's
+  // questions 2 and 3, `skillGroups`, or `skillGroupsEarly` for Nursery and Kindergarten), one
+  // Subjects section where each area that takes a comment has a comment (questions 1 to 3) and
+  // next steps (question 4, in the section's next_focus column), and an "Also Joined" strip with
+  // the level of every other area. No review scores, no course descriptions, no tiers.
+  // `nextSteps` is the next steps limit, taken from the comment's (Bowen: "split the same
+  // total"), so a subject has as many characters as on the regular report.
+  // `optional` lists the parts a teacher may leave empty: an empty homeroom comment or ratings
+  // with no level count as done and are left off the page.
   global: {
     key: 'global', name: 'Global Program', program: 'Global Program', program_vi: 'Chương trình Global',
-    forProgram: 'global', yearGroups: [], scoreYearGroups: [], areas: [], optional: ['homeroom', 'skills'],
+    forProgram: 'global', layout: 'global', yearGroups: [], scoreYearGroups: [], areas: [], optional: ['homeroom', 'skills'],
+    docTitle: 'Global Program Report', docTitle_vi: 'Báo cáo Chương trình Global',
+    closing: 'Thank you for choosing Palm River Academy during your time in Hội An. We hope to see {nickname} again.',
+    closing_vi: 'Cảm ơn ba mẹ đã chọn Palm River Academy cho {nickname} trong thời gian gia đình ở Hội An. Mong sớm được gặp lại {nickname}.',
+    nextSteps: 150,
+    minimums: { academic_comment: 400, specialist_comment: 250, next_steps: 40 },
     titles: {
-      academicNote: 'Each comment: understanding, English, communication and participation, progress and next steps',
-      academicNote_vi: 'Mỗi nhận xét: mức hiểu bài, tiếng Anh, giao tiếp và tham gia, tiến bộ và bước tiếp theo',
-      specialistNote: 'Each comment: understanding, English, communication and participation, progress and next steps',
-      specialistNote_vi: 'Mỗi nhận xét: mức hiểu bài, tiếng Anh, giao tiếp và tham gia, tiến bộ và bước tiếp theo',
-      vocationalNote: "{nickname}'s level in each of these classes",
-      vocationalNote_vi: 'Mức độ của {nickname} ở từng lớp',
+      homeroom: "About {nickname}'s stay", homeroom_vi: 'Về thời gian {nickname} học tại PRA',
+      skills: 'English in Class', skills_vi: 'Tiếng Anh trên lớp',
+      subjects: 'Subjects', subjects_vi: 'Các môn học',
+      subjectsNote: "Teachers' comments on understanding, English and taking part, then next steps",
+      subjectsNote_vi: 'Nhận xét của thầy cô về mức hiểu bài, tiếng Anh và sự tham gia, kèm bước tiếp theo',
+      nextSteps: 'Next steps', nextSteps_vi: 'Bước tiếp theo',
+      alsoJoined: 'Also Joined', alsoJoined_vi: 'Các lớp khác',
+      alsoJoinedNote: "{nickname}'s level in each class", alsoJoinedNote_vi: 'Mức độ của {nickname} ở từng lớp',
     },
-    // Seth's four questions, in his words.
+    // Seth's questions 2 and 3, in his words, as ratings the homeroom teacher gives.
+    skillGroups: [
+      { key: 'gl_english', name: 'English Language', name_vi: 'Ngôn ngữ tiếng Anh', items: [
+        { key: 'gl_vocab', name: 'Vocabulary', name_vi: 'Từ vựng', icon: 'languages' },
+        { key: 'gl_grammar', name: 'Grammar and sentence structure', name_vi: 'Ngữ pháp và cấu trúc câu', icon: 'blocks' },
+        { key: 'gl_reading', name: 'Reading comprehension', name_vi: 'Đọc hiểu', icon: 'book' },
+        { key: 'gl_explain', name: 'Explaining ideas in English', name_vi: 'Diễn đạt ý tưởng bằng tiếng Anh', icon: 'lightbulb' },
+      ] },
+      { key: 'gl_communication', name: 'Communication and Participation', name_vi: 'Giao tiếp và tham gia', items: [
+        { key: 'gl_instructions', name: 'Follows instructions', name_vi: 'Làm theo hướng dẫn', icon: 'list' },
+        { key: 'gl_questions', name: 'Asks and answers questions', name_vi: 'Hỏi và trả lời câu hỏi', icon: 'chat' },
+        { key: 'gl_confidence', name: 'Speaks with confidence', name_vi: 'Tự tin khi nói', icon: 'mic' },
+        { key: 'gl_participation', name: 'Takes part in class activities', name_vi: 'Tham gia hoạt động trên lớp', icon: 'users' },
+      ] },
+    ],
+    // The same two areas for children of 2 to 5 (Nursery and Kindergarten).
+    skillGroupsEarly: [
+      { key: 'gl_ey_english', name: 'Understanding and Using English', name_vi: 'Hiểu và dùng tiếng Anh', items: [
+        { key: 'gl_ey_listens', name: 'Listens and understands simple English', name_vi: 'Nghe hiểu tiếng Anh đơn giản', icon: 'ear' },
+        { key: 'gl_ey_words', name: 'Uses English words and phrases', name_vi: 'Dùng từ và cụm từ tiếng Anh', icon: 'languages' },
+        { key: 'gl_ey_songs', name: 'Joins in songs, stories and rhymes', name_vi: 'Tham gia bài hát, truyện và đồng dao', icon: 'music' },
+      ] },
+      { key: 'gl_ey_communication', name: 'Communication and Joining In', name_vi: 'Giao tiếp và tham gia', items: [
+        { key: 'gl_ey_instructions', name: 'Follows simple instructions', name_vi: 'Làm theo hướng dẫn đơn giản', icon: 'list' },
+        { key: 'gl_ey_asks', name: 'Asks for help and says what they need', name_vi: 'Biết nhờ giúp đỡ và nói nhu cầu', icon: 'hand' },
+        { key: 'gl_ey_joins', name: 'Plays and joins in with others', name_vi: 'Chơi và tham gia cùng bạn', icon: 'users' },
+      ] },
+    ],
+    // Seth's four questions, in his words: the first three for the comment, the fourth (`part:
+    // 'next'`) for next steps. Shown to teachers in the editor, not printed.
     prompts: [
       { title: 'Subject Understanding', question: 'How well has the student understood and engaged with the concepts, topics, and skills covered in your subject?' },
       { title: 'English Language Development', question: 'How has the student used and developed English in your subject? Consider vocabulary, grammar, sentence structure, reading comprehension, and their ability to understand and communicate subject-specific ideas.' },
       { title: 'Communication and Participation', question: 'How confidently and independently does the student communicate, follow instructions, ask and answer questions, and participate in classroom activities using English?' },
-      { title: 'Progress and Next Steps', question: "What progress have you observed during the student's time in the program? What are their particular strengths, and what areas would benefit from further development?" },
+      { title: 'Progress and Next Steps', part: 'next', question: "What progress have you observed during the student's time in the program? What are their particular strengths, and what areas would benefit from further development?" },
     ],
   },
 }
@@ -326,7 +367,7 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
-const SETTINGS_VERSION = 18
+const SETTINGS_VERSION = 19
 
 // The default names before version 14, which that upgrade replaces with today's.
 const NAMES_BEFORE_14 = {
@@ -400,7 +441,9 @@ export const DEFAULT_REPORT_SETTINGS = {
  * the "Tiếng Anh nâng cao" lead on area names) takes today's. Before version 17 a
  * "Head Teacher" signature line becomes "Head of Academy", Seth's title on the website.
  * Before version 18 the Global Program template is added, unless a template already
- * serves the Global Program. Saving in Report settings then stores the upgraded version.
+ * serves the Global Program. Before version 19 a Global Program template saved before the
+ * redesign (no `layout`) takes the new one, keeping its name and program line.
+ * Saving in Report settings then stores the upgraded version.
  */
 export function normalizeReportSettings(stored) {
   const v = stored || {}
@@ -586,6 +629,12 @@ export function normalizeReportSettings(stored) {
   if ((Number(v.version) || 1) < 17) s.signatures = (s.signatures || []).map((sg) => (sg.role === 'Head Teacher' ? { ...sg, role: 'Head of Academy' } : sg))
   if ((Number(v.version) || 1) < 18 && v.templates && !Object.values(templates).some((t) => t.forProgram === 'global')) {
     templates = { ...templates, global: JSON.parse(JSON.stringify(TEMPLATES.global)) }
+  }
+  if ((Number(v.version) || 1) < 19) {
+    for (const [k, t] of Object.entries(templates)) {
+      if (t.forProgram !== 'global' || t.layout) continue
+      templates[k] = { ...JSON.parse(JSON.stringify(TEMPLATES.global)), key: k, name: t.name, program: t.program, program_vi: t.program_vi }
+    }
   }
   for (const sub of subjects) if (!tierKeys.includes(sub.kind)) sub.kind = 'vocational'
   for (const [k, t] of Object.entries(templates)) {

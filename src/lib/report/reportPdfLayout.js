@@ -79,7 +79,7 @@
 // about the same middle line, from the light blue of the logo's wave; the page below it
 // did not move.
 
-import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor, fixedDescription, nameParts, printedTeacher, isProgramReport, stayLine, optionalPart, skillsRated, homeroomPrints } from './utils'
+import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor, fixedDescription, nameParts, printedTeacher, isProgramReport, stayLine, stayLength, ownLayout, optionalPart, skillsRated, homeroomPrints } from './utils'
 import { reportStrings, reportTitle, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
 import { partialFrom } from '../studentRecords'
 import { foldName, nicknameInName } from '../names'
@@ -386,6 +386,8 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   // A Global Program report (since 18 November 2026): no course descriptions, a level only on
   // the areas without a comment, and the stay's dates in place of the quarter.
   const programReport = isProgramReport(settings, report)
+  // Its own page (since the redesign the same day): globalBody below, its own title and closing.
+  const own = ownLayout(settings, report)
   // An optional homeroom comment left empty is left off, and the name takes the whole row.
   const showHomeroom = homeroomPrints(settings, report)
   const yearGroup = yearGroupLabel(report.year_group, lang)
@@ -601,14 +603,16 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     ? new Date(`${report.report_date}T00:00:00`).toLocaleDateString(vi ? 'vi-VN' : 'en-GB', { day: 'numeric', month: vi ? 'numeric' : 'long', year: 'numeric' })
     : ''
   const RW = 340
-  putLine(X + W - RW, ruleY - 31, RW, (vi && org.docTitle_vi) || org.docTitle || '', F.docTitle, { bold: true, color: C.navy, font: HF, align: 'right' })
+  // A template may have its own title (the Global Program Report).
+  putLine(X + W - RW, ruleY - 31, RW, (vi && (template.docTitle_vi || org.docTitle_vi)) || template.docTitle || org.docTitle || '', F.docTitle, { bold: true, color: C.navy, font: HF, align: 'right' })
   // A year range takes an en dash in print: 2026–2027.
   const schoolYear = String(report.school_year || '').replace(/^(\d{4})-(\d{4})$/, '$1–$2')
   const program = (vi && template.program_vi) || template.program || template.name || ''
   const stay = programReport ? stayLine(student, lang) : ''
   const subline = [
     { text: stay || `${periodLabel(report.period_label, lang)}  ·  ${schoolYear}`, bold: true, color: THEME.academic.deep },
-    ...[program, reportDate].filter(Boolean).map((x) => ({ text: `   ·   ${x}`, color: C.muted })),
+    // The Global Program page names the program in its title, so its line has the stay's length instead.
+    ...(own ? [stayLength(student, lang), reportDate] : [program, reportDate]).filter(Boolean).map((x) => ({ text: `   ·   ${x}`, color: C.muted })),
   ]
   putLine(X + W - RW, ruleY - 11, RW, subline, F.period, { align: 'right' })
   const ruleX = X + LOGO.left + LOGO.w * LOGO.crest + RULE.gap
@@ -622,7 +626,8 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   // the signature blocks on the right (the closing message was there).
   const legal = org.legalLine || ''
   const legalW = legal ? M.width({ text: legal, ...T(F.foot, { pitch: 1 }) }) : 0
-  const closing = curly(((vi && org.closing_vi) || org.closing || '').replace('{nickname}', nick).replace('{name}', student?.full_name || ''))
+  // A template may have its own closing line (the Global Program's thanks for the stay, which names the child twice).
+  const closing = curly(((vi && (template.closing_vi || org.closing_vi)) || template.closing || org.closing || '').replaceAll('{nickname}', nick).replace('{name}', student?.full_name || ''))
   const closingW = W - (legal ? legalW + 16 : 0)
   const closingStyle = (s) => T(s, { italics: true, color: THEME.academic.deep, pitch: 1.2 })
   // One line beside the legal line, a little smaller if need be; else two, broken between the sentences.
@@ -655,6 +660,66 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const keyH = sum(keyRows)
   const bandH = Math.max(keyH, sigs.length ? 36 : 0)
   const bandY = footY - FOOT_GAP - bandH
+
+  // =========================================================================
+  // The foot of the page, drawn last by both pages (the regular one and the Global
+  // Program one): drawFoot().
+  const drawFoot = () => {
+    // The band above the footer. On the left the level key: the whole scale in order,
+    // first steps to the top, each level's bubbles and name in its colour, then what it
+    // means. Every capsule on the page reads from it.
+    const lastCy = bandY + bandH - KEY_PITCH / 2 // the middle of the band's last line
+    if (levels.length) {
+      const ky0 = bandY + bandH - keyH
+      rect(X, ky0, KEY_LABEL, keyH, { r: 5, fill: C.keyFill })
+      const label = { text: t.levelsKey.toUpperCase(), ...T(5.9, { bold: true, color: C.muted, spacing: 0.5, pitch: 1.15, align: 'center' }) }
+      put(X + 3, ky0 + (keyH - M.height(label, KEY_LABEL - 6)) / 2 + 0.4, KEY_LABEL - 6, label)
+      let ky = ky0
+      levels.forEach((l, i) => {
+        const cy = ky + KEY_PITCH / 2
+        bubbleRow(l.value, keyBubblesX, cy, KB)
+        putLine(keyBubblesX + bubblesW(KB) + 4, midTop(cy, F.level), levelNameW + 1, nameIn(l), F.level, { bold: true, color: l.color })
+        if (descOf(l)) put(descX, midTop(cy, descSize), descW, descNode(l, descSize))
+        ky += keyRows[i]
+      })
+    }
+
+    // On the right the signature blocks: the signature (Setup > Signatures) above the line,
+    // the name and role below it, the role on the key's last line.
+    const sigX0 = X + W - sigsW
+    const roleTop = midTop(lastCy, F.role, true)
+    const sigLineY = roleTop - F.sig * HEAD_METRICS.LINE - 3.2
+    // A signature line's own signature (Setup > Signatures): the one saved under the same title
+    // and name ("Ms. Thắm N"), or else the only one that prints the same ("Ms. Thắm").
+    const signatureOf = (name) => {
+      const full = (sg) => `${sg.title} ${sg.name}`.trim()
+      const exact = signatures.filter((sg) => full(sg).toLowerCase() === String(name || '').trim().toLowerCase())
+      if (exact.length === 1) return exact[0]
+      const near = signatures.filter((sg) => printedTeacher(full(sg)).toLowerCase() === printedTeacher(name).toLowerCase())
+      return near.length === 1 ? near[0] : null
+    }
+    const INK_H = 26 // the tallest a signature prints, its foot a little below the line
+    sigs.forEach((sg, i) => {
+      const sx = sigX0 + i * (sigW + SIG_GAP)
+      // The signature as large as the room above the line allows, its foot just below the line.
+      const ink = sg.name ? signatureOf(sg.name) : null
+      if (ink?.w > 0 && ink?.h > 0) {
+        const scale = Math.min(INK_H / ink.h, (sigW - 6) / ink.w, (sigLineY + 3 - bandY + 3) / ink.h)
+        nodes.push({ absolutePosition: { x: sx + 3, y: sigLineY + 3 - ink.h * scale }, image: ink.key, width: ink.w * scale, height: ink.h * scale })
+      }
+      line(sx, sigLineY, sx + sigW, sigLineY, { color: C.sigLine, lw: 0.7, cap: 'round' })
+      if (sg.name) putLine(sx, sigLineY + 2.4, sigW, printedTeacher(sg.name), F.sig, { bold: true, color: C.navy, font: HF })
+      putLine(sx, roleTop, sigW, roleLabel(sg.role, lang).toUpperCase(), F.role, { bold: true, color: C.muted, spacing: 0.5 })
+    })
+
+    // =========================================================================
+    // Footer: the closing message on the left, the legal line on the right, on the
+    // closing message's last line.
+    line(X, footY, X + W, footY, { color: C.line, lw: 0.6 })
+    const footBase = footY + 3.5 + ASC * F.closing + (footLines - 1) * F.closing * 1.2
+    if (closing) put(X, footY + 3.5 + ASC * (F.closing - closingNode.fontSize), closingW, closingNode)
+    if (legal) putLine(X + W - legalW - 1, footBase - ASC * F.foot, legalW + 1, legal, F.foot, { color: C.muted })
+  }
 
   // =========================================================================
   // Prepare the parts that share the page's height.
@@ -711,6 +776,243 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const signOnLast = (s) => !!signature && M.height(boxNode(homeroom, s, `${homeroom.content}\u2003\u2003${signature}`), homeroom.w) <= M.height(boxNode(homeroom, s), homeroom.w) + 0.5
   const signRoom = (s) => (signOnLast(s) ? 0 : HR_SIGN)
   const homeroom = { ...BODY, name: 'Homeroom teacher comment', x: hrX + 10, w: hrW - 15, ...picked(report.homeroom_note, report.homeroom_note_vi) }
+
+  // =========================================================================
+  // The Global Program page (since 18 November 2026; Bowen: "it doesn't need to look so much
+  // like the main student templates"), built around Seth's four questions for the Global
+  // reports. Below the student and the homeroom comment ("About Mai's stay", optional):
+  // English in Class, his questions 2 and 3 as ratings (optional); Subjects, one row for each
+  // area that takes a comment, with the academic rows' name column, the comment (questions 1 to
+  // 3) and a green Next steps box (question 4); and Also Joined, the areas with a level only,
+  // two to a line. The homeroom comment, the comments and the next steps share one text size,
+  // the largest at which the page fits. The key, signatures and footer are the regular page's.
+  if (own) {
+    const commentOf = (s) => writingFor(settings, s.subject_key, report.year_group, report).comment
+    const all = [...tiers.academic, ...tiers.specialist, ...tiers.vocational]
+    const subjects = all.filter(commentOf)
+    const others = all.filter((s) => !commentOf(s))
+    const groups = optionalPart(settings, report, 'skills') && !skillsRated(report) ? [] : skillGroupsFor(settings, report)
+    const SUBJ = THEME.academic
+    const NEXT = THEME.vocational
+    const SKILLS = { ...THEME.skills, icon: 'languages' }
+    const NAME_W = 80
+    const colW = NAME_W - 4
+    const bx = X + PAD + NAME_W + 4
+    const bw = X + W - PAD - bx
+    const ROW_MIN = 46
+    const NS = { gap: 4, padX: 5, padY: 2.5 } // the Next steps box: the space above it and its padding
+    const HEAD_STYLE = { bold: true, color: C.navy, font: HF }
+
+    // The lead of a name ("Intensive English in") as a small line, on two lines if need be (the
+    // Vietnamese lead breaks before "theo chủ đề"), as on the regular page.
+    const leadOf = (text, w, color, align) => {
+      let lead = null
+      for (const size of [F.lead, 6, 5.6]) {
+        const style = T(size, { color, pitch: 1.12, ...(align && { align }) })
+        let node = { text, ...style }
+        if (M.height(node, w) > size * 1.12 + 0.5) node = { text: text.replace(/ (theo chủ đề)$/u, '\n$1'), ...style }
+        lead = { node, h: M.height(node, w) }
+        if (lead.h <= size * 1.12 * 2 + 0.5) break
+      }
+      return lead
+    }
+    const rows = subjects.map((s) => {
+      const sub = areaOf(s.subject_key)
+      const comment = { ...BODY, name: `${sub.name} comment`, x: bx, w: bw, ...picked(s.comment, s.comment_vi) }
+      const next = { ...BODY, name: `${sub.name} next steps`, x: bx + NS.padX, w: bw - 2 * NS.padX, label: `${title('nextSteps')}:`, labelColor: NEXT.deep, ...picked(s.next_focus, s.next_focus_vi) }
+      const { lead: leadText, head } = nameParts(nameIn(sub))
+      const lead = leadText ? leadOf(leadText, colW, SUBJ.deep, 'center') : null
+      let wrap = null
+      for (const size of [F.title, 8.6, 8, 7.4]) {
+        const style = T(size, { ...HEAD_STYLE, pitch: 1.1, align: 'center' })
+        let node = { text: head, ...style }
+        if (vi && M.height(node, colW) > size * 1.1 + 0.5) node = { text: head.replace(/ (?=\S+ \S+$)/u, '\n'), ...style }
+        wrap = { node, h: M.height(node, colW) }
+        if (wrap.h <= size * 1.1 * 2 + 0.5) break
+      }
+      const teacher = teacherOf(s)
+      const leadH = lead ? lead.h + 0.6 : 0
+      const nameH = leadH + wrap.h
+      const textH = nameH + (teacher ? 1.5 + F.teacher * LINE : 0) + 4 + pillFit(s.level, colW).h
+      return { s, sub, comment, next, teacher, lead, leadH, wrap, nameH, textH }
+    })
+
+    // What each part needs at comment size `s` (and the spacing S in force).
+    const commentH = (r, s) => M.height(boxNode(r.comment, s), bw)
+    const nextH = (r, s) => M.height(boxNode(r.next, s), r.next.w) + 2 * NS.padY
+    const rowNeed = (r, s) => Math.max(ROW_MIN, r.textH + S.padT + 3, S.padT + commentH(r, s) + NS.gap + nextH(r, s) + S.padB)
+    const iconRow = (r, d) => r.textH + S.padT + S.padB + 6 + d
+    const SKILL_TOP = 13
+    const maxItems = Math.max(0, ...groups.map((g) => g.items.length))
+    const skillsNeed = groups.length ? BAR + SKILL_TOP + maxItems * 10.8 + 2 : 0
+    const ALSO_ROW = 21
+    const alsoNeed = others.length ? BAR + 3 + Math.ceil(others.length / 2) * ALSO_ROW + 2 : 0
+    const homeroomNeed = (s) => (showHomeroom ? Math.max(studentNeed, HR_TOP + M.height(boxNode(homeroom, s), homeroom.w) + signRoom(s) + HR_PAD) : studentNeed)
+    const subjectsNeed = (s, d = 0) => (rows.length ? BAR + sum(rows.map((r) => Math.max(rowNeed(r, s), d ? iconRow(r, d) : 0))) : 0)
+    const total = (s, d = 0) => {
+      const p = [homeroomNeed(s), skillsNeed, subjectsNeed(s, d), alsoNeed].filter(Boolean)
+      return sum(p) + S.gap * (p.length - 1)
+    }
+    const avail = bandY - BAND_GAP - startY
+    // The largest comment size at which the page fits as a full page, then the spacing opens
+    // as far as it can with room kept for a good-sized subject icon (as on the regular page).
+    const bodySizes = sizesOf({ base: F.body, min: F.bodyMin })
+    const body = bodySizes.find((s) => total(s) <= avail) ?? bodySizes[bodySizes.length - 1]
+    const steps = Array.from({ length: LOOSE_STEPS + 1 }, (_, k) => (LOOSE_STEPS - k) / LOOSE_STEPS)
+    loosen(steps.find((tt) => { loosen(tt); return total(body, ICON_FLOOR) <= avail }) ?? 0)
+    checks.bodySize = body
+    checks.pitch = BODY.style.pitch
+    checks.spare = Math.round((avail - total(body)) * 10) / 10
+
+    // Room to spare: first room for a large icon in every subject row, then a little more for
+    // the homeroom row, the ratings and each row (at most 30pt a row); anything left is white
+    // space above the key, so no panel stands half empty (as on a regular partial-day page).
+    let spare = Math.max(0, avail - total(body))
+    const rowH = rows.map((r) => rowNeed(r, body))
+    // Text past its limit that does not fit even at the smallest size: the rows give up the
+    // difference (the fullest ones), and their comments are cut and reported, as elsewhere.
+    const over = total(body) - avail
+    if (over > 0 && rows.length) shareHeight(rowH, Math.max(0, sum(rowH) - over)).forEach((v, i) => { rowH[i] = v })
+    const extra = rows.map((r, i) => Math.max(0, Math.max(ROW_COMFY, iconRow(r, 24)) - rowH[i]))
+    const part = sum(extra) ? Math.min(1, spare / sum(extra)) : 0
+    rows.forEach((_, i) => { rowH[i] += extra[i] * part })
+    spare -= sum(extra) * part
+    const grow = (cap) => { const g = Math.min(cap, spare); spare -= g; return g }
+    const hrH = homeroomNeed(body) + (showHomeroom ? grow(14) : 0)
+    const skH = skillsNeed + (groups.length ? grow(12) : 0)
+    rows.forEach((_, i) => { rowH[i] += grow(Math.min(30, spare / Math.max(1, rows.length - i))) })
+    const alH = alsoNeed + (others.length ? grow(8) : 0)
+
+    // The student, the photo and the homeroom comment, as on the regular page.
+    let y = startY
+    const colTop = Math.max(y + (hrH - colH) / 2, clearTop)
+    const photoY = colTop + (colH - photoD) / 2
+    if (photoKey) {
+      nodes.push({ absolutePosition: { x: X, y: photoY }, image: photoKey, width: photoD, height: photoD })
+    } else {
+      circle(X + photoD / 2, photoY + photoD / 2, photoD / 2, C.photoFill)
+      strokes.push({ type: 'ellipse', x: X + photoD / 2, y: photoY + photoD / 2, r1: photoD / 2 - 1.2, r2: photoD / 2 - 1.2, lineColor: C.photoRing, lineWidth: 2.4 })
+      const initials = (student?.full_name || '?').split(' ').filter(Boolean).map((w) => w[0]).slice(-2).join('').toUpperCase()
+      put(X, midTop(photoY + photoD / 2, 14, true, HF), photoD, { text: initials, ...T(14, { bold: true, color: C.initials, align: 'center', pitch: 1, font: HF }) })
+    }
+    let infoY = colTop + (colH - infoH) / 2
+    put(infoX, infoY, infoW, nameNode)
+    infoY += fullH + 3
+    infoLines.forEach((l) => { put(infoX, infoY, infoW, oneLine(l.text, F.info, infoW, l.style).node); infoY += infoPitch })
+    if (showHomeroom) {
+      rect(hrX, y, hrW, hrH, { fill: C.homeroomFill })
+      rect(hrX, y, 2.6, hrH, { fill: THEME.academic.accent })
+      kicker(hrX + 10, y + 6, hrW - 15, title('homeroom'), C.homeroomInk)
+      placeBoxes([{ ...homeroom, base: body, y: y + HR_TOP, h: hrH - HR_TOP - signRoom(body) - HR_PAD }])
+      if (signature) {
+        const textH = M.height(boxNode(homeroom, body), homeroom.w)
+        const below = hrH - HR_TOP - HR_PAD - textH >= HR_SIGN
+        const lastTop = y + HR_TOP + textH - body * BODY.style.pitch
+        const signY = below ? y + hrH - HR_PAD - HR_SIGN + 1 : lastTop + (body - F.hrSign) * ASC
+        putLine(hrX + 10, signY, hrW - 15, signature, F.hrSign, { italics: true, color: C.homeroomInk, align: 'right' })
+      }
+    }
+    y += hrH + S.gap
+
+    // English in Class: the two groups of ratings side by side.
+    if (groups.length) {
+      section(X, y, W, skH, SKILLS, title('skills'))
+      const x = X + PAD
+      const w = W - 2 * PAD
+      const gGap = 16
+      const gw = (w - gGap * (groups.length - 1)) / groups.length
+      const itemsTop = y + BAR + SKILL_TOP
+      const ih = Math.min(13, (y + skH - 2 - itemsTop) / Math.max(1, maxItems))
+      groups.forEach((g, gi) => {
+        const gx = x + gi * (gw + gGap)
+        kicker(gx, y + BAR + 2.5, gw, nameIn(g), SKILLS.deep)
+        g.items.forEach((it, k) => {
+          const iy = itemsTop + k * ih
+          const cy = iy + ih / 2
+          if (k > 0) line(gx, iy, gx + gw, iy, { color: mix(SKILLS.accent, 0.82), lw: 0.5 })
+          icon(it.icon, gx, cy - 4, 8, SKILLS.accent)
+          const SB = { d: 4.6, gap: 1.2 }
+          putLine(gx + 11.5, midTop(cy, F.skill), gw - 11.5 - bubblesW(SB) - 6, nameIn(it), F.skill)
+          bubbleRow(report.skills?.[it.key], gx + gw - bubblesW(SB), cy, SB)
+        })
+      })
+      y += skH + S.gap
+    }
+
+    // Subjects: a row each, the name column on the left, the comment, then Next steps on a pale green panel.
+    if (rows.length) {
+      const h = BAR + sum(rowH)
+      section(X, y, W, h, SUBJ, title('subjects'), title('subjectsNote'))
+      const iconD = Math.min(ICON_MAX, ...rows.map((r, i) => rowH[i] - S.padT - S.padB - 6 - r.textH))
+      checks.iconSize = iconD >= 14 ? Math.floor(iconD) : 0
+      const boxes = []
+      let ry = y + BAR
+      rows.forEach((r, i) => {
+        if (i > 0) line(X + PAD, ry, X + W - PAD, ry, { color: mix(SUBJ.accent, 0.75), lw: 0.6 })
+        const nx = X + PAD
+        const mid = nx + colW / 2
+        let cy = ry + S.padT + 0.5
+        if (iconD >= 14) {
+          circle(mid, cy + iconD / 2, iconD / 2, '#ffffff')
+          strokes.push({ type: 'ellipse', x: mid, y: cy + iconD / 2, r1: iconD / 2 - 0.4, r2: iconD / 2 - 0.4, lineColor: SUBJ.edge, lineWidth: 0.8 })
+          icon(r.sub.icon, mid - iconD * 0.29, cy + iconD * 0.21, iconD * 0.58, SUBJ.accent)
+          cy += iconD + 5
+        }
+        if (r.lead) put(nx, cy, colW, r.lead.node)
+        put(nx, cy + r.leadH, colW, r.wrap.node)
+        cy += r.nameH
+        if (r.teacher) {
+          putLine(nx, cy + 1.5, colW, r.teacher, F.teacher, { color: C.muted, align: 'center' })
+          cy += 1.5 + F.teacher * LINE
+        }
+        pill(r.s.level, mid, cy + 4, colW, 'center')
+        // The comment, then the Next steps panel right under it; any room left stays below.
+        const top = ry + S.padT
+        const nh = nextH(r, body)
+        const ch = Math.max(body * 1.3, Math.min(commentH(r, body), rowH[i] - S.padT - S.padB - NS.gap - nh))
+        boxes.push({ ...r.comment, base: body, y: top, h: ch })
+        const ny = top + ch + NS.gap
+        rect(bx, ny, bw, nh, { r: 3, fill: NEXT.tint })
+        rect(bx, ny, 2.2, nh, { fill: NEXT.accent })
+        boxes.push({ ...r.next, base: body, y: ny + NS.padY, h: nh - 2 * NS.padY })
+        ry += rowH[i]
+      })
+      placeBoxes(boxes)
+      y += h + S.gap
+    }
+
+    // Also Joined: the areas with a level only, two to a line: icon, lead, name and teacher, level.
+    if (others.length) {
+      section(X, y, W, alH, NEXT, title('alsoJoined'), title('alsoJoinedNote'))
+      const gap = 16
+      const cw = (W - 2 * PAD - gap) / 2
+      const top = y + BAR + 3 + (alH - alsoNeed) / 2
+      others.forEach((s, i) => {
+        const col = i % 2
+        const lineNo = Math.floor(i / 2)
+        const cx = X + PAD + col * (cw + gap)
+        const cy = top + lineNo * ALSO_ROW
+        if (lineNo > 0 && col === 0) line(X + PAD, cy, X + W - PAD, cy, { color: mix(NEXT.accent, 0.8), lw: 0.5 })
+        if (col === 1) line(cx - gap / 2, cy + 3, cx - gap / 2, cy + ALSO_ROW - 3, { color: mix(NEXT.accent, 0.8), lw: 0.5 })
+        const sub = areaOf(s.subject_key)
+        const { lead, head } = nameParts(nameIn(sub))
+        const mid = cy + ALSO_ROW / 2
+        badge(sub.icon, cx + 7.5, mid, 15, NEXT.tint, NEXT.accent)
+        const p = pill(s.level, cx + cw, mid - PILL_H / 2, cw * 0.5, 'right')
+        const tx = cx + 20
+        const tw = cw - 20 - p.w - 6
+        const nameTop = lead ? cy + 2 + F.lead * 1.12 : midTop(mid, F.cardTitle, true, HF)
+        if (lead) putLine(tx, cy + 2, tw, lead, F.lead, { color: NEXT.deep })
+        const nw = putLine(tx, nameTop, tw, head, F.cardTitle, HEAD_STYLE)
+        const teacher = teacherOf(s)
+        // The teacher after the name, on its baseline.
+        if (teacher && tw - nw - 5 > 20) putLine(tx + nw + 5, nameTop + F.cardTitle * HEAD_METRICS.ASC - F.teacher * ASC, tw - nw - 5, teacher, F.teacher, { color: C.muted })
+      })
+    }
+
+    drawFoot()
+    return { fills, strokes, nodes, checks }
+  }
 
   // Academic rows: the name column (subject tile, lead, name, teacher, level) on
   // the left, then the course description and the comment.
@@ -1152,61 +1454,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     y += h + S.gap
   }
 
-  // =========================================================================
-  // The band above the footer. On the left the level key: the whole scale in order,
-  // first steps to the top, each level's bubbles and name in its colour, then what it
-  // means. Every capsule on the page reads from it.
-  const lastCy = bandY + bandH - KEY_PITCH / 2 // the middle of the band's last line
-  if (levels.length) {
-    const ky0 = bandY + bandH - keyH
-    rect(X, ky0, KEY_LABEL, keyH, { r: 5, fill: C.keyFill })
-    const label = { text: t.levelsKey.toUpperCase(), ...T(5.9, { bold: true, color: C.muted, spacing: 0.5, pitch: 1.15, align: 'center' }) }
-    put(X + 3, ky0 + (keyH - M.height(label, KEY_LABEL - 6)) / 2 + 0.4, KEY_LABEL - 6, label)
-    let ky = ky0
-    levels.forEach((l, i) => {
-      const cy = ky + KEY_PITCH / 2
-      bubbleRow(l.value, keyBubblesX, cy, KB)
-      putLine(keyBubblesX + bubblesW(KB) + 4, midTop(cy, F.level), levelNameW + 1, nameIn(l), F.level, { bold: true, color: l.color })
-      if (descOf(l)) put(descX, midTop(cy, descSize), descW, descNode(l, descSize))
-      ky += keyRows[i]
-    })
-  }
-
-  // On the right the signature blocks: the signature (Setup > Signatures) above the line,
-  // the name and role below it, the role on the key's last line.
-  const sigX0 = X + W - sigsW
-  const roleTop = midTop(lastCy, F.role, true)
-  const sigLineY = roleTop - F.sig * HEAD_METRICS.LINE - 3.2
-  // A signature line's own signature (Setup > Signatures): the one saved under the same title
-  // and name ("Ms. Thắm N"), or else the only one that prints the same ("Ms. Thắm").
-  const signatureOf = (name) => {
-    const full = (sg) => `${sg.title} ${sg.name}`.trim()
-    const exact = signatures.filter((sg) => full(sg).toLowerCase() === String(name || '').trim().toLowerCase())
-    if (exact.length === 1) return exact[0]
-    const near = signatures.filter((sg) => printedTeacher(full(sg)).toLowerCase() === printedTeacher(name).toLowerCase())
-    return near.length === 1 ? near[0] : null
-  }
-  const INK_H = 26 // the tallest a signature prints, its foot a little below the line
-  sigs.forEach((sg, i) => {
-    const sx = sigX0 + i * (sigW + SIG_GAP)
-    // The signature as large as the room above the line allows, its foot just below the line.
-    const ink = sg.name ? signatureOf(sg.name) : null
-    if (ink?.w > 0 && ink?.h > 0) {
-      const scale = Math.min(INK_H / ink.h, (sigW - 6) / ink.w, (sigLineY + 3 - bandY + 3) / ink.h)
-      nodes.push({ absolutePosition: { x: sx + 3, y: sigLineY + 3 - ink.h * scale }, image: ink.key, width: ink.w * scale, height: ink.h * scale })
-    }
-    line(sx, sigLineY, sx + sigW, sigLineY, { color: C.sigLine, lw: 0.7, cap: 'round' })
-    if (sg.name) putLine(sx, sigLineY + 2.4, sigW, printedTeacher(sg.name), F.sig, { bold: true, color: C.navy, font: HF })
-    putLine(sx, roleTop, sigW, roleLabel(sg.role, lang).toUpperCase(), F.role, { bold: true, color: C.muted, spacing: 0.5 })
-  })
-
-  // =========================================================================
-  // Footer: the closing message on the left, the legal line on the right, on the
-  // closing message's last line.
-  line(X, footY, X + W, footY, { color: C.line, lw: 0.6 })
-  const footBase = footY + 3.5 + ASC * F.closing + (footLines - 1) * F.closing * 1.2
-  if (closing) put(X, footY + 3.5 + ASC * (F.closing - closingNode.fontSize), closingW, closingNode)
-  if (legal) putLine(X + W - legalW - 1, footBase - ASC * F.foot, legalW + 1, legal, F.foot, { color: C.muted })
+  drawFoot()
 
   return { fills, strokes, nodes, checks }
 }
