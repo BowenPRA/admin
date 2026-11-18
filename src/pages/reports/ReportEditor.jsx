@@ -7,7 +7,7 @@ import { partialFrom } from '../../lib/studentRecords'
 import { useAuth } from '../../lib/AuthContext'
 import { db, genId } from '../../lib/db'
 import { loadReportBundle } from '../../lib/report/loaders'
-import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor, fixedDescription, classScores, avg, isPublished } from '../../lib/report/utils'
+import { subjectByKey, completion, charCount, levelInfo, hasNum, sectionsByTier, missingAreas, buildSection, pctFromRaw, isNA, teacherNameFor, sectionTeacher, hasReviewScores, scheduledHomeroom, reportHomeroom, isHomeroomSignature, templateOf, skillGroupsFor, textLimits, textMinimums, writingFor, fixedDescription, classScores, avg, isPublished, isProgramReport, stayLine, optionalPart } from '../../lib/report/utils'
 import { TIERS } from '../../lib/report/defaults'
 import { reportTitle } from '../../lib/report/strings'
 import { Card, Field, TextInput, TextArea, NumberInput, Select, Spinner, LevelPicker, SaveState, ReportStatusChip } from '../../components/ui'
@@ -292,13 +292,23 @@ export default function ReportEditor() {
   // Character limits and suggested minimums (a template can raise them, e.g. Early Years Applied English).
   const L = textLimits(settings, report)
   const MIN = textMinimums(settings, report)
-  const cardProps = { reviewScores, settings, levels, bi, teachers, isHead, signName: displayName, yearGroup: report.year_group, isLastPeriod, lastLabel, name, viAll, limits: L, minimums: MIN }
   // Headings and learner skills follow the report's template (Early Years has its own).
   const template = templateOf(settings, report)
+  // A Global Program report: a comment answering the template's questions, or a level only.
+  const programReport = isProgramReport(settings, report)
+  // Parts the template lets a teacher leave empty (Global Program: the homeroom comment and the learner skills).
+  const optionalHomeroom = optionalPart(settings, report, 'homeroom')
+  const optionalSkills = optionalPart(settings, report, 'skills')
+  const cardProps = { reviewScores, settings, levels, bi, teachers, isHead, signName: displayName, yearGroup: report.year_group, isLastPeriod, lastLabel, name, viAll, limits: L, minimums: MIN, report, prompts: programReport ? template?.prompts || [] : [] }
   // Reports without review scores (Early Years, Years 1 to 3) leave that part out of the hint,
   // and a vocational area with its own comment (Early Years Physical Development) or a fixed
   // description (Movement) is named.
   const tierHint = (tier) => {
+    if (programReport) {
+      const own = tiers[tier.key].filter((s) => writingFor(settings, s.subject_key, report.year_group, report).comment).length
+      return own === tiers[tier.key].length ? `A level and one comment for each area, answering the ${template?.name || 'program'} questions shown above the comment box.`
+        : own ? 'A level for each area, and a comment where the area shows a comment box.' : 'A level only: these classes have no comment and no course description on this report.'
+    }
     if (tier.key === 'academic' && !reviewScores) return tier.hint.replace(', progress review score', '')
     if (tier.key !== 'vocational') return tier.hint
     const named = (test) => tiers.vocational.map((s) => subjectByKey(settings, s.subject_key, report.year_group)).filter(test).map((sub) => sub.name)
@@ -320,7 +330,7 @@ export default function ReportEditor() {
             {photoSrc(student?.photo) ? <img src={photoSrc(student.photo)} alt="" className="h-9 w-9 rounded-full object-cover" /> : null}
             <div className="mr-auto">
               <div className="font-bold leading-tight">{student?.full_name || report.student_name}</div>
-              <div className="text-xs text-slate-500">{report.year_group} · {report.period_label} {report.school_year} · {comp.pct}% complete{partialFrom(student) && <> · <span className="font-semibold text-amber-700" title="Joins after the morning lessons, so this report has no academic learning">Partial day, from {partialFrom(student)}</span></>}</div>
+              <div className="text-xs text-slate-500">{report.year_group} · {report.period_label} {report.school_year}{programReport && <> · <span className="font-semibold text-teal-700">{template?.name}{stayLine(student) && `, ${stayLine(student)}`}</span></>} · {comp.pct}% complete{partialFrom(student) && <> · <span className="font-semibold text-amber-700" title="Joins after the morning lessons, so this report has no academic learning">Partial day, from {partialFrom(student)}</span></>}</div>
             </div>
             <SaveState state={saveState} />
             {homeroomOk ? (
@@ -379,15 +389,16 @@ export default function ReportEditor() {
               <Field label="Class name" hint="Optional, e.g. Secondary"><TextInput value={report.class_name} onChange={(v) => patchReport({ class_name: v })} disabled={!homeroomOk} /></Field>
               <Field label="Reports" hint={bi ? 'Vietnamese prints as its own page' : undefined}><Select value={report.lang || 'en'} onChange={(v) => patchReport({ lang: v })} disabled={!homeroomOk} options={[{ value: 'en', label: 'English only' }, { value: 'bi', label: 'English and Vietnamese' }]} /></Field>
             </div>
-            <Field label="Homeroom teacher comment" className="mt-3" right={<Count text={report.homeroom_note} max={L.homeroom_note} min={MIN.homeroom_note} />} hint={<Wording text={report.homeroom_note} name={name} />}>
-              <TextArea {...EN} rows={4} value={report.homeroom_note} onChange={(v) => patchReport({ homeroom_note: v })} disabled={!homeroomOk} placeholder={`How has ${name.legal || 'the student'} settled in and approached learning this quarter?`} />
+            <Field label={optionalHomeroom ? 'Homeroom teacher comment (optional)' : 'Homeroom teacher comment'} className="mt-3" right={<Count text={report.homeroom_note} max={L.homeroom_note} min={optionalHomeroom ? 0 : MIN.homeroom_note} />}
+              hint={optionalHomeroom && !(report.homeroom_note || '').trim() ? `Optional on ${template?.name || 'this'} reports: left empty, it is left off the page and the student's name takes the row.` : <Wording text={report.homeroom_note} name={name} />}>
+              <TextArea {...EN} rows={4} value={report.homeroom_note} onChange={(v) => patchReport({ homeroom_note: v })} disabled={!homeroomOk} placeholder={`How has ${name.legal || 'the student'} settled in and approached learning ${programReport ? 'during their stay' : 'this quarter'}?`} />
             </Field>
             <NoLongerPrinted label="The student's words box" text={report.student_voice || report.student_voice_vi} />
             <NoLongerPrinted label="The experiences list" text={(report.experiences || []).some((e) => (e || '').trim()) ? report.experiences : report.experiences_vi} />
             {bi && (
               <div className="mt-3">
                 <ViPanel pairs={[[report.homeroom_note, report.homeroom_note_vi]]} openAll={viAll}>
-                  <Field label="Homeroom teacher comment" right={<Count text={report.homeroom_note_vi} max={L.homeroom_note} min={MIN.homeroom_note} />} hint={<Wording lang="vi" text={report.homeroom_note_vi} name={name} />}>
+                  <Field label="Homeroom teacher comment" right={<Count text={report.homeroom_note_vi} max={L.homeroom_note} min={optionalHomeroom ? 0 : MIN.homeroom_note} />} hint={<Wording lang="vi" text={report.homeroom_note_vi} name={name} />}>
                     <TextArea {...VI} rows={3} value={report.homeroom_note_vi} onChange={(v) => patchReport({ homeroom_note_vi: v })} disabled={!homeroomOk} />
                   </Field>
                 </ViPanel>
@@ -410,7 +421,8 @@ export default function ReportEditor() {
         ))}
 
         {(homeroomOk || showHomeroom) && (<>
-          <Card title="How I learn" locked={!homeroomOk} subtitle="Learner skills, printed as a level beside each skill.">
+          <Card title={optionalSkills ? 'How I learn (optional)' : 'How I learn'} locked={!homeroomOk}
+            subtitle={optionalSkills ? `Learner skills, printed as a level beside each skill. Optional on ${template?.name || 'these'} reports: with no level given, How I Learn is left off the page.` : 'Learner skills, printed as a level beside each skill.'}>
             <div className="space-y-4">
               {skillGroupsFor(settings, report).map((g) => (
                 <div key={g.key}>
@@ -458,16 +470,17 @@ export default function ReportEditor() {
   )
 }
 
-function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, teachers, isHead, editable, onPatch, classList, note, onNote, signName, yearGroup, isLastPeriod, lastLabel, name, viAll, limits, minimums }) {
+function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, teachers, isHead, editable, onPatch, classList, note, onNote, signName, yearGroup, isLastPeriod, lastLabel, name, viAll, limits, minimums, report, prompts = [] }) {
   const sub = subjectByKey(settings, s.subject_key, yearGroup)
   // The teacher comes from the Teachers page; a typed name is only used while nobody is linked.
   const linkedTeacher = teacherNameFor(teachers, s.subject_key, yearGroup)
   const teacher = sectionTeacher(teachers, s, yearGroup)
   const scored = reviewScores && tier === 'academic' && sub.scored !== false
   // What this area needs: an individual comment, a course description, or both (core areas).
-  const writing = writingFor(settings, s.subject_key, yearGroup)
-  // Or neither: a description fixed in Report settings (Movement) prints instead.
-  const fixed = fixedDescription(sub)
+  // A Global Program report has no course descriptions (writingFor with the report).
+  const writing = writingFor(settings, s.subject_key, yearGroup, report)
+  // Or neither: a description fixed in Report settings (Movement) prints instead, except on a Global Program report.
+  const fixed = isProgramReport(settings, report) ? null : fixedDescription(sub)
 
   if (!editable) {
     const lvl = levelInfo(settings, s.level)
@@ -570,9 +583,17 @@ function SubjectCard({ tier, section: s, reviewScores, settings, levels, bi, tea
                 </p>
               </div>
             )}
+            {writing.comment && prompts.length > 0 && (
+              <div className="rounded-lg border border-teal-200 bg-teal-50/70 p-3 text-xs text-teal-900">
+                <div className="mb-1 font-semibold">One comment that answers these questions</div>
+                <ol className="list-decimal space-y-1 pl-4">
+                  {prompts.map((p, i) => <li key={i}><b className="font-semibold">{p.title}:</b> {p.question}</li>)}
+                </ol>
+              </div>
+            )}
             {writing.comment && (<>
               <Field label="Individual comment" right={<Count text={s.comment} max={commentMax} min={commentMin} />} hint={<Wording text={s.comment} name={name} />}>
-                <TextArea {...EN} rows={tier === 'academic' ? 6 : 5} value={s.comment} onChange={(v) => onPatch({ comment: v })} placeholder={`${name?.legal ? `${name.legal}'s s` : 'S'}trengths, progress and evidence from this quarter…`} />
+                <TextArea {...EN} rows={tier === 'academic' ? 6 : 5} value={s.comment} onChange={(v) => onPatch({ comment: v })} placeholder={prompts.length ? `${name?.legal || 'The student'}: understanding, English, communication and participation, progress and next steps…` : `${name?.legal ? `${name.legal}'s s` : 'S'}trengths, progress and evidence from this quarter…`} />
               </Field>
               <NoLongerPrinted label="Next focus" text={s.next_focus || s.next_focus_vi} />
             </>)}

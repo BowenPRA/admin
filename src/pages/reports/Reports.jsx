@@ -6,7 +6,7 @@ import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
 import { LEVELS } from '../../lib/fees'
 import { loadPreviousSections } from '../../lib/report/loaders'
-import { buildReport, buildSections, buildSection, completion, sectionDone, homeroomDone, descriptionTasks, writingFor, missingAreas, studentSections, templateForYearGroup, fmtDate, subjectByKey, currentPeriod, scheduledHomeroom, isPublished, REPORT_STATUSES } from '../../lib/report/utils'
+import { buildReport, buildSections, buildSection, completion, sectionDone, homeroomDone, descriptionTasks, writingFor, missingAreas, studentSections, templateForYearGroup, optionalPart, fmtDate, subjectByKey, currentPeriod, scheduledHomeroom, isPublished, REPORT_STATUSES } from '../../lib/report/utils'
 import { photoSrc } from '../../lib/report/photo'
 import { isEnrolled } from '../../lib/studentRecords'
 import { Card, Field, Select, Checkbox, Modal, Empty, Spinner, ReportStatusChip } from '../../components/ui'
@@ -351,7 +351,7 @@ function ReportsList({ settings }) {
                             <Link to={`/reports/${r.id}`} className="flex items-center gap-2.5 hover:text-pra-blue">
                               {photo ? <img src={photo} alt="" className="h-8 w-8 flex-none rounded-full object-cover" /> : <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">{(student?.nickname || r.student_name || '?')[0]}</span>}
                               <span className="min-w-0">
-                                <span className="block truncate font-semibold text-slate-800">{student?.full_name || r.student_name}</span>
+                                <span className="block truncate font-semibold text-slate-800">{student?.full_name || r.student_name}{settings.templates?.[r.template]?.forProgram && <span className="chip ml-1.5 bg-teal-50 align-middle text-[10px] font-semibold text-teal-700">{settings.templates[r.template].name}</span>}</span>
                                 {meta && <span className={`block truncate text-xs ${moved ? 'text-amber-700' : 'text-slate-400'}`}>{meta}</span>}
                               </span>
                             </Link>
@@ -359,8 +359,8 @@ function ReportsList({ settings }) {
                           {!isHead && (
                             <td className="py-2 pr-3">
                               <div className="flex flex-wrap gap-1">
-                                {mine.map((s) => { const done = sectionDone(settings, s, r); return <span key={s.id} className={pill(done)}>{done && <Check size={12} />}{subjectByKey(settings, s.subject_key).name} <WritingTags settings={settings} subjectKey={s.subject_key} yearGroup={r.year_group} compact size={11} /></span> })}
-                                {canHomeroom(r) && <span className={pill(homeroomDone(settings, r))}>{homeroomDone(settings, r) && <Check size={12} />}Homeroom</span>}
+                                {mine.map((s) => { const done = sectionDone(settings, s, r); return <span key={s.id} className={pill(done)}>{done && <Check size={12} />}{subjectByKey(settings, s.subject_key).name} <WritingTags writing={writingFor(settings, s.subject_key, r.year_group, r)} compact size={11} /></span> })}
+                                {canHomeroom(r) && <span className={pill(homeroomDone(settings, r))}>{homeroomDone(settings, r) && <Check size={12} />}{optionalPart(settings, r, 'homeroom') ? 'Homeroom (optional)' : 'Homeroom'}</span>}
                                 {!mine.length && !canHomeroom(r) && <span className="text-xs text-slate-400">read-only</span>}
                               </div>
                             </td>

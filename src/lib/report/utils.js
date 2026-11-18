@@ -52,12 +52,67 @@ export function levelInfo(settings, value) {
 }
 
 export function templateForYearGroup(settings, yg) {
-  return Object.values(settings?.templates || {}).find((t) => (t.yearGroups || []).includes(yg)) || null
+  return Object.values(settings?.templates || {}).find((t) => !t.forProgram && (t.yearGroups || []).includes(yg)) || null
+}
+
+/**
+ * A program's template (the Global Program, since 18 November 2026) as one year group has it:
+ * the learning areas, learner skills, limits and headings of that year group's template, with
+ * the program's own name, program line, headings and teacher prompts, and no review scores.
+ */
+export function programTemplate(own, base) {
+  return {
+    ...(base || {}), ...own,
+    areas: templateAreas(base), yearGroups: [], scoreYearGroups: [],
+    ...(base?.skillGroups && { skillGroups: base.skillGroups }),
+    ...(base?.limits && { limits: base.limits }), ...(base?.minimums && { minimums: base.minimums }),
+    titles: { ...(base?.titles || {}), ...(own.titles || {}) },
+  }
+}
+
+/** The template a student's report is made from: their Program's (Global Program) when one serves it, else their year group's. */
+export function templateForStudent(settings, student) {
+  const own = Object.values(settings?.templates || {}).find((t) => t.forProgram && t.forProgram === student?.program)
+  return own || templateForYearGroup(settings, student?.level)
 }
 
 /** The template a report was made from (or, failing that, the one for its year group). */
-export const templateOf = (settings, report) =>
-  settings?.templates?.[report?.template] || templateForYearGroup(settings, report?.year_group) || null
+export function templateOf(settings, report) {
+  const own = settings?.templates?.[report?.template]
+  if (own?.forProgram) return programTemplate(own, templateForYearGroup(settings, report?.year_group))
+  return own || templateForYearGroup(settings, report?.year_group) || null
+}
+
+/**
+ * A Global Program student's stay as the report prints it, from their start and expected end
+ * dates (Students → Enrollment): "3 November – 12 December 2026", "3/11 – 12/12/2026", or
+ * "From 3 November 2026" with no end date; '' with no start date.
+ */
+export function stayLine(student, lang = 'en') {
+  const from = String(student?.start_date || '').slice(0, 10)
+  const to = String(student?.end_date || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) return ''
+  const d = (iso) => new Date(`${iso}T00:00:00`)
+  const vi = lang === 'vi'
+  const full = (iso) => (vi ? d(iso).toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric', year: 'numeric' }) : d(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }))
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) return vi ? `Từ ${full(from)}` : `From ${full(from)}`
+  const sameYear = from.slice(0, 4) === to.slice(0, 4)
+  const start = !sameYear ? full(from) : vi ? d(from).toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' }) : d(from).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })
+  return `${start} – ${full(to)}`
+}
+
+/** Whether a report was made from a program's template (the Global Program). */
+export const isProgramReport = (settings, report) => !!settings?.templates?.[report?.template]?.forProgram
+
+/** Whether a part of this report ('homeroom', 'skills') may be left empty: the template's `optional` (Global Program). */
+export const optionalPart = (settings, report, part) => (templateOf(settings, report)?.optional || []).includes(part)
+
+/** Whether any learner skill has a level on this report. */
+export const skillsRated = (report) => Object.values(report?.skills || {}).some((v) => v != null && v !== '')
+
+/** Whether the homeroom comment prints: always, unless it is optional and empty (in English and Vietnamese). */
+export const homeroomPrints = (settings, report) =>
+  !optionalPart(settings, report, 'homeroom') || !!String(report?.homeroom_note || '').trim() || !!String(report?.homeroom_note_vi || '').trim()
 
 /** Whether this report's year group has progress review scores (a template can limit them, e.g. Primary: Years 4 to 6). */
 export function hasReviewScores(settings, report) {
@@ -94,11 +149,13 @@ export const WRITING = {
   vocational: { comment: false, description: true },
   levelOnly: { comment: false, description: false },
 }
-export function writingFor(settings, key, yearGroup) {
+export function writingFor(settings, key, yearGroup, report = null) {
   const sub = subjectByKey(settings, key, yearGroup)
-  if (sub.kind === 'vocational' && sub.comment) return WRITING.specialist
-  if (fixedDescription(sub)) return WRITING.levelOnly
-  return WRITING[sub.kind] || WRITING.vocational
+  let w = WRITING[sub.kind] || WRITING.vocational
+  if (sub.kind === 'vocational' && sub.comment) w = WRITING.specialist
+  else if (fixedDescription(sub)) w = WRITING.levelOnly
+  // A Global Program report has no course descriptions: a comment where the area takes one, else a level.
+  return report && isProgramReport(settings, report) ? (w.comment ? WRITING.specialist : WRITING.levelOnly) : w
 }
 
 /** The area's fixed course description ({ description, description_vi }), printed on every report instead of one written each quarter, or null. */
@@ -128,7 +185,9 @@ export const templateAreas = (t) => t?.areas || [...(t?.academic || []), ...(t?.
  */
 export function areasFor(settings, template, yearGroup, student = null) {
   const partial = !!partialFrom(student)
-  return templateAreas(template).filter((k) => {
+  // A program's template (Global Program) has the areas of the year group's own template.
+  const t = template?.forProgram ? programTemplate(template, templateForYearGroup(settings, yearGroup)) : template
+  return templateAreas(t).filter((k) => {
     const s = subjectByKey(settings, k)
     const only = s.yearGroups || []
     return (!only.length || only.includes(yearGroup)) && !(partial && s.kind === 'academic')
@@ -259,12 +318,13 @@ const written = (text, min) => charCount(text) >= Math.max(1, min || 0)
 export function sectionDone(settings, s, report = null) {
   if (!s.level) return false
   const tier = tierOf(settings, s, report?.year_group)
-  if (!writingFor(settings, s.subject_key, report?.year_group).comment) return true
+  if (!writingFor(settings, s.subject_key, report?.year_group, report).comment) return true
   return written(s.comment, textMinimums(settings, report)[tier === 'academic' ? 'academic_comment' : 'specialist_comment'])
 }
 
-/** The homeroom teacher comment is done once it reaches its minimum. */
-export const homeroomDone = (settings, report) => written(report?.homeroom_note, textMinimums(settings, report).homeroom_note)
+/** The homeroom teacher comment is done once it reaches its minimum; an optional one (Global Program) always counts as done. */
+export const homeroomDone = (settings, report) =>
+  optionalPart(settings, report, 'homeroom') || written(report?.homeroom_note, textMinimums(settings, report).homeroom_note)
 
 /** A course description (shared note) for `key` in `yearGroup` is done once it reaches its minimum (core areas have none). */
 export function descriptionDone(settings, note, yearGroup) {
@@ -273,10 +333,11 @@ export function descriptionDone(settings, note, yearGroup) {
   return written(note?.description, min)
 }
 
-/** How much of a report is filled in: every section plus the homeroom teacher comment. */
+/** How much of a report is filled in: every section plus the homeroom teacher comment (unless it is optional). */
 export function completion(report, sections, settings) {
-  const total = sections.length + 1
-  const done = sections.filter((s) => sectionDone(settings, s, report)).length + (homeroomDone(settings, report) ? 1 : 0)
+  const homeroom = optionalPart(settings, report, 'homeroom') ? 0 : 1
+  const total = Math.max(1, sections.length + homeroom)
+  const done = sections.filter((s) => sectionDone(settings, s, report)).length + (homeroom && homeroomDone(settings, report) ? 1 : 0)
   return { done, total, pct: Math.round((done / total) * 100) }
 }
 
@@ -293,8 +354,10 @@ export const HOMEROOM_PART = '_homeroom'
  */
 export function descriptionTasks(settings, reports, sections, { subjects = [], notes = [] } = {}) {
   const out = []
-  for (const yearGroup of [...new Set(reports.map((r) => r.year_group))]) {
-    const rs = reports.filter((r) => r.year_group === yearGroup)
+  // Global Program reports print no course descriptions, so they set no description task.
+  const regular = reports.filter((r) => !isProgramReport(settings, r))
+  for (const yearGroup of [...new Set(regular.map((r) => r.year_group))]) {
+    const rs = regular.filter((r) => r.year_group === yearGroup)
     const ids = new Set(rs.map((r) => r.id))
     const keys = [...new Set(sections.filter((s) => ids.has(s.report_id)).map((s) => s.subject_key))]
     for (const key of keys) {
@@ -344,7 +407,8 @@ export function reportWork(settings, reports, sections, { subjects = [], homeroo
     for (const s of byReport.get(r.id) || []) {
       if (subjects.includes(`${s.subject_key}:${r.year_group}`)) tally(r.year_group, s.subject_key, published || sectionDone(settings, s, r))
     }
-    if (homeroom_groups.includes(r.year_group)) tally(r.year_group, HOMEROOM_PART, published || homeroomDone(settings, r))
+    // An optional homeroom comment (Global Program) is not on anyone's list.
+    if (homeroom_groups.includes(r.year_group) && !optionalPart(settings, r, 'homeroom')) tally(r.year_group, HOMEROOM_PART, published || homeroomDone(settings, r))
   }
   for (const d of descriptionTasks(settings, reports, sections, { subjects, notes })) {
     const [g, a] = areaOf(d.yearGroup, d.key)

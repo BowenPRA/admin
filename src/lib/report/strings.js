@@ -20,8 +20,9 @@ const STRINGS = {
     howILearn: 'How I Learn',
     levelsKey: 'Progress levels',
     // Headings a template may reword ({nickname}, {yearGroup} are filled in).
+    // academicNote: none on the standard page; the Global Program template has one (18 November 2026).
     titles: {
-      academic: 'Academic Learning', specialist: 'Specialist Learning', vocational: 'Vocational Learning',
+      academic: 'Academic Learning', specialist: 'Specialist Learning', vocational: 'Vocational Learning', academicNote: '',
       specialistNote: "Individual comments on {nickname}'s progress",
       vocationalNote: 'Course descriptions: topics the {yearGroup} group covered this quarter',
     },
@@ -45,7 +46,7 @@ const STRINGS = {
     // Since 23 October 2026 the specialist and vocational bands follow the website's
     // "các lớp kỹ năng và thực hành"; "Hướng nghiệp" means careers guidance.
     titles: {
-      academic: 'Học thuật', specialist: 'Các lớp kỹ năng', vocational: 'Các lớp thực hành',
+      academic: 'Học thuật', specialist: 'Các lớp kỹ năng', vocational: 'Các lớp thực hành', academicNote: '',
       specialistNote: 'Nhận xét riêng về sự tiến bộ của {nickname}',
       vocationalNote: 'Mô tả khóa học: nội dung lớp {yearGroup} đã học trong quý này',
     },

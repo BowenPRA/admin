@@ -79,7 +79,7 @@
 // about the same middle line, from the light blue of the logo's wave; the page below it
 // did not move.
 
-import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor, fixedDescription, nameParts, printedTeacher } from './utils'
+import { levelInfo, subjectByKey, firstName, sectionsByTier, reviewRows, sectionTeacher, reportHomeroom, reportSignatures, templateOf, skillGroupsFor, writingFor, fixedDescription, nameParts, printedTeacher, isProgramReport, stayLine, optionalPart, skillsRated, homeroomPrints } from './utils'
 import { reportStrings, reportTitle, periodLabel, yearGroupLabel, roleLabel, pickText } from './strings'
 import { partialFrom } from '../studentRecords'
 import { foldName, nicknameInName } from '../names'
@@ -383,6 +383,11 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const tiers = sectionsByTier(settings, sections, report.year_group)
   const nick = firstName(student)
   const template = templateOf(settings, report) || {}
+  // A Global Program report (since 18 November 2026): no course descriptions, a level only on
+  // the areas without a comment, and the stay's dates in place of the quarter.
+  const programReport = isProgramReport(settings, report)
+  // An optional homeroom comment left empty is left off, and the name takes the whole row.
+  const showHomeroom = homeroomPrints(settings, report)
   const yearGroup = yearGroupLabel(report.year_group, lang)
   // Section headings: the template's own wording (Early Years) or the standard one.
   const title = (key) => reportTitle(template, key, lang, { nickname: nick, yearGroup })
@@ -600,8 +605,9 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   // A year range takes an en dash in print: 2026–2027.
   const schoolYear = String(report.school_year || '').replace(/^(\d{4})-(\d{4})$/, '$1–$2')
   const program = (vi && template.program_vi) || template.program || template.name || ''
+  const stay = programReport ? stayLine(student, lang) : ''
   const subline = [
-    { text: `${periodLabel(report.period_label, lang)}  ·  ${schoolYear}`, bold: true, color: THEME.academic.deep },
+    { text: stay || `${periodLabel(report.period_label, lang)}  ·  ${schoolYear}`, bold: true, color: THEME.academic.deep },
     ...[program, reportDate].filter(Boolean).map((x) => ({ text: `   ·   ${x}`, color: C.muted })),
   ]
   putLine(X + W - RW, ruleY - 11, RW, subline, F.period, { align: 'right' })
@@ -657,7 +663,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const hrX = X + 152
   const hrW = X + W - hrX
   const infoX = X + photoD + 8
-  const infoW = hrX - 8 - infoX
+  const infoW = (showHomeroom ? hrX : X + W) - 8 - infoX
   const HR_TOP = 15
   const HR_PAD = 4.5
   // The full name, the largest words on the page after the title: on one line where it
@@ -736,7 +742,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     const area = areaOf(s.subject_key).name
     const note = noteFor(s.subject_key)
     // The course description on top (left out of a draft while it is still empty), then the comment.
-    const topics = (note?.description || '').trim()
+    const topics = !programReport && (note?.description || '').trim()
       ? { ...TOPICS, name: `${area} course description`, labelColor: THEME.vocational.deep, x: bx, w: bw, ...picked(note.description, note.description_vi) }
       : null
     if (topics) topics.h = lines(topics)
@@ -767,14 +773,17 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const cardTiers = ['specialist', 'vocational'].filter((k) => tiers[k].length)
   // A card holds an individual comment (specialist areas, and a vocational area
   // ticked for one, as Early Years Physical Development) or the course description.
-  const commentCard = (s) => writingFor(settings, s.subject_key, report.year_group).comment
+  const commentCard = (s) => writingFor(settings, s.subject_key, report.year_group, report).comment
+  // On a Global Program report a card without a comment holds only its name, teacher and level.
+  const levelOnlyCard = (s) => programReport && !commentCard(s)
   // Each tier's cards share the panel's width (two areas make two wide cards, one
   // area one full-width card). Where a tier mixes the two kinds, a comment card
   // is half as wide again as a description card, so the longer comment and the
   // shorter description come out closer in height.
   const GUT = 12
   const cardWs = Object.fromEntries(cardTiers.map((k) => {
-    const shares = tiers[k].map((s) => (commentCard(s) ? 1.5 : 1))
+    // A level-only card (Global Program) needs less width still, so the comment beside it has more.
+    const shares = tiers[k].map((s) => (commentCard(s) ? 1.5 : levelOnlyCard(s) ? 0.8 : 1))
     const free = W - 2 * PAD - GUT * (shares.length - 1)
     return [k, shares.map((v) => (free * v) / sum(shares))]
   }))
@@ -826,7 +835,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
     const teacherOnLead = !teacher || leadW + 8 + teacherW <= cw - TX
     // A comment is set at the shared body size; a course description in the smaller topics style.
     return {
-      ...(desc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, head, kick, teacher, titleW, teacherBeside, titleBeside, teacherBesidePill, teacherOnLead, pillH: pillBox.h,
+      ...(desc ? { ...TOPICS, usual: F.topics } : BODY), s, sub, head, kick, teacher, titleW, teacherBeside, titleBeside, teacherBesidePill, teacherOnLead, pillH: pillBox.h, levelOnly: levelOnlyCard(s),
       pillFull: pillBox.full, stackPillW, pillBesideTeacher,
       name: `${sub.name} ${desc ? 'course description' : 'comment'}`, w: cw,
       label: desc ? t.topicsCovered : t.comment, labelColor: THEME[tier].deep,
@@ -844,11 +853,12 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const cardTop = Object.fromEntries(cardTiers.map((k) => [k, kickH[k] +
     (tierLayout[k] in pillTop ? pillTop[tierLayout[k]] + Math.max(...cards[k].map((c) => c.pillH)) + 1.5 : tierLayout[k] === 'two' ? HEAD_TWO : HEAD_ONE)]))
   // A card's text height at comment size `s` (vocational cards keep their own size).
-  const cardText = (c, s) => M.height(boxNode(c, c.body ? s : c.base), c.w)
+  const cardText = (c, s) => (c.levelOnly ? 0 : M.height(boxNode(c, c.body ? s : c.base), c.w))
 
   const reviews = reviewRows(settings, { report, sections, history, cohort })
   const periods = (settings.periods || []).map((p) => ({ ...p, short: p.label.replace(/Quarter\s*/i, 'Q').replace(/Semester\s*/i, 'S').replace(/Term\s*/i, 'T') }))
-  const groups = skillGroupsFor(settings, report)
+  // Optional learner skills (Global Program) with no level given are left off the page.
+  const groups = optionalPart(settings, report, 'skills') && !skillsRated(report) ? [] : skillGroupsFor(settings, report)
   const maxItems = Math.max(0, ...groups.map((g) => g.items.length))
   const SCORE_HEAD = 13.5
   const SCORE_KEY = 10.5
@@ -868,7 +878,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const iconRow = (r, d) => r.label.textH + S.padT + S.padB + 6 + d
   const comfyRow = (r) => Math.max(ROW_COMFY, iconRow(r, 24))
   const needsAt = (s) => flexKeys.map((k) => {
-    if (k === 'homeroom') return Math.max(studentNeed, HR_TOP + M.height(boxNode(homeroom, s), homeroom.w) + signRoom(s) + HR_PAD)
+    if (k === 'homeroom') return showHomeroom ? Math.max(studentNeed, HR_TOP + M.height(boxNode(homeroom, s), homeroom.w) + signRoom(s) + HR_PAD) : studentNeed
     if (k === 'academic') return BAR + sum(rows.map((r) => rowNeed(r, s)))
     if (k === 'mid') return midMin
     return BAR + cardTop[k] + Math.max(...cards[k].map((c) => cardText(c, s))) + S.cardPad
@@ -904,7 +914,8 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   const shareNeeds = needs.map((v, i) => (flexKeys[i] === 'academic'
     ? Math.min(v + spare, BAR + sum(rows.map((r) => Math.max(rowNeed(r, body), comfyRow(r)))))
     : v))
-  const caps = flexKeys.map((k, i) => (k in GROW ? shareNeeds[i] + GROW[k] : Infinity))
+  // A student row with no homeroom comment beside it does not grow: it holds only the photo and name.
+  const caps = flexKeys.map((k, i) => (k in GROW ? shareNeeds[i] + (k === 'homeroom' && !showHomeroom ? 0 : GROW[k]) : Infinity))
   // A partial-day page (no academic rows) has far more room than it needs: each part grows
   // a little (the cards by at most 24pt) and the rest is left as white space above the
   // signatures, so no coloured panel stands half empty.
@@ -933,14 +944,16 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   infoLines.forEach((l) => { put(infoX, infoY, infoW, oneLine(l.text, F.info, infoW, l.style).node); infoY += infoPitch })
 
   // The homeroom comment as a quotation: a pale blue panel with a brand-blue rule on its left.
-  rect(hrX, y, hrW, hrH, { fill: C.homeroomFill })
-  rect(hrX, y, 2.6, hrH, { fill: THEME.academic.accent })
-  kicker(hrX + 10, y + 6, hrW - 15, t.homeroomComment, C.homeroomInk)
-  placeBoxes([{ ...homeroom, base: body, y: y + HR_TOP, h: hrH - HR_TOP - signRoom(body) - HR_PAD }])
+  if (showHomeroom) {
+    rect(hrX, y, hrW, hrH, { fill: C.homeroomFill })
+    rect(hrX, y, 2.6, hrH, { fill: THEME.academic.accent })
+    kicker(hrX + 10, y + 6, hrW - 15, t.homeroomComment, C.homeroomInk)
+    placeBoxes([{ ...homeroom, base: body, y: y + HR_TOP, h: hrH - HR_TOP - signRoom(body) - HR_PAD }])
+  }
   // The signature, bottom right (since 22 October 2026; the name was a "Homeroom:" line
   // beside the photo before): below the comment where the box has room for it, else at the
   // end of the comment's last line, on its baseline.
-  if (signature) {
+  if (showHomeroom && signature) {
     const textH = M.height(boxNode(homeroom, body), homeroom.w)
     const below = hrH - HR_TOP - HR_PAD - textH >= HR_SIGN
     const lastTop = y + HR_TOP + textH - body * BODY.style.pitch
@@ -954,7 +967,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
   if (rows.length) {
     const h = heights.academic
     const theme = THEME.academic
-    section(X, y, W, h, theme, title('academic'))
+    section(X, y, W, h, theme, title('academic'), title('academicNote'))
     // Each row its need, plus as much of the room for an icon as the section has (all of it,
     // or the same part of it in every row); anything over is shared out.
     const plainRows = rows.map((r) => rowNeed(r, body))
@@ -1135,7 +1148,7 @@ function buildPage(item, M, { proof, icons = {}, headFont = HEAD_FONT, signature
       else if (c.teacher) putLine(cx + TX, hy + TEACHER_Y, cw - TX, c.teacher, F.teacher, { color: C.muted })
       return { ...c, base: c.body ? body : c.base, x: cx, y: cy + top, h: y + h - S.cardPad - (cy + top) }
     })
-    placeBoxes(boxes)
+    placeBoxes(boxes.filter((b) => !b.levelOnly))
     y += h + S.gap
   }
 

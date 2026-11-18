@@ -288,6 +288,35 @@ export const TEMPLATES = {
     yearGroups: ['Year 7', 'Year 8', 'Year 9'],
     areas: ['math', 'science', 'english', 'art_of_science', 'history', 'movement', 'executive_function', 'technology', 'wellbeing'],
   },
+  // The Global Program report (Seth, 6 November 2026: "the questions for the Global reports";
+  // shape chosen by Bowen, 18 November 2026). A template with `forProgram` is chosen by the
+  // student's Program on the Students page, not by year group: it covers no year groups of its
+  // own and takes the learning areas, learner skills, limits and headings of the template of the
+  // student's year group (programTemplate in utils.js). On these reports each area that takes a
+  // comment has one comment that answers the four questions in `prompts` (shown to teachers in
+  // the editor), the other areas a level only, and there are no review scores and no course
+  // descriptions. The page prints the stay's dates in place of the quarter.
+  // `optional` lists the parts a teacher may leave empty (Bowen, 18 November 2026): an empty
+  // homeroom comment or learner skills with no level counts as done and is left off the page.
+  global: {
+    key: 'global', name: 'Global Program', program: 'Global Program', program_vi: 'Chương trình Global',
+    forProgram: 'global', yearGroups: [], scoreYearGroups: [], areas: [], optional: ['homeroom', 'skills'],
+    titles: {
+      academicNote: 'Each comment: understanding, English, communication and participation, progress and next steps',
+      academicNote_vi: 'Mỗi nhận xét: mức hiểu bài, tiếng Anh, giao tiếp và tham gia, tiến bộ và bước tiếp theo',
+      specialistNote: 'Each comment: understanding, English, communication and participation, progress and next steps',
+      specialistNote_vi: 'Mỗi nhận xét: mức hiểu bài, tiếng Anh, giao tiếp và tham gia, tiến bộ và bước tiếp theo',
+      vocationalNote: "{nickname}'s level in each of these classes",
+      vocationalNote_vi: 'Mức độ của {nickname} ở từng lớp',
+    },
+    // Seth's four questions, in his words.
+    prompts: [
+      { title: 'Subject Understanding', question: 'How well has the student understood and engaged with the concepts, topics, and skills covered in your subject?' },
+      { title: 'English Language Development', question: 'How has the student used and developed English in your subject? Consider vocabulary, grammar, sentence structure, reading comprehension, and their ability to understand and communicate subject-specific ideas.' },
+      { title: 'Communication and Participation', question: 'How confidently and independently does the student communicate, follow instructions, ask and answer questions, and participate in classroom activities using English?' },
+      { title: 'Progress and Next Steps', question: "What progress have you observed during the student's time in the program? What are their particular strengths, and what areas would benefit from further development?" },
+    ],
+  },
 }
 
 export const PERIODS = [
@@ -297,7 +326,7 @@ export const PERIODS = [
   { index: 4, label: 'Quarter 4', start: '2027-03-29', end: '2027-06-04' },
 ]
 
-const SETTINGS_VERSION = 17
+const SETTINGS_VERSION = 18
 
 // The default names before version 14, which that upgrade replaces with today's.
 const NAMES_BEFORE_14 = {
@@ -370,7 +399,8 @@ export const DEFAULT_REPORT_SETTINGS = {
  * and descriptions, the program lines, the closing message, learner skills, and
  * the "Tiếng Anh nâng cao" lead on area names) takes today's. Before version 17 a
  * "Head Teacher" signature line becomes "Head of Academy", Seth's title on the website.
- * Saving in Report settings then stores the upgraded version.
+ * Before version 18 the Global Program template is added, unless a template already
+ * serves the Global Program. Saving in Report settings then stores the upgraded version.
  */
 export function normalizeReportSettings(stored) {
   const v = stored || {}
@@ -554,6 +584,9 @@ export function normalizeReportSettings(stored) {
     for (const sub of subjects) if (String(sub.name_vi || '').startsWith(NAME_LEADS[2])) sub.name_vi = NAME_LEADS[1] + sub.name_vi.slice(NAME_LEADS[2].length)
   }
   if ((Number(v.version) || 1) < 17) s.signatures = (s.signatures || []).map((sg) => (sg.role === 'Head Teacher' ? { ...sg, role: 'Head of Academy' } : sg))
+  if ((Number(v.version) || 1) < 18 && v.templates && !Object.values(templates).some((t) => t.forProgram === 'global')) {
+    templates = { ...templates, global: JSON.parse(JSON.stringify(TEMPLATES.global)) }
+  }
   for (const sub of subjects) if (!tierKeys.includes(sub.kind)) sub.kind = 'vocational'
   for (const [k, t] of Object.entries(templates)) {
     if (!t.areas) templates[k] = { ...t, areas: [...(t.academic || []), ...(t.specialist || []), ...(t.vocational || [])] }

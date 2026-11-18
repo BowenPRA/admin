@@ -75,7 +75,7 @@ There is no center-wide rule for this. As an example, these are the bands Bowen 
 
 ## The templates
 
-A template is the set of learning areas one stage's reports contain. The template follows the student's year group.
+A template is the set of learning areas one stage's reports contain. The template follows the student's year group, except for Global Program students, who get the Global Program template (see [Global Program reports](#/handbook/reports?s=global-program-reports)).
 
 | Template | Year groups | Academic | Specialist | Vocational | Review scores |
 |---|---|---|---|---|---|
@@ -125,6 +125,29 @@ On the Teachers page, the Reports page and the editor, a violet speech-bubble ic
 ### Partial-day students
 
 A student who arrives after the morning lessons has an arrival time on their record (Students → the student → Enrollment → partial-day arrival time). The morning is when the academic lessons happen, so a partial-day student's report has no academic areas. The editor's header says "Partial day, from" and the time. This is intended. On the printed page the time shows under the year group ("Afternoons from 11:35"), and since the page has less to say, each section grows only a little and the rest is left as white space above the level key and signatures.
+
+### Global Program reports
+
+The Global Program is the short-term program (3 weeks to 3 months). Its students get their own report, built on 18 November 2026 from Seth's questions for the Global reports (Google Chat, 6 November 2026). Bowen chose the shape the same day: one comment per subject, a level only for the vocational classes, and the homeroom comment, levels and learner skills kept.
+
+- **Who gets it.** A student whose **Program** on the Students page is Global Program, whatever their year group. The other templates leave these students out, and Create reports names them.
+- **What is on it.** The learning areas of the student's year group (a Year 4 Global student has Year 4's areas). Each area that takes a comment on the regular report has one comment, up to the usual limit (750 academic, 550 specialist, 600 for Early Years Applied English, Cooking and Physical Development). The other areas (Technology, Wellbeing, Everyday Life, Movement, Expressive Arts & Design) print a level only, in a compact band. There are no review scores and no course descriptions. The level key prints as on the regular report.
+- **Optional parts** (Bowen, 18 November 2026). The homeroom comment and the learner skills (How I Learn: Manages Emotions and the rest) may be left empty. An empty homeroom comment is left off the page and the student's name takes the whole row; it counts as done, so it is on no one's task list and the report can reach 100% without it. Learner skills with no level given are left off the page, and the subjects take the room. Give one skill a level and the whole How I Learn section prints, the others as empty bubbles; click a level again to clear it. In the editor both are marked "(optional)".
+- **What each comment answers.** Seth's four questions, shown to the teacher above every comment box in the editor:
+  1. Subject Understanding: How well has the student understood and engaged with the concepts, topics, and skills covered in your subject?
+  2. English Language Development: How has the student used and developed English in your subject? Consider vocabulary, grammar, sentence structure, reading comprehension, and their ability to understand and communicate subject-specific ideas.
+  3. Communication and Participation: How confidently and independently does the student communicate, follow instructions, ask and answer questions, and participate in classroom activities using English?
+  4. Progress and Next Steps: What progress have you observed during the student's time in the program? What are their particular strengths, and what areas would benefit from further development?
+
+  The page says so in one line on the Academic and Specialist bands: "Each comment: understanding, English, communication and participation, progress and next steps".
+- **The header** prints the stay's dates ("2 November – 11 December 2026") in place of the quarter, from the student's start date and expected end date (Students → the student → Enrollment), then "Global Program" and the report date. Without an end date it reads "From 2 November 2026".
+- **Making one.** Reports → Create reports, choose the quarter and the **Global Program** template: it lists the Global students whose expected end date falls in that quarter (or before the next quarter starts, so a stay ending in the holidays counts), and makes one report each, however short the stay. A student with no end date yet is listed every quarter from their start. To make one at any other time, for example in a child's last week, choose them under **One student only**: a Global student always gets this template there.
+- **Report settings** shows the Global Program template in its own card: its name and program line, the four questions (they can be reworded or added to; they are not printed), and its headings. Its areas, learner skills and limits come from the year-group templates.
+- **Family emails.** For a family whose reports are all Global Program reports, Reports → Family emails says "Attached is Mai's progress report for the Global Program (2 November – 11 December 2026)" and, in Vietnamese, "... trong thời gian theo học Chương trình Global, 2/11 – 11/12/2026", instead of naming the quarter. A family with a Global child and a regular child gets the usual quarter wording. The Vietnamese wording has not been read by Vietnamese staff (18 November 2026).
+- **Measured** on 18 November 2026 with every comment box at its limit and at 85%, in English and Vietnamese, for Nursery, Kindergarten and Years 1, 2, 4, 5 and 7, and a partial-day Year 4; then again with the homeroom comment, the learner skills, or both left empty: every page at the full 8.25pt, nothing cut. Regular reports did not change.
+- Behind it: the template `global` in `src/lib/report/defaults.js` (Report settings version 18 adds it to saved settings; its `optional` list names the parts that may be left empty). A Global report is an ordinary row in `adm_reports` with `template` = `global`, so it needed no SQL.
+
+> **Ask Claude:** "Make the Global Program reports for the students leaving this quarter and tell the teachers which comments to write."
 
 ### Upper Secondary
 
@@ -338,7 +361,7 @@ Bowen asked on 23 October 2026, the day the English reports went out, for every 
 ### The settings version
 
 - The defaults for these settings are in the code. The saved settings carry a version number: 17 since 23 October 2026 (version 17 renamed a "Head Teacher" signature line to "Head of Academy"). Version 16 replaced Vietnamese wording still at its earlier default (two level names and descriptions, the program lines, the closing message, six learner skills, the "Tiếng Anh nâng cao" lead); wording changed by hand is left alone.
-- When Claude adds a learning area or a template in the code, it raises the version. The first time the new app reads the saved settings, it upgrades them: versions 14 and 15 gave the "Intensive English in ..." names to every area still under an earlier default name (a name changed by hand is left alone) and dropped an Early Years "Mathematics", versions 10 to 13 (22 October 2026) made Movement a fixed description, renamed History and the vocational classes, shortened Movement's description and gave Year 7 Movement its comments back, version 9 gave Physical Development an individual comment and added Cooking to Early Years, version 8 added Master Minds, version 7 renamed a standard four- or five-level scale to the current names (a scale changed by hand is left alone), version 5 added the Early Years template.
+- When Claude adds a learning area or a template in the code, it raises the version. The first time the new app reads the saved settings, it upgrades them: version 18 added the Global Program template, versions 14 and 15 gave the "Intensive English in ..." names to every area still under an earlier default name (a name changed by hand is left alone) and dropped an Early Years "Mathematics", versions 10 to 13 (22 October 2026) made Movement a fixed description, renamed History and the vocational classes, shortened Movement's description and gave Year 7 Movement its comments back, version 9 gave Physical Development an individual comment and added Cooking to Early Years, version 8 added Master Minds, version 7 renamed a standard four- or five-level scale to the current names (a scale changed by hand is left alone), version 5 added the Early Years template.
 - Pressing **Save** in Report settings stores the upgraded version.
 - The upgrade adds the area to the template. Reports made before it do not have it until the head presses **Add … to N reports** on the year group's card.
 

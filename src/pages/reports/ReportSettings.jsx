@@ -6,12 +6,13 @@ import { useAuth } from '../../lib/AuthContext'
 import { db } from '../../lib/db'
 import { DEFAULT_REPORT_SETTINGS, TIERS } from '../../lib/report/defaults'
 import { TITLE_FIELDS, reportStrings } from '../../lib/report/strings'
-import { LEVELS as YEAR_GROUPS } from '../../lib/fees'
+import { LEVELS as YEAR_GROUPS, PROGRAMS } from '../../lib/fees'
 import { ICONS } from '../../components/report/icons'
 import { Card, Field, TextInput, TextArea, Select, Checkbox, Empty, Spinner } from '../../components/ui'
 
 const clone = (x) => JSON.parse(JSON.stringify(x))
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+const PROGRAM_NAMES = Object.fromEntries(PROGRAMS.map((p) => [p.id, p.en]))
 
 export default function ReportSettings() {
   const { reportSettings, loading } = useData()
@@ -154,11 +155,48 @@ function SettingsForm({ initial }) {
         </div>
       </Card>
 
-      <Card title="Report templates" subtitle="Which learning areas a report contains, by stage. A student's year group decides which template they get.">
+      <Card title="Report templates" subtitle="Which learning areas a report contains, by stage. A student's year group decides which template they get; a Global Program student gets the Global Program template.">
         <div className="space-y-4">
           {Object.keys(s.templates || {}).map((k) => {
             const t = s.templates[k]
             const toggleArea = (key) => (on) => set(`templates.${k}.areas`, on ? s.subjects.map((x) => x.key).filter((x) => x === key || (t.areas || []).includes(x)) : (t.areas || []).filter((x) => x !== key))
+            // A program's template (Global Program) is chosen by the student's Program and takes its
+            // areas, learner skills and limits from the year group's template: only its wording is set here.
+            if (t.forProgram) return (
+              <div key={k} className="rounded-xl border border-teal-200 bg-teal-50/30 p-3">
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <Field label="Template name"><TextInput value={t.name} onChange={(v) => set(`templates.${k}.name`, v)} /></Field>
+                  <Field label="Program line (header badge)"><TextInput value={t.program || ''} onChange={(v) => set(`templates.${k}.program`, v)} /></Field>
+                  <Field label="Program line (Vietnamese)"><TextInput value={t.program_vi || ''} onChange={(v) => set(`templates.${k}.program_vi`, v)} /></Field>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  For students whose Program on the Students page is {PROGRAM_NAMES[t.forProgram] || t.forProgram}, whatever their year group. Each report has the learning areas, learner skills and character limits of the student's year-group template: one comment on each area that takes a comment, a level on the others, no review scores and no course descriptions. {(t.optional || []).length > 0 && `The ${(t.optional || []).map((p) => ({ homeroom: 'homeroom comment', skills: 'learner skills' })[p] || p).join(' and the ')} ${(t.optional || []).length > 1 ? 'are' : 'is'} optional: left empty, ${(t.optional || []).length > 1 ? 'they are' : 'it is'} left off the page. `}The page prints the stay's dates (the student's start and expected end dates) in place of the quarter.
+                </p>
+                <div className="mt-3">
+                  <div className="label">Questions each comment answers <span className="font-normal normal-case text-slate-400">(shown to teachers above the comment box; not printed)</span></div>
+                  <div className="space-y-2">
+                    {(t.prompts || []).map((p, i) => (
+                      <div key={i} className="grid gap-2 sm:grid-cols-[14rem_1fr_auto]">
+                        <TextInput value={p.title} onChange={(v) => set(`templates.${k}.prompts.${i}.title`, v)} />
+                        <TextInput value={p.question} onChange={(v) => set(`templates.${k}.prompts.${i}.question`, v)} />
+                        <button className="btn-ghost" onClick={() => set(`templates.${k}.prompts`, t.prompts.filter((_, j) => j !== i))}><Trash2 size={16} /></button>
+                      </div>
+                    ))}
+                    <button className="btn-secondary text-xs" onClick={() => set(`templates.${k}.prompts`, [...(t.prompts || []), { title: '', question: '' }])}><Plus size={14} /> Add a question</button>
+                  </div>
+                </div>
+                <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-600">Headings on these reports <span className="font-normal text-slate-400">(blank uses the year group's wording)</span></summary>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {[{ key: 'academicNote', label: 'Academic subtitle' }, ...TITLE_FIELDS].map((f) => (<div key={f.key} className="contents">
+                      <Field label={f.label}><TextInput value={t.titles?.[f.key] || ''} placeholder={reportStrings('en').titles[f.key]} onChange={(v) => set(`templates.${k}.titles`, { ...(t.titles || {}), [f.key]: v })} /></Field>
+                      <Field label={`${f.label} (Vietnamese)`}><TextInput value={t.titles?.[`${f.key}_vi`] || ''} placeholder={reportStrings('vi').titles[f.key]} onChange={(v) => set(`templates.${k}.titles`, { ...(t.titles || {}), [`${f.key}_vi`]: v })} /></Field>
+                    </div>))}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">{'{nickname}'} is replaced by the student's first name and {'{yearGroup}'} by the year group.</p>
+                </details>
+              </div>
+            )
             return (
               <div key={k} className="rounded-xl border border-slate-200 p-3">
                 <div className="grid gap-2 sm:grid-cols-4">
